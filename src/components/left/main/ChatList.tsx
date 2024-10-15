@@ -76,7 +76,6 @@ const ChatList: FC<OwnProps> = ({
     openChat,
     openNextChat,
     closeForumPanel,
-    toggleStoryRibbon,
   } = getActions();
   // eslint-disable-next-line no-null/no-null
   const containerRef = useRef<HTMLDivElement>(null);
@@ -198,16 +197,6 @@ const ChatList: FC<OwnProps> = ({
     shouldIgnoreDragRef.current = true;
   });
 
-  const handleShowStoryRibbon = useLastCallback(() => {
-    toggleStoryRibbon({ isShown: true, isArchived });
-  });
-
-  const handleHideStoryRibbon = useLastCallback(() => {
-    toggleStoryRibbon({ isShown: false, isArchived });
-  });
-
-  const renderedOverflowTrigger = useTopOverscroll(containerRef, handleShowStoryRibbon, handleHideStoryRibbon, isSaved);
-
   function renderChats() {
     const viewportOffset = orderedIds!.indexOf(viewportIds![0]);
 
@@ -243,7 +232,6 @@ const ChatList: FC<OwnProps> = ({
       itemSelector=".ListItem:not(.chat-item-archive)"
       preloadBackwards={CHAT_LIST_SLICE}
       withAbsolutePositioning
-      beforeChildren={renderedOverflowTrigger}
       maxHeight={chatsHeight + archiveHeight + unconfirmedSessionHeight}
       onLoadMore={getMore}
       onDragLeave={handleDragLeave}

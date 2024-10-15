@@ -37,7 +37,6 @@ import { useFullscreenStatus } from '../../../hooks/window/useFullscreen';
 import useLeftHeaderButtonRtlForumTransition from './hooks/useLeftHeaderButtonRtlForumTransition';
 
 import PickerSelectedItem from '../../common/pickers/PickerSelectedItem';
-import StoryToggler from '../../story/StoryToggler';
 import Button from '../../ui/Button';
 import DropdownMenu from '../../ui/DropdownMenu';
 import SearchInput from '../../ui/SearchInput';
@@ -292,7 +291,6 @@ const LeftMainHeader: FC<OwnProps & StateProps> = ({
           onSpinnerClick={connectionStatusPosition === 'minimized' ? toggleConnectionStatus : undefined}
         >
           {searchContent}
-          <StoryToggler canShow={!isSearchFocused && !selectedSearchDate && !globalSearchChatId} />
         </SearchInput>
         {isCurrentUserPremium && <StatusButton />}
         {hasPasscode && (
