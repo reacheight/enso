@@ -328,7 +328,6 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
         shouldRenderStoryRibbon && 'with-story-ribbon',
       )}
     >
-      {shouldRenderStoryRibbon && <StoryRibbon isClosing={isStoryRibbonClosing} />}
       {shouldRenderFolders ? (
         <TabList
           contextRootElementSelector="#LeftColumn"
