@@ -27,6 +27,7 @@ import ForumPanel from './ForumPanel';
 import LeftMainHeader from './LeftMainHeader';
 
 import './LeftMain.scss';
+import WorkspaceManager from './WorkspaceManager';
 
 type OwnProps = {
   content: LeftColumnContent;
@@ -182,6 +183,7 @@ const LeftMain: FC<OwnProps> = ({
         shouldSkipTransition={shouldSkipTransition}
         isClosingSearch={isClosingSearch}
       />
+      <WorkspaceManager />
       <Transition
         name={shouldSkipTransition ? 'none' : 'zoomFade'}
         renderCount={TRANSITION_RENDER_COUNT}

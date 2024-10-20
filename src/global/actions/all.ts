@@ -41,3 +41,4 @@ import './apiUpdaters/twoFaSettings';
 import './apiUpdaters/password';
 import './apiUpdaters/calls';
 import './apiUpdaters/payments';
+import './ui/workspaces';

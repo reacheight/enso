@@ -532,3 +532,8 @@ export interface CustomPeer {
 export interface UniqueCustomPeer extends CustomPeer {
   type: CustomPeerType;
 }
+
+export interface Workspace {
+  id: string;
+  name: string;
+}

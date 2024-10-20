@@ -1205,6 +1205,10 @@ export type GlobalState = {
     balance: number;
     history: StarsTransactionHistory;
   };
+
+  workspaces: {
+    isCreatorOpen: boolean;
+  };
 };
 
 export type CallSound = (
@@ -2093,6 +2097,8 @@ export interface ActionPayloads {
   openLimitReachedModal: { limit: ApiLimitTypeWithModal } & WithTabId;
   closeLimitReachedModal: WithTabId | undefined;
   checkAppVersion: undefined;
+  openWorkspaceCreator: undefined;
+  closeWorkspaceCreator: undefined;
   setIsElectronUpdateAvailable: boolean;
   setGlobalSearchClosing: ({
     isClosing?: boolean;

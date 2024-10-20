@@ -302,6 +302,10 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
 
   profilePhotosById: {},
   monetizationInfo: {},
+
+  workspaces: {
+    isCreatorOpen: false,
+  },
 };
 
 export const INITIAL_TAB_STATE: TabState = {

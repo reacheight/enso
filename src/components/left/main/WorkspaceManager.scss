@@ -1,0 +1,53 @@
+.WorkspaceManager {
+  &-dropdown .Menu .bubble {
+    margin-left: 0.5rem;
+    max-height: calc(100 * var(--vh) - 3.75rem);
+    overflow-y: auto;
+  }
+
+  &-trigger {
+    font-weight: 500;
+    margin-inline: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    background-color: var(--color-background-translucent);
+    border-radius: var(--border-radius-default-tiny);
+    transition: background-color 0.15s, color 0.15s;
+
+    &:hover,
+    &.active {
+      background-color: var(--color-interactive-element-hover);
+    }
+  }
+
+  &-item {
+    align-items: normal !important;
+    cursor: pointer;
+
+    &.compact {
+      padding-inline: 0.5rem;
+    }
+  }
+
+  &-newItem {
+    cursor: pointer;
+
+    .icon {
+      color: var(--color-primary);
+      margin-inline: 0.5rem !important;
+    }
+  }
+
+  .MenuItem {
+    .icon {
+      margin-right: 1rem;
+      font-size: 1.5rem;
+      color: var(--color-text-secondary);
+    }
+
+    .icon-check {
+      margin-left: auto;
+      font-size: 1.25rem;
+      color: var(--color-primary);
+    }
+  }
+}
