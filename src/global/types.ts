@@ -1207,6 +1207,7 @@ export type GlobalState = {
   };
 
   workspaces: {
+    currentWorkspaceId?: string;
     isCreatorOpen: boolean;
   };
 };

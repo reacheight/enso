@@ -26,6 +26,7 @@ import useHistoryBack from '../../../hooks/useHistoryBack';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
 import useShowTransition from '../../../hooks/useShowTransition';
+import { useStorage } from '../../../hooks/useStorage';
 
 import StoryRibbon from '../../story/StoryRibbon';
 import TabList from '../../ui/TabList';
@@ -120,17 +121,28 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
     } satisfies ApiChatFolder;
   }, [orderedFolderIds, lang]);
 
+  const { currentWorkspaceId, savedWorkspaces } = useStorage();
+  const everythingWorkspace = { id: '0', name: 'Everything', foldersIds: [] };
+  const currentWorkspace = savedWorkspaces.find((workspace) => workspace.id === currentWorkspaceId) || everythingWorkspace;
+
   const displayedFolders = useMemo(() => {
+    if (!orderedFolderIds) return undefined;
+
     return orderedFolderIds
-      ? orderedFolderIds.map((id) => {
-        if (id === ALL_FOLDER_ID) {
+      .map((id) => {
+        if (id === ALL_FOLDER_ID && currentWorkspaceId === everythingWorkspace.id) {
           return allChatsFolder;
         }
 
-        return chatFoldersById[id] || {};
-      }).filter(Boolean)
-      : undefined;
-  }, [chatFoldersById, allChatsFolder, orderedFolderIds]);
+        const folder = chatFoldersById[id];
+        if (folder && (currentWorkspaceId === everythingWorkspace.id || currentWorkspace.foldersIds.includes(id))) {
+          return folder;
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+  }, [chatFoldersById, allChatsFolder, orderedFolderIds, currentWorkspaceId]);
 
   const allChatsFolderIndex = displayedFolders?.findIndex((folder) => folder.id === ALL_FOLDER_ID);
   const isInAllChatsFolder = allChatsFolderIndex === activeChatFolder;

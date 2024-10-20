@@ -8,7 +8,7 @@ const workspaceSettingsRoot = createRoot(workspaceSettingsElement!);
 interface OwnProps {
   isOpen: boolean;
   onClose: () => void;
-  workspaceId?: number;
+  workspaceId?: string;
 }
 
 const WorkspaceSettingsPageRoot: React.FC<OwnProps> = ({ isOpen, onClose, workspaceId }) => {

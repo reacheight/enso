@@ -536,4 +536,5 @@ export interface UniqueCustomPeer extends CustomPeer {
 export interface Workspace {
   id: string;
   name: string;
+  foldersIds: number[];
 }

@@ -51,8 +51,13 @@
     outline: none;
   }
 
-  &:hover {
+  &:hover:not(:disabled) {
     background-color: var(--color-primary-shade);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 }
 
@@ -73,5 +78,25 @@
 
   &:hover {
     background-color: var(--color-primary-shade);
+  }
+}
+
+.folderSelection {
+  margin-bottom: 1rem;
+}
+
+.folderSelectionTitle {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.folderCheckbox {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+
+  input[type="checkbox"] {
+    margin-right: 0.5rem;
   }
 }

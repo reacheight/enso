@@ -14,7 +14,8 @@ const WorkspaceManager: FC = () => {
   const { openWorkspaceCreator } = getActions();
   const { savedWorkspaces, currentWorkspaceId, setCurrentWorkspaceId } = useStorage();
 
-  const selectedWorkspace = savedWorkspaces.find(workspace => workspace.id === currentWorkspaceId) || null;
+  const everythingWorkspace: Workspace = { id: '0', name: 'Everything', foldersIds: [] };
+  const selectedWorkspace = savedWorkspaces.find(workspace => workspace.id === currentWorkspaceId) || everythingWorkspace;
 
   const handleWorkspaceSelect = useCallback((workspace: Workspace) => {
     setCurrentWorkspaceId(workspace.id);
@@ -30,7 +31,7 @@ const WorkspaceManager: FC = () => {
       onClick={onTrigger}
       className={buildClassName('WorkspaceManager-trigger', isOpen && 'active')}
     >
-      {selectedWorkspace?.name || 'Select Wrkspace'}
+      {selectedWorkspace.name}
     </div>
   ), [selectedWorkspace]);
 
@@ -40,7 +41,7 @@ const WorkspaceManager: FC = () => {
       trigger={renderTrigger}
       positionX="left"
     >
-      {savedWorkspaces.map((workspace) => (
+      {[everythingWorkspace, ...savedWorkspaces].map((workspace) => (
         <MenuItem
           key={workspace.id}
           onClick={() => handleWorkspaceSelect(workspace)}
