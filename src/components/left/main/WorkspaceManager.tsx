@@ -31,6 +31,7 @@ const WorkspaceManager: FC = () => {
       onClick={onTrigger}
       className={buildClassName('WorkspaceManager-trigger', isOpen && 'active')}
     >
+      <i className="icon icon-folder" />
       {selectedWorkspace.name}
     </div>
   ), [selectedWorkspace]);

@@ -6,8 +6,11 @@
   }
 
   &-trigger {
+    display: flex;
+    align-items: center;
     font-weight: 500;
-    margin-inline: 0.5rem;
+    font-size: 1rem;
+    margin-inline: 1rem;
     padding: 0.3rem 0.5rem;
     background-color: var(--color-background-translucent);
     border-radius: var(--border-radius-default-tiny);
@@ -16,6 +19,12 @@
     &:hover,
     &.active {
       background-color: var(--color-interactive-element-hover);
+    }
+
+    .icon {
+      font-size: 1.5rem;
+      color: var(--color-icon-secondary);
+      margin-right: 1rem;
     }
   }
 
