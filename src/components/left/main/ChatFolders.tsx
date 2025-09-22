@@ -7,7 +7,7 @@ import { getActions, getGlobal, withGlobal } from '../../../global';
 import type { ApiChatFolder, ApiChatlistExportedInvite, ApiSession } from '../../../api/types';
 import type { GlobalState } from '../../../global/types';
 import type { FolderEditDispatch } from '../../../hooks/reducers/useFoldersReducer';
-import type { LeftColumnContent, SettingsScreens } from '../../../types';
+import type { LeftColumnContent, SettingsScreens, Workspace } from '../../../types';
 import type { MenuItemContextAction } from '../../ui/ListItem';
 import type { TabWithProperties } from '../../ui/TabList';
 
@@ -122,7 +122,7 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
   }, [orderedFolderIds, lang]);
 
   const { currentWorkspaceId, savedWorkspaces } = useStorage();
-  const everythingWorkspace = { id: '0', name: 'Everything', foldersIds: [] };
+  const everythingWorkspace = { id: '0', name: 'Everything', foldersIds: [] } satisfies Workspace;
   const currentWorkspace = savedWorkspaces.find((workspace) => workspace.id === currentWorkspaceId) || everythingWorkspace;
 
   const displayedFolders = useMemo(() => {
@@ -134,7 +134,7 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
           return allChatsFolder;
         }
 
-        const folder = chatFoldersById[id];
+        const folder = chatFoldersById[id] || allChatsFolder;
         if (folder && (currentWorkspaceId === everythingWorkspace.id || currentWorkspace.foldersIds.includes(id))) {
           return folder;
         }
@@ -315,6 +315,7 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
 
     return (
       <ChatList
+        key={`${currentWorkspaceId}-${activeChatFolder}`}
         folderType={isFolder ? 'folder' : 'all'}
         folderId={isFolder ? activeFolder.id : undefined}
         isActive={isActive}

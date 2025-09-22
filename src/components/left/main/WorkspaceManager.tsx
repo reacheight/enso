@@ -11,7 +11,7 @@ import './WorkspaceManager.scss';
 import buildClassName from '../../../util/buildClassName';
 
 const WorkspaceManager: FC = () => {
-  const { openWorkspaceCreator } = getActions();
+  const { openWorkspaceCreator, setActiveChatFolder } = getActions();
   const { savedWorkspaces, currentWorkspaceId, setCurrentWorkspaceId } = useStorage();
 
   const everythingWorkspace: Workspace = { id: '0', name: 'Everything', foldersIds: [] };
@@ -19,7 +19,8 @@ const WorkspaceManager: FC = () => {
 
   const handleWorkspaceSelect = useCallback((workspace: Workspace) => {
     setCurrentWorkspaceId(workspace.id);
-  }, [setCurrentWorkspaceId]);
+    setActiveChatFolder({ activeChatFolder: 0 }, { forceOnHeavyAnimation: true });
+  }, [setCurrentWorkspaceId, setActiveChatFolder]);
 
   const handleCreateWorkspace = useCallback(() => {
     openWorkspaceCreator();
