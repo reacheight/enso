@@ -19,6 +19,8 @@
 }
 
 .inputGroup {
+  display: flex;
+  gap: 6px;
   margin-bottom: 1rem;
 }
 
@@ -58,6 +60,19 @@
   &:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+}
+
+.deleteButton {
+  background-color: var(--color-error);
+  border: none;
+  border-radius: var(--border-radius-default-tiny);
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+
+  &:hover {
+    background-color: var(--color-error-shade);
   }
 }
 

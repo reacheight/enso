@@ -73,6 +73,12 @@ const WorkspaceSettingsPage: FC<OwnProps> = ({
     );
   }, [setSelectedFolderIds]);
 
+  const handleDeleteWorkspace = useCallback(() => {
+    setSavedWorkspaces(savedWorkspaces.filter(w => w.id !== workspaceId));
+    setCurrentWorkspaceId('0');
+    onBack();
+  }, [workspaceId, setSavedWorkspaces, setCurrentWorkspaceId, onBack]);
+
   return (
     <div className={styles.container}>
       <button onClick={onBack} className={styles.backButton}>Back</button>
@@ -87,6 +93,11 @@ const WorkspaceSettingsPage: FC<OwnProps> = ({
             required
             className={styles.input}
           />
+          {workspaceId && (
+            <button onClick={handleDeleteWorkspace} className={styles.deleteButton} aria-label="Delete workspace" title="Delete workspace">
+              <i className="icon icon-delete" />
+            </button>
+          )}
         </div>
         <div className={styles.folderSelection}>
           <h3 className={styles.folderSelectionTitle}>Select folders:</h3>
