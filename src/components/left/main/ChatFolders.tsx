@@ -142,7 +142,7 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
         return null;
       })
       .filter(Boolean);
-  }, [chatFoldersById, allChatsFolder, orderedFolderIds, currentWorkspaceId]);
+  }, [chatFoldersById, allChatsFolder, orderedFolderIds, currentWorkspaceId, currentWorkspace.foldersIds]);
 
   const allChatsFolderIndex = displayedFolders?.findIndex((folder) => folder.id === ALL_FOLDER_ID);
   const isInAllChatsFolder = allChatsFolderIndex === activeChatFolder;

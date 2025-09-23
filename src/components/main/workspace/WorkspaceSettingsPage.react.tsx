@@ -1,6 +1,6 @@
 import type { FC } from 'react';
-import React, { useState, useCallback, useEffect, memo } from 'react';
-import { getGlobal, withGlobal } from '../../../global';
+import React, { useState, useCallback, useEffect } from 'react';
+import { getGlobal, getActions } from '../../../global';
 import styles from './WorkspaceSettingsPage.module.scss';
 
 import { useStorage } from '../../../hooks/useStorage.react';
@@ -16,6 +16,7 @@ const WorkspaceSettingsPage: FC<OwnProps> = ({
   workspaceId,
 }) => {
   const global = getGlobal();
+  const { setActiveChatFolder } = getActions();
   const chatFoldersById = global.chatFolders.byId;
   const orderedFolderIds = global.chatFolders.orderedIds;
   const folders = orderedFolderIds ? orderedFolderIds.map((id) => chatFoldersById[id]).filter(Boolean) : [];
@@ -43,7 +44,7 @@ const WorkspaceSettingsPage: FC<OwnProps> = ({
       if (workspaceId) {
         setSavedWorkspaces(
           savedWorkspaces.map(w =>
-            w.id === workspaceId ? { ...w, name: trimmedName, folderIds: selectedFolderIds } : w
+            w.id === workspaceId ? { ...w, name: trimmedName, foldersIds: selectedFolderIds } : w
           )
         );
       } else {
@@ -55,6 +56,7 @@ const WorkspaceSettingsPage: FC<OwnProps> = ({
         setSavedWorkspaces([...savedWorkspaces, newWorkspace]);
         setCurrentWorkspaceId(newWorkspace.id);
       }
+      setActiveChatFolder({ activeChatFolder: 0 }, { forceOnHeavyAnimation: true });
       onBack();
     }
   }, [workspaceName, selectedFolderIds, workspaceId, onBack, setSavedWorkspaces, savedWorkspaces, isFormValid]);

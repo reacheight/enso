@@ -305,6 +305,7 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
 
   workspaces: {
     isCreatorOpen: false,
+    editingWorkspaceId: undefined,
   },
 };
 

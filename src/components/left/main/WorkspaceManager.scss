@@ -29,7 +29,14 @@
   }
 
   &-item {
-    align-items: normal !important;
+    &-name {
+      display: flex;
+      align-items: normal !important;
+    }
+
+    display: flex;
+    justify-content: space-between;
+    
     cursor: pointer;
 
     &.compact {

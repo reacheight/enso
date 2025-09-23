@@ -9,9 +9,11 @@ import MenuItem from '../../ui/MenuItem';
 
 import './WorkspaceManager.scss';
 import buildClassName from '../../../util/buildClassName';
+import Button from '../../ui/Button';
+import Icon from '../../common/icons/Icon';
 
 const WorkspaceManager: FC = () => {
-  const { openWorkspaceCreator, setActiveChatFolder } = getActions();
+  const { openWorkspaceCreator, openWorkspaceEditor, setActiveChatFolder } = getActions();
   const { savedWorkspaces, currentWorkspaceId, setCurrentWorkspaceId } = useStorage();
 
   const everythingWorkspace: Workspace = { id: '0', name: 'Everything', foldersIds: [] };
@@ -32,7 +34,7 @@ const WorkspaceManager: FC = () => {
       onClick={onTrigger}
       className={buildClassName('WorkspaceManager-trigger', isOpen && 'active')}
     >
-      <i className="icon icon-folder" />
+      <Icon name="my-notes" />
       {selectedWorkspace.name}
     </div>
   ), [selectedWorkspace]);
@@ -49,8 +51,25 @@ const WorkspaceManager: FC = () => {
           onClick={() => handleWorkspaceSelect(workspace)}
           className="WorkspaceManager-item"
         >
-          {workspace.name}
-          {workspace.id === currentWorkspaceId && <i className="icon icon-check" />}
+          <div className="WorkspaceManager-item-name">
+            {workspace.name}
+            {workspace.id === currentWorkspaceId && <Icon name="check" />}
+          </div>
+          {workspace.id !== everythingWorkspace.id && (
+            <Button
+              size="tiny"
+              isText
+              round
+              color="translucent"
+              nonInteractive
+              allowDisabledClick
+              shouldStopPropagation
+              ariaLabel={`Edit ${workspace.name} workspace`}
+              onClick={(e) => openWorkspaceEditor({ workspaceId: workspace.id }) }
+            >
+              <Icon name="edit" />
+            </Button>
+          )}
         </MenuItem>
       ))}
       <MenuItem

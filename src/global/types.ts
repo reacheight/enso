@@ -1207,8 +1207,8 @@ export type GlobalState = {
   };
 
   workspaces: {
-    currentWorkspaceId?: string;
     isCreatorOpen: boolean;
+    editingWorkspaceId?: string;
   };
 };
 
@@ -2099,6 +2099,7 @@ export interface ActionPayloads {
   closeLimitReachedModal: WithTabId | undefined;
   checkAppVersion: undefined;
   openWorkspaceCreator: undefined;
+  openWorkspaceEditor: { workspaceId: string };
   closeWorkspaceCreator: undefined;
   setIsElectronUpdateAvailable: boolean;
   setGlobalSearchClosing: ({

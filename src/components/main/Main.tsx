@@ -91,7 +91,7 @@ import SafeLinkModal from './SafeLinkModal.async';
 
 import './Main.scss';
 import WorkspaceSettingsPageRoot from './workspace/WorkspaceSettingsPageRoot.react';
-import { selectIsWorkspaceCreatorOpen } from '../../global/selectors/workspaces';
+import { selectIsWorkspaceCreatorOpen, selectEditingWorkspaceId } from '../../global/selectors/workspaces';
 
 export interface OwnProps {
   isMobile?: boolean;
@@ -145,6 +145,7 @@ type StateProps = {
   withInterfaceAnimations?: boolean;
   isSynced?: boolean;
   isWorkspaceCreatorOpen: boolean;
+  editingWorkspaceId?: string;
 };
 
 const APP_OUTDATED_TIMEOUT_MS = 5 * 60 * 1000; // 5 min
@@ -202,6 +203,7 @@ const Main = ({
   isSynced,
   currentUserId,
   isWorkspaceCreatorOpen,
+  editingWorkspaceId,
 }: OwnProps & StateProps) => {
   const {
     initMain,
@@ -584,7 +586,7 @@ const Main = ({
       <DeleteFolderDialog folder={deleteFolderDialog} />
       <ReactionPicker isOpen={isReactionPickerOpen} />
       <DeleteMessageModal isOpen={isDeleteMessageModalOpen} />
-      <WorkspaceSettingsPageRoot isOpen={isWorkspaceCreatorOpen} onClose={closeWorkspaceCreator} />
+      <WorkspaceSettingsPageRoot isOpen={isWorkspaceCreatorOpen} onClose={closeWorkspaceCreator} workspaceId={editingWorkspaceId} />
     </div>
   );
 };
@@ -687,6 +689,7 @@ export default memo(withGlobal<OwnProps>(
       noRightColumnAnimation,
       isSynced: global.isSynced,
       isWorkspaceCreatorOpen: selectIsWorkspaceCreatorOpen(global),
+      editingWorkspaceId: selectEditingWorkspaceId(global),
     };
   },
 )(Main));
