@@ -29,11 +29,6 @@
   }
 
   &-item {
-    &-name {
-      display: flex;
-      align-items: normal !important;
-    }
-
     display: flex;
     justify-content: space-between;
     
@@ -42,14 +37,10 @@
     &.compact {
       padding-inline: 0.5rem;
     }
-  }
-
-  &-newItem {
-    cursor: pointer;
 
     .icon {
       color: var(--color-primary);
-      margin-inline: 0.5rem !important;
+      margin: 0 !important;
     }
   }
 

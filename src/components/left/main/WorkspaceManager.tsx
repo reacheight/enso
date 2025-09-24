@@ -9,8 +9,8 @@ import MenuItem from '../../ui/MenuItem';
 
 import './WorkspaceManager.scss';
 import buildClassName from '../../../util/buildClassName';
-import Button from '../../ui/Button';
 import Icon from '../../common/icons/Icon';
+import MenuSeparator from '../../ui/MenuSeparator';
 
 const WorkspaceManager: FC = () => {
   const { openWorkspaceCreator, openWorkspaceEditor, setActiveChatFolder } = getActions();
@@ -51,34 +51,25 @@ const WorkspaceManager: FC = () => {
           onClick={() => handleWorkspaceSelect(workspace)}
           className="WorkspaceManager-item"
         >
-          <div className="WorkspaceManager-item-name">
-            {workspace.name}
-            {workspace.id === currentWorkspaceId && <Icon name="check" />}
-          </div>
-          {workspace.id !== everythingWorkspace.id && (
-            <Button
-              size="tiny"
-              isText
-              round
-              color="translucent"
-              nonInteractive
-              allowDisabledClick
-              shouldStopPropagation
-              ariaLabel={`Edit ${workspace.name} workspace`}
-              onClick={(e) => openWorkspaceEditor({ workspaceId: workspace.id }) }
-            >
-              <Icon name="edit" />
-            </Button>
-          )}
+          {workspace.name}
+          {workspace.id === currentWorkspaceId && <Icon name="check" />}
         </MenuItem>
       ))}
+      <MenuSeparator />
       <MenuItem
         icon="add"
         onClick={handleCreateWorkspace}
-        className="WorkspaceManager-newItem"
       >
         New Workspace
       </MenuItem>
+      {selectedWorkspace.id !== everythingWorkspace.id && (
+        <MenuItem
+          icon="settings"
+          onClick={() => openWorkspaceEditor({ workspaceId: selectedWorkspace.id })}
+        >
+          Workspace settings
+        </MenuItem>
+      )}
     </DropdownMenu>
   );
 };
