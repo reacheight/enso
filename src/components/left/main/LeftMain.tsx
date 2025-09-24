@@ -25,9 +25,10 @@ import ChatFolders from './ChatFolders';
 import ContactList from './ContactList.async';
 import ForumPanel from './ForumPanel';
 import LeftMainHeader from './LeftMainHeader';
+import WorkspaceManager from './WorkspaceManager';
+import SavedMessages from './SavedMessages';
 
 import './LeftMain.scss';
-import WorkspaceManager from './WorkspaceManager';
 
 type OwnProps = {
   content: LeftColumnContent;
@@ -184,6 +185,7 @@ const LeftMain: FC<OwnProps> = ({
         isClosingSearch={isClosingSearch}
       />
       <WorkspaceManager />
+      <SavedMessages />
       <Transition
         name={shouldSkipTransition ? 'none' : 'zoomFade'}
         renderCount={TRANSITION_RENDER_COUNT}
