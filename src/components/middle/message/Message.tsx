@@ -541,6 +541,7 @@ const Message: FC<OwnProps & StateProps> = ({
     && !isStoryMention
   );
   const canForward = isChannel && !isScheduled && message.isForwardingAllowed && !isChatProtected;
+  const canMarkAsRead = isChatWithSelf && !isOwn;
   const canFocus = Boolean(isPinnedList
     || (forwardInfo
       && (forwardInfo.isChannelPost || (isChatWithSelf && !isOwn) || isRepliesChat || isAnonymousForwards)
@@ -618,6 +619,7 @@ const Message: FC<OwnProps & StateProps> = ({
     handleVoteSend,
     handleGroupForward,
     handleForward,
+    handleMarkAsRead,
     handleFocus,
     handleFocusForwarded,
     handleDocumentGroupSelectAll,
@@ -1599,6 +1601,18 @@ const Message: FC<OwnProps & StateProps> = ({
               isLoadingComments && 'message-action-buttons-shown',
             )}
             >
+              {canMarkAsRead && (
+                <Button
+                  className="message-action-button"
+                  color="translucent-white"
+                  round
+                  size="tiny"
+                  ariaLabel="Mark as read"
+                  onClick={handleMarkAsRead}
+                >
+                  <Icon name="check" />
+                </Button>
+              )}
               {canForward && (
                 <Button
                   className="message-action-button"

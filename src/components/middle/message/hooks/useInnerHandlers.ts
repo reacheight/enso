@@ -35,7 +35,7 @@ export default function useInnerHandlers(
   const {
     openChat, showNotification, focusMessage, openMediaViewer, openAudioPlayer,
     markMessagesRead, cancelUploadMedia, sendPollVote, openForwardMenu,
-    openChatLanguageModal, openThread, openStoryViewer, searchChatMediaMessages,
+    openChatLanguageModal, openThread, openStoryViewer, searchChatMediaMessages, deleteMessages
   } = getActions();
 
   const {
@@ -168,6 +168,10 @@ export default function useInnerHandlers(
     }
   });
 
+  const handleMarkAsRead = useLastCallback(() => {
+    deleteMessages({ messageIds: [messageId] });
+  });
+
   const handleFocus = useLastCallback(() => {
     focusMessage({
       chatId, threadId: MAIN_THREAD_ID, messageId,
@@ -250,6 +254,7 @@ export default function useInnerHandlers(
     handleVoteSend,
     handleGroupForward,
     handleForward,
+    handleMarkAsRead,
     handleFocus,
     handleFocusForwarded,
     handleDocumentGroupSelectAll: selectWithGroupedId,
