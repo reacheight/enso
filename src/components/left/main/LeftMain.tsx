@@ -25,8 +25,7 @@ import ChatFolders from './ChatFolders';
 import ContactList from './ContactList.async';
 import ForumPanel from './ForumPanel';
 import LeftMainHeader from './LeftMainHeader';
-import WorkspaceManager from './WorkspaceManager';
-import SavedMessages from './SavedMessages';
+import CustomButtons from './CustomButtons';
 
 import './LeftMain.scss';
 
@@ -184,8 +183,7 @@ const LeftMain: FC<OwnProps> = ({
         shouldSkipTransition={shouldSkipTransition}
         isClosingSearch={isClosingSearch}
       />
-      <WorkspaceManager />
-      <SavedMessages />
+      <CustomButtons />
       <Transition
         name={shouldSkipTransition ? 'none' : 'zoomFade'}
         renderCount={TRANSITION_RENDER_COUNT}

@@ -1,6 +1,6 @@
 .WorkspaceManager {
   &-dropdown .Menu .bubble {
-    margin-left: 0.5rem;
+    margin-inline: 1rem;
     max-height: calc(100 * var(--vh) - 3.75rem);
     overflow-y: auto;
   }
@@ -22,9 +22,9 @@
     }
 
     .icon {
-      font-size: 1.5rem;
+      font-size: 1.25rem;
       color: var(--color-icon-secondary);
-      margin-right: 1rem;
+      margin-right: 0.5rem;
     }
   }
 
