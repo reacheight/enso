@@ -78,7 +78,8 @@ import HeaderActions from './HeaderActions';
 import HeaderPinnedMessage from './HeaderPinnedMessage';
 
 import './MiddleHeader.scss';
-
+import Icon from '../common/icons/Icon';
+ 
 const ANIMATION_DURATION = 350;
 const BACK_BUTTON_INACTIVE_TIME = 450;
 const EMOJI_STATUS_SIZE = 22;
@@ -167,6 +168,7 @@ const MiddleHeader: FC<OwnProps & StateProps> = ({
     openThread,
     openStickerSet,
     updateMiddleSearch,
+    openSavedDialog,
   } = getActions();
 
   const lang = useOldLang();
@@ -237,6 +239,10 @@ const MiddleHeader: FC<OwnProps & StateProps> = ({
       });
       onFocusPinnedMessage(messageId);
     }
+  });
+
+  const handleOpenSavedMessages = useLastCallback(() => {
+    openSavedDialog({ chatId });
   });
 
   const handleAllPinnedClick = useLastCallback(() => {
@@ -478,6 +484,11 @@ const MiddleHeader: FC<OwnProps & StateProps> = ({
 
   return (
     <div className="MiddleHeader" ref={componentRef}>
+      {!isMobile && !isSavedDialog && (
+      <Button className="saved-messages-button" round size="smaller" color="translucent" onClick={handleOpenSavedMessages} ariaLabel="Saved Messages">
+          <Icon name="saved-messages" />
+        </Button>
+      )}
       <Transition
         name={shouldSkipHistoryAnimations ? 'none' : 'slideFade'}
         activeKey={currentTransitionKey}
