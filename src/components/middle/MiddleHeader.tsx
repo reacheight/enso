@@ -120,6 +120,7 @@ type StateProps = {
   isFetchingDifference?: boolean;
   emojiStatusSticker?: ApiSticker;
   isMiddleSearchOpen?: boolean;
+  isSavedMessages?: boolean;
 };
 
 const MiddleHeader: FC<OwnProps & StateProps> = ({
@@ -154,6 +155,7 @@ const MiddleHeader: FC<OwnProps & StateProps> = ({
   isSavedDialog,
   isMiddleSearchOpen,
   onFocusPinnedMessage,
+  isSavedMessages,
 }) => {
   const {
     openThreadWithInfo,
@@ -169,6 +171,7 @@ const MiddleHeader: FC<OwnProps & StateProps> = ({
     openStickerSet,
     updateMiddleSearch,
     openSavedDialog,
+    focusLastMessage,
   } = getActions();
 
   const lang = useOldLang();
@@ -243,6 +246,7 @@ const MiddleHeader: FC<OwnProps & StateProps> = ({
 
   const handleOpenSavedMessages = useLastCallback(() => {
     openSavedDialog({ chatId });
+    focusLastMessage();
   });
 
   const handleAllPinnedClick = useLastCallback(() => {
@@ -484,7 +488,7 @@ const MiddleHeader: FC<OwnProps & StateProps> = ({
 
   return (
     <div className="MiddleHeader" ref={componentRef}>
-      {!isMobile && !isSavedDialog && (
+      {!isMobile && !isSavedMessages && !isSavedDialog && (
       <Button className="saved-messages-button" round size="smaller" color="translucent" onClick={handleOpenSavedMessages} ariaLabel="Saved Messages">
           <Icon name="saved-messages" />
         </Button>
@@ -594,6 +598,7 @@ export default memo(withGlobal<OwnProps>(
 
     const isSavedDialog = getIsSavedDialog(chatId, threadId, global.currentUserId);
     const isMiddleSearchOpen = Boolean(selectCurrentMiddleSearch(global));
+    const isSavedMessages = selectIsChatWithSelf(global, chatId);
 
     const state: StateProps = {
       typingStatus,
@@ -614,6 +619,7 @@ export default memo(withGlobal<OwnProps>(
       hasButtonInHeader: canStartBot || canRestartBot || canSubscribe || shouldSendJoinRequest,
       isSavedDialog,
       isMiddleSearchOpen,
+      isSavedMessages,
     };
 
     const messagesById = selectChatMessages(global, chatId);
