@@ -1,9 +1,9 @@
-import type { FC } from 'react';
-import React, { useState, useCallback, useEffect } from 'react';
+import type { FC } from '../../../lib/teact/teact';
+import { useState, useCallback, useEffect } from '../../../lib/teact/teact';
 import { getGlobal, getActions } from '../../../global';
 import styles from './WorkspaceSettingsPage.module.scss';
 
-import { useStorage } from '../../../hooks/useStorage.react';
+import { useStorage } from '../../../hooks/useStorage';
 import { Workspace } from '../../../types';
 
 interface OwnProps {
@@ -37,7 +37,7 @@ const WorkspaceSettingsPage: FC<OwnProps> = ({
 
   const isFormValid = selectedFolderIds.length > 0 && workspaceName.trim() !== '';
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
+  const handleSubmit = useCallback((e) => {
     e.preventDefault();
     const trimmedName = workspaceName.trim();
     if (isFormValid) {
@@ -61,7 +61,7 @@ const WorkspaceSettingsPage: FC<OwnProps> = ({
     }
   }, [workspaceName, selectedFolderIds, workspaceId, onBack, setSavedWorkspaces, savedWorkspaces, isFormValid]);
 
-  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNameChange = useCallback((e) => {
     setWorkspaceName(e.target.value);
   }, [setWorkspaceName]);
 
@@ -108,7 +108,7 @@ const WorkspaceSettingsPage: FC<OwnProps> = ({
                 checked={selectedFolderIds.includes(folder.id)}
                 onChange={() => handleFolderSelect(folder.id)}
               />
-              {folder.title}
+              {folder.title.text}
             </label>
           ))}
         </div>

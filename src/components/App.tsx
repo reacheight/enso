@@ -1,6 +1,6 @@
 import type { FC } from '../lib/teact/teact';
 import { useEffect, useLayoutEffect } from '../lib/teact/teact';
-import { withGlobal } from '../global';
+import { getActions, withGlobal } from '../global';
 
 import type { GlobalState } from '../global/types';
 import type { ThemeKey } from '../types';
@@ -11,6 +11,7 @@ import {
   PAGE_TITLE_TAURI,
 } from '../config';
 import { selectTabState, selectTheme } from '../global/selectors';
+import { selectIsWorkspaceCreatorOpen, selectEditingWorkspaceId } from '../global/selectors/workspaces';
 import { IS_TAURI } from '../util/browser/globalEnvironment';
 import { IS_INSTALL_PROMPT_SUPPORTED, PLATFORM_ENV } from '../util/browser/windowEnvironment';
 import buildClassName from '../util/buildClassName';
@@ -32,6 +33,7 @@ import UiLoader from './common/UiLoader';
 import AppInactive from './main/AppInactive';
 import LockScreen from './main/LockScreen.async';
 import Main from './main/Main.async';
+import WorkspaceSettingsPage from './main/workspace/WorkspaceSettingsPage';
 import Transition from './ui/Transition';
 
 import styles from './App.module.scss';
@@ -44,6 +46,8 @@ type StateProps = {
   hasWebAuthTokenFailed?: boolean;
   isTestServer?: boolean;
   theme: ThemeKey;
+  isWorkspaceCreatorOpen: boolean;
+  editingWorkspaceId?: string;
 };
 
 enum AppScreens {
@@ -51,6 +55,7 @@ enum AppScreens {
   main,
   lock,
   inactive,
+  workspaceSettings,
 }
 
 const TRANSITION_RENDER_COUNT = Object.keys(AppScreens).length / 2;
@@ -65,6 +70,8 @@ const App: FC<StateProps> = ({
   hasWebAuthTokenFailed,
   isTestServer,
   theme,
+  isWorkspaceCreatorOpen,
+  editingWorkspaceId,
 }) => {
   const [isInactive, markInactive, unmarkInactive] = useFlag(false);
   const { isMobile } = useAppLayout();
@@ -137,6 +144,8 @@ const App: FC<StateProps> = ({
 
   if (isInactive) {
     activeKey = AppScreens.inactive;
+  } else if (isWorkspaceCreatorOpen) {
+    activeKey = AppScreens.workspaceSettings;
   } else if (isScreenLocked) {
     page = 'lock';
     activeKey = AppScreens.lock;
@@ -214,6 +223,9 @@ const App: FC<StateProps> = ({
         return <LockScreen isLocked={isScreenLocked} />;
       case AppScreens.inactive:
         return <AppInactive />;
+      case AppScreens.workspaceSettings:
+        const { closeWorkspaceCreator } = getActions();
+        return <WorkspaceSettingsPage onBack={closeWorkspaceCreator} workspaceId={editingWorkspaceId} />;
     }
   }
 
@@ -259,6 +271,8 @@ export default withGlobal(
       hasWebAuthTokenFailed: global.hasWebAuthTokenFailed || global.hasWebAuthTokenPasswordRequired,
       theme: selectTheme(global),
       isTestServer: global.config?.isTestServer,
+      isWorkspaceCreatorOpen: selectIsWorkspaceCreatorOpen(global),
+      editingWorkspaceId: selectEditingWorkspaceId(global),
     };
   },
 )(App);

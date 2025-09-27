@@ -94,8 +94,6 @@ import SnapEffectContainer from './visualEffects/SnapEffectContainer';
 import WaveContainer from './visualEffects/WaveContainer';
 
 import './Main.scss';
-import WorkspaceSettingsPageRoot from './workspace/WorkspaceSettingsPageRoot.react';
-import { selectIsWorkspaceCreatorOpen, selectEditingWorkspaceId } from '../../global/selectors/workspaces';
 
 export interface OwnProps {
   isMobile?: boolean;
@@ -147,8 +145,6 @@ type StateProps = {
   isSynced?: boolean;
   isAccountFrozen?: boolean;
   isAppConfigLoaded?: boolean;
-  isWorkspaceCreatorOpen: boolean;
-  editingWorkspaceId?: string;
 };
 
 const APP_OUTDATED_TIMEOUT_MS = 5 * 60 * 1000; // 5 min
@@ -203,8 +199,6 @@ const Main = ({
   currentUserId,
   isAccountFrozen,
   isAppConfigLoaded,
-  isWorkspaceCreatorOpen,
-  editingWorkspaceId,
 }: OwnProps & StateProps) => {
   const {
     initMain,
@@ -257,7 +251,6 @@ const Main = ({
     loadStarStatus,
     loadAvailableEffects,
     loadTopBotApps,
-    closeWorkspaceCreator,
     loadPaidReactionPrivacy,
     loadPasswordInfo,
     loadBotFreezeAppeal,
@@ -607,7 +600,6 @@ const Main = ({
       <DeleteFolderDialog folder={deleteFolderDialog} />
       <ReactionPicker isOpen={isReactionPickerOpen} />
       <DeleteMessageModal isOpen={isDeleteMessageModalOpen} />
-      <WorkspaceSettingsPageRoot isOpen={isWorkspaceCreatorOpen} onClose={closeWorkspaceCreator} workspaceId={editingWorkspaceId} />
     </div>
   );
 };
@@ -700,8 +692,6 @@ export default memo(withGlobal<OwnProps>(
       isSynced: global.isSynced,
       isAccountFrozen,
       isAppConfigLoaded: global.isAppConfigLoaded,
-      isWorkspaceCreatorOpen: selectIsWorkspaceCreatorOpen(global),
-      editingWorkspaceId: selectEditingWorkspaceId(global),
     };
   },
 )(Main));
