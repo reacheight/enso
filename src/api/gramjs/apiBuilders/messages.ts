@@ -1,38 +1,38 @@
 import { Api as GramJs } from '../../../lib/gramjs';
 
-import type { ApiDraft } from '../../../global/types';
 import type {
-  ApiAction,
   ApiAttachment,
   ApiChat,
   ApiContact,
+  ApiDraft,
   ApiFactCheck,
-  ApiGroupCall,
   ApiInputMessageReplyInfo,
   ApiInputReplyInfo,
-  ApiKeyboardButton,
+  ApiInputSuggestedPostInfo,
+  ApiMediaTodo,
   ApiMessage,
   ApiMessageEntity,
   ApiMessageForwardInfo,
+  ApiMessageReportResult,
+  ApiNewMediaTodo,
   ApiNewPoll,
   ApiPeer,
   ApiPhoto,
   ApiPoll,
+  ApiPreparedInlineMessage,
   ApiQuickReply,
   ApiReplyInfo,
-  ApiReplyKeyboard,
+  ApiSearchPostsFlood,
   ApiSponsoredMessage,
   ApiSticker,
   ApiStory,
   ApiStorySkipped,
+  ApiSuggestedPost,
   ApiThreadInfo,
   ApiVideo,
   MediaContent,
-  PhoneCallAction,
 } from '../../types';
-import {
-  ApiMessageEntityTypes, MAIN_THREAD_ID,
-} from '../../types';
+import { ApiMessageEntityTypes, MAIN_THREAD_ID } from '../../types';
 
 import {
   DELETED_COMMENTS_CHANNEL_ID,
@@ -43,22 +43,35 @@ import {
   SUPPORTED_VIDEO_CONTENT_TYPES,
 } from '../../../config';
 import { getEmojiOnlyCountForMessage } from '../../../global/helpers/getEmojiOnlyCountForMessage';
+import { addTimestampEntities } from '../../../util/dates/timestamp';
 import { omitUndefined, pick } from '../../../util/iteratees';
 import { getServerTime, getServerTimeOffset } from '../../../util/serverTime';
 import { interpolateArray } from '../../../util/waveform';
-import { buildPeer } from '../gramjsBuilders';
 import {
+  buildApiCurrencyAmount,
+} from '../apiBuilders/payments';
+import { buildPeer, getEntityTypeById } from '../gramjsBuilders';
+import {
+  addDocumentToLocalDb,
   addPhotoToLocalDb,
+  addWebDocumentToLocalDb,
   type MediaRepairContext,
-  resolveMessageApiChatId,
-  serializeBytes,
-} from '../helpers';
-import { buildApiCallDiscardReason } from './calls';
+} from '../helpers/localDb';
+import { resolveMessageApiChatId, serializeBytes } from '../helpers/misc';
+import {
+  buildApiBotInlineMediaResult,
+  buildApiBotInlineResult,
+  buildApiInlineQueryPeerType,
+  buildReplyButtons,
+} from './bots';
 import {
   buildApiFormattedText,
   buildApiPhoto,
 } from './common';
+import { type OmitVirtualFields } from './helpers';
+import { buildApiMessageAction } from './messageActions';
 import { buildMessageContent, buildMessageMediaContent, buildMessageTextContent } from './messageContent';
+import { buildApiRestrictionReasons } from './misc';
 import { buildApiPeerColor, buildApiPeerId, getApiChatIdFromMtpPeer } from './peers';
 import { buildMessageReactions } from './reactions';
 
@@ -133,7 +146,6 @@ export function buildApiMessageFromShort(mtpMessage: GramJs.UpdateShortMessage):
 
   return buildApiMessageWithChatId(chatId, {
     ...mtpMessage,
-    fromId: buildPeer(mtpMessage.out ? currentUserId : buildApiPeerId(mtpMessage.userId, 'user')),
     peerId: buildPeer(mtpMessage.out ? buildApiPeerId(mtpMessage.userId, 'user') : currentUserId),
   });
 }
@@ -160,26 +172,36 @@ export function buildApiMessageFromNotification(
     chatId: SERVICE_NOTIFICATIONS_USER_ID,
     date: notification.inboxDate || currentDate,
     content,
+    isInvertedMedia: notification.invertMedia,
     isOutgoing: false,
   };
 }
 
+type TypeMessageWithContent = OmitVirtualFields<GramJs.Message> & OmitVirtualFields<GramJs.MessageService>;
 export type UniversalMessage = (
-  Pick<GramJs.Message & GramJs.MessageService, ('id' | 'date' | 'peerId')>
-  & Partial<GramJs.Message & GramJs.MessageService>
+  Pick<TypeMessageWithContent, ('id' | 'date' | 'peerId')>
+  & Partial<TypeMessageWithContent>
 );
 
 export function buildApiMessageWithChatId(
   chatId: string,
   mtpMessage: UniversalMessage,
 ): ApiMessage {
-  const fromId = mtpMessage.fromId ? getApiChatIdFromMtpPeer(mtpMessage.fromId) : undefined;
-  const peerId = mtpMessage.peerId ? getApiChatIdFromMtpPeer(mtpMessage.peerId) : undefined;
+  const isPrivateChat = getEntityTypeById(chatId) === 'user';
+  // Server can return `fromId` for our own messages in private chats, but not for incoming ones
+  // This can break grouping logic, as we do not fill `fromId` for `UpdateShortMessage` case
+  const fromId = mtpMessage.fromId && !isPrivateChat
+    ? getApiChatIdFromMtpPeer(mtpMessage.fromId) : undefined;
+
   const isChatWithSelf = !fromId && chatId === currentUserId;
-  const isOutgoing = (mtpMessage.out && !mtpMessage.post) || (isChatWithSelf && !mtpMessage.fwdFrom);
+  const forwardInfo = mtpMessage.fwdFrom && buildApiMessageForwardInfo(mtpMessage.fwdFrom, isChatWithSelf);
+
+  const isSavedOutgoing = Boolean(!forwardInfo || forwardInfo.fromId === currentUserId || forwardInfo.isSavedOutgoing);
+
+  const isOutgoing = !isChatWithSelf ? Boolean(mtpMessage.out && !mtpMessage.post)
+    : isSavedOutgoing;
   const content = buildMessageContent(mtpMessage);
-  const action = mtpMessage.action
-    && buildAction(mtpMessage.action, fromId, peerId, Boolean(mtpMessage.post), isOutgoing);
+  const action = mtpMessage.action && buildApiMessageAction(mtpMessage.action);
   if (action) {
     content.action = action;
   }
@@ -191,8 +213,10 @@ export function buildApiMessageWithChatId(
   const isEdited = Boolean(mtpMessage.editDate) && !mtpMessage.editHide;
   const {
     inlineButtons, keyboardButtons, keyboardPlaceholder, isKeyboardSingleUse, isKeyboardSelective,
-  } = buildReplyButtons(mtpMessage, isInvoiceMedia) || {};
-  const forwardInfo = mtpMessage.fwdFrom && buildApiMessageForwardInfo(mtpMessage.fwdFrom, isChatWithSelf);
+  } = buildReplyButtons(
+    mtpMessage.replyMarkup,
+    mtpMessage.media instanceof GramJs.MessageMediaInvoice ? mtpMessage.media.receiptMsgId : undefined,
+  ) || {};
   const { mediaUnread: isMediaUnread, postAuthor } = mtpMessage;
   const groupedId = mtpMessage.groupedId && String(mtpMessage.groupedId);
   const isInAlbum = Boolean(groupedId) && !(content.document || content.audio || content.sticker);
@@ -205,12 +229,16 @@ export function buildApiMessageWithChatId(
   const hasComments = mtpMessage.replies?.comments;
   const senderBoosts = mtpMessage.fromBoostsApplied;
   const factCheck = mtpMessage.factcheck && buildApiFactCheck(mtpMessage.factcheck);
+  const isVideoProcessingPending = mtpMessage.videoProcessingPending;
+  const areReactionsPossible = mtpMessage.reactionsArePossible;
 
   const isInvertedMedia = mtpMessage.invertMedia;
 
   const savedPeerId = mtpMessage.savedPeerId && getApiChatIdFromMtpPeer(mtpMessage.savedPeerId);
 
-  return omitUndefined<ApiMessage>({
+  const restrictionReasons = buildApiRestrictionReasons(mtpMessage.restrictionReason);
+
+  return {
     id: mtpMessage.id,
     chatId,
     isOutgoing,
@@ -226,11 +254,13 @@ export function buildApiMessageWithChatId(
     reactions: mtpMessage.reactions && buildMessageReactions(mtpMessage.reactions),
     emojiOnlyCount,
     ...(mtpMessage.replyTo && { replyInfo: buildApiReplyInfo(mtpMessage.replyTo, mtpMessage) }),
+    ...(mtpMessage.suggestedPost && { suggestedPostInfo: buildApiSuggestedPost(mtpMessage.suggestedPost) }),
     forwardInfo,
     isEdited,
     editDate: mtpMessage.editDate,
     isMediaUnread,
     hasUnreadMention: mtpMessage.mentioned && isMediaUnread,
+    areReactionsPossible,
     isMentioned: mtpMessage.mentioned,
     ...(groupedId && {
       groupedId,
@@ -252,7 +282,11 @@ export function buildApiMessageWithChatId(
     factCheck,
     effectId: mtpMessage.effect?.toString(),
     isInvertedMedia,
-  });
+    isVideoProcessingPending,
+    reportDeliveryUntilDate: mtpMessage.reportDeliveryUntilDate,
+    paidMessageStars: mtpMessage.paidMessageStars?.toJSNumber(),
+    restrictionReasons,
+  };
 }
 
 export function buildMessageDraft(draft: GramJs.TypeDraftMessage): ApiDraft | undefined {
@@ -261,7 +295,7 @@ export function buildMessageDraft(draft: GramJs.TypeDraftMessage): ApiDraft | un
   }
 
   const {
-    message, entities, replyTo, date, effect,
+    message, entities, replyTo, date, effect, suggestedPost,
   } = draft;
 
   const replyInfo = replyTo instanceof GramJs.InputReplyToMessage ? {
@@ -269,14 +303,33 @@ export function buildMessageDraft(draft: GramJs.TypeDraftMessage): ApiDraft | un
     replyToMsgId: replyTo.replyToMsgId,
     replyToTopId: replyTo.topMsgId,
     replyToPeerId: replyTo.replyToPeerId && getApiChatIdFromMtpPeer(replyTo.replyToPeerId),
+    monoforumPeerId: replyTo.monoforumPeerId && getApiChatIdFromMtpPeer(replyTo.monoforumPeerId),
     quoteText: replyTo.quoteText ? buildMessageTextContent(replyTo.quoteText, replyTo.quoteEntities) : undefined,
+    quoteOffset: replyTo.quoteOffset,
   } satisfies ApiInputMessageReplyInfo : undefined;
+
+  const suggestedPostInfo = suggestedPost instanceof GramJs.SuggestedPost ? {
+    isAccepted: suggestedPost.accepted,
+    isRejected: suggestedPost.rejected,
+    price: suggestedPost.price ? buildApiCurrencyAmount(suggestedPost.price) : undefined,
+    scheduleDate: suggestedPost.scheduleDate,
+  } satisfies ApiInputSuggestedPostInfo : undefined;
 
   return {
     text: message ? buildMessageTextContent(message, entities) : undefined,
     replyInfo,
+    suggestedPostInfo,
     date,
     effectId: effect?.toString(),
+  };
+}
+
+function buildApiSuggestedPost(suggestedPost: GramJs.SuggestedPost): ApiSuggestedPost {
+  return {
+    isAccepted: suggestedPost.accepted,
+    isRejected: suggestedPost.rejected,
+    price: suggestedPost.price ? buildApiCurrencyAmount(suggestedPost.price) : undefined,
+    scheduleDate: suggestedPost.scheduleDate,
   };
 }
 
@@ -290,8 +343,10 @@ function buildApiMessageForwardInfo(fwdFrom: GramJs.MessageFwdHeader, isChatWith
     isImported: fwdFrom.imported,
     isChannelPost: Boolean(fwdFrom.channelPost),
     channelPostId: fwdFrom.channelPost,
-    isLinkedChannelPost: Boolean(fwdFrom.channelPost && savedFromPeerId && !isChatWithSelf),
+    isLinkedChannelPost: Boolean(fwdFrom.channelPost && savedFromPeerId === fromId
+      && fwdFrom.savedFromMsgId === fwdFrom.channelPost && !isChatWithSelf),
     savedFromPeerId,
+    isSavedOutgoing: fwdFrom.savedOut,
     fromId,
     fromChatId: fromId || savedFromPeerId,
     fromMessageId: fwdFrom.savedFromMsgId || fwdFrom.channelPost,
@@ -322,6 +377,7 @@ function buildApiReplyInfo(
       quote,
       quoteText,
       quoteEntities,
+      quoteOffset,
     } = replyHeader;
 
     return {
@@ -334,6 +390,7 @@ function buildApiReplyInfo(
       replyMedia: replyMedia && buildMessageMediaContent(replyMedia, context),
       isQuote: quote,
       quoteText: quoteText ? buildMessageTextContent(quoteText, quoteEntities) : undefined,
+      quoteOffset,
     };
   }
 
@@ -349,504 +406,6 @@ export function buildApiFactCheck(factCheck: GramJs.FactCheck): ApiFactCheck {
   };
 }
 
-function buildAction(
-  action: GramJs.TypeMessageAction,
-  senderId: string | undefined,
-  targetPeerId: string | undefined,
-  isChannelPost: boolean,
-  isOutgoing: boolean,
-): ApiAction | undefined {
-  if (action instanceof GramJs.MessageActionEmpty) {
-    return undefined;
-  }
-
-  let phoneCall: PhoneCallAction | undefined;
-  let call: Partial<ApiGroupCall> | undefined;
-  let amount: number | undefined;
-  let stars: number | undefined;
-  let currency: string | undefined;
-  let giftCryptoInfo: {
-    currency: string;
-    amount: number;
-  } | undefined;
-  let text: string;
-  const translationValues: string[] = [];
-  let type: ApiAction['type'] = 'other';
-  let photo: ApiPhoto | undefined;
-  let score: number | undefined;
-  let months: number | undefined;
-  let topicEmojiIconId: string | undefined;
-  let isTopicAction: boolean | undefined;
-  let slug: string | undefined;
-  let isGiveaway: boolean | undefined;
-  let isUnclaimed: boolean | undefined;
-  let pluralValue: number | undefined;
-  let transactionId: string | undefined;
-
-  let targetUserIds = 'users' in action
-    ? action.users && action.users.map((id) => buildApiPeerId(id, 'user'))
-    : ('userId' in action && [buildApiPeerId(action.userId, 'user')]) || [];
-
-  let targetChatId;
-  if (action instanceof GramJs.MessageActionChatCreate) {
-    text = 'Notification.CreatedChatWithTitle';
-    translationValues.push('%action_origin%', action.title);
-    type = 'chatCreate';
-  } else if (action instanceof GramJs.MessageActionChatEditTitle) {
-    if (isChannelPost) {
-      text = 'Channel.MessageTitleUpdated';
-      translationValues.push(action.title);
-    } else {
-      text = 'Notification.ChangedGroupName';
-      translationValues.push('%action_origin%', action.title);
-    }
-  } else if (action instanceof GramJs.MessageActionChatEditPhoto) {
-    if (isChannelPost) {
-      text = 'Channel.MessagePhotoUpdated';
-    } else {
-      text = 'Notification.ChangedGroupPhoto';
-      translationValues.push('%action_origin%');
-    }
-  } else if (action instanceof GramJs.MessageActionChatDeletePhoto) {
-    if (isChannelPost) {
-      text = 'Channel.MessagePhotoRemoved';
-    } else {
-      text = 'Group.MessagePhotoRemoved';
-    }
-  } else if (action instanceof GramJs.MessageActionChatAddUser) {
-    if (!senderId || targetUserIds.includes(senderId)) {
-      text = 'Notification.JoinedChat';
-      translationValues.push('%target_user%');
-    } else {
-      text = 'Notification.Invited';
-      translationValues.push('%action_origin%', '%target_user%');
-    }
-  } else if (action instanceof GramJs.MessageActionChatDeleteUser) {
-    if (!senderId || targetUserIds.includes(senderId)) {
-      text = 'Notification.LeftChat';
-      translationValues.push('%target_user%');
-    } else {
-      text = 'Notification.Kicked';
-      translationValues.push('%action_origin%', '%target_user%');
-    }
-  } else if (action instanceof GramJs.MessageActionChatJoinedByLink) {
-    text = 'Notification.JoinedGroupByLink';
-    translationValues.push('%action_origin%');
-  } else if (action instanceof GramJs.MessageActionChannelCreate) {
-    text = 'Notification.CreatedChannel';
-  } else if (action instanceof GramJs.MessageActionChatMigrateTo) {
-    targetChatId = getApiChatIdFromMtpPeer(action);
-    text = 'Migrated to %target_chat%';
-    translationValues.push('%target_chat%');
-  } else if (action instanceof GramJs.MessageActionChannelMigrateFrom) {
-    targetChatId = getApiChatIdFromMtpPeer(action);
-    text = 'Migrated from %target_chat%';
-    translationValues.push('%target_chat%');
-  } else if (action instanceof GramJs.MessageActionPinMessage) {
-    text = 'Chat.Service.Group.UpdatedPinnedMessage1';
-    translationValues.push('%action_origin%', '%message%');
-  } else if (action instanceof GramJs.MessageActionHistoryClear) {
-    text = 'HistoryCleared';
-    type = 'historyClear';
-  } else if (action instanceof GramJs.MessageActionPhoneCall) {
-    const withDuration = Boolean(action.duration);
-    text = [
-      withDuration ? 'ChatList.Service' : 'Chat',
-      action.video ? 'VideoCall' : 'Call',
-      isOutgoing ? (withDuration ? 'outgoing' : 'Outgoing') : (withDuration ? 'incoming' : 'Incoming'),
-    ].join('.');
-
-    if (withDuration) {
-      const mins = Math.max(Math.round(action.duration! / 60), 1);
-      translationValues.push(`${mins} min${mins > 1 ? 's' : ''}`);
-    }
-
-    phoneCall = {
-      isOutgoing,
-      isVideo: action.video,
-      duration: action.duration,
-      reason: buildApiCallDiscardReason(action.reason),
-    };
-  } else if (action instanceof GramJs.MessageActionInviteToGroupCall) {
-    text = 'Notification.VoiceChatInvitation';
-    call = {
-      id: action.call.id.toString(),
-      accessHash: action.call.accessHash.toString(),
-    };
-    translationValues.push('%action_origin%', '%target_user%');
-  } else if (action instanceof GramJs.MessageActionContactSignUp) {
-    text = 'Notification.Joined';
-    translationValues.push('%action_origin%');
-    type = 'contactSignUp';
-  } else if (action instanceof GramJs.MessageActionPaymentSent) {
-    amount = Number(action.totalAmount);
-    currency = action.currency;
-    text = 'PaymentSuccessfullyPaid';
-    type = 'receipt';
-    if (targetPeerId) {
-      targetUserIds.push(targetPeerId);
-    }
-    translationValues.push('%payment_amount%', '%target_user%', '%product%');
-  } else if (action instanceof GramJs.MessageActionGroupCall) {
-    if (action.duration) {
-      const mins = Math.max(Math.round(action.duration / 60), 1);
-      text = 'Notification.VoiceChatEnded';
-      translationValues.push(`${mins} min${mins > 1 ? 's' : ''}`);
-    } else {
-      text = 'Notification.VoiceChatStartedChannel';
-      call = {
-        id: action.call.id.toString(),
-        accessHash: action.call.accessHash.toString(),
-      };
-    }
-  } else if (action instanceof GramJs.MessageActionBotAllowed) {
-    if (action.domain) {
-      text = 'ActionBotAllowed';
-      translationValues.push(action.domain);
-    } else if (action.fromRequest) {
-      text = 'lng_action_webapp_bot_allowed';
-    } else {
-      text = 'ActionAttachMenuBotAllowed';
-    }
-  } else if (action instanceof GramJs.MessageActionCustomAction) {
-    text = action.message;
-  } else if (action instanceof GramJs.MessageActionChatJoinedByRequest) {
-    text = 'ChatService.UserJoinedGroupByRequest';
-    translationValues.push('%action_origin%');
-  } else if (action instanceof GramJs.MessageActionGameScore) {
-    text = senderId === currentUserId ? 'ActionYouScoredInGame' : 'ActionUserScoredInGame';
-    translationValues.push('%score%');
-    score = action.score;
-  } else if (action instanceof GramJs.MessageActionWebViewDataSent) {
-    text = 'Notification.WebAppSentData';
-    translationValues.push(action.text);
-  } else if (action instanceof GramJs.MessageActionGiftPremium) {
-    type = 'giftPremium';
-    text = isOutgoing ? 'ActionGiftOutbound' : 'ActionGiftInbound';
-    if (isOutgoing) {
-      translationValues.push('%gift_payment_amount%');
-    } else {
-      translationValues.push('%action_origin%', '%gift_payment_amount%');
-    }
-    if (targetPeerId) {
-      targetUserIds.push(targetPeerId);
-    }
-    currency = action.currency;
-    if (action.cryptoCurrency) {
-      giftCryptoInfo = {
-        currency: action.cryptoCurrency,
-        amount: action.cryptoAmount!.toJSNumber(),
-      };
-    }
-    amount = action.amount.toJSNumber();
-    months = action.months;
-  } else if (action instanceof GramJs.MessageActionTopicCreate) {
-    text = 'TopicWasCreatedAction';
-    type = 'topicCreate';
-    translationValues.push(action.title);
-  } else if (action instanceof GramJs.MessageActionTopicEdit) {
-    if (action.closed !== undefined) {
-      text = action.closed ? 'TopicWasClosedAction' : 'TopicWasReopenedAction';
-      translationValues.push('%action_origin%', '%action_topic%');
-    } else if (action.hidden !== undefined) {
-      text = action.hidden ? 'TopicHidden2' : 'TopicShown';
-    } else if (action.title) {
-      text = 'TopicRenamedTo';
-      translationValues.push('%action_origin%', action.title);
-    } else if (action.iconEmojiId) {
-      text = 'TopicWasIconChangedToAction';
-      translationValues.push('%action_origin%', '%action_topic_icon%');
-      topicEmojiIconId = action.iconEmojiId.toString();
-    } else {
-      text = 'ChatList.UnsupportedMessage';
-    }
-    isTopicAction = true;
-  } else if (action instanceof GramJs.MessageActionSuggestProfilePhoto) {
-    const isVideo = action.photo instanceof GramJs.Photo && action.photo.videoSizes?.length;
-    text = senderId === currentUserId
-      ? (isVideo ? 'ActionSuggestVideoFromYouDescription' : 'ActionSuggestPhotoFromYouDescription')
-      : (isVideo ? 'ActionSuggestVideoToYouDescription' : 'ActionSuggestPhotoToYouDescription');
-    type = 'suggestProfilePhoto';
-    translationValues.push('%target_user%');
-
-    if (targetPeerId) targetUserIds.push(targetPeerId);
-  } else if (action instanceof GramJs.MessageActionGiveawayLaunch) {
-    text = 'BoostingGiveawayJustStarted';
-    translationValues.push('%action_origin%');
-  } else if (action instanceof GramJs.MessageActionGiftCode) {
-    type = 'giftCode';
-    text = isOutgoing ? 'ActionGiftOutbound' : 'BoostingReceivedGiftNoName';
-    slug = action.slug;
-    months = action.months;
-    amount = action.amount?.toJSNumber();
-    isGiveaway = Boolean(action.viaGiveaway);
-    isUnclaimed = Boolean(action.unclaimed);
-    if (isOutgoing) {
-      translationValues.push('%gift_payment_amount%');
-    }
-    currency = action.currency;
-    if (action.cryptoCurrency) {
-      giftCryptoInfo = {
-        currency: action.cryptoCurrency,
-        amount: action.cryptoAmount!.toJSNumber(),
-      };
-    }
-    if (action.boostPeer) {
-      targetChatId = getApiChatIdFromMtpPeer(action.boostPeer);
-    }
-    if (targetPeerId) {
-      targetUserIds.push(targetPeerId);
-    }
-  } else if (action instanceof GramJs.MessageActionGiveawayResults) {
-    if (!action.winnersCount) {
-      text = 'lng_action_giveaway_results_none';
-    } else if (action.unclaimedCount) {
-      text = 'lng_action_giveaway_results_some';
-    } else {
-      text = 'BoostingGiveawayServiceWinnersSelected';
-      translationValues.push('%amount%');
-      amount = action.winnersCount;
-      pluralValue = action.winnersCount;
-    }
-  } else if (action instanceof GramJs.MessageActionPrizeStars) {
-    type = 'prizeStars';
-    isUnclaimed = Boolean(action.unclaimed);
-    if (action.boostPeer) {
-      targetChatId = getApiChatIdFromMtpPeer(action.boostPeer);
-    }
-    text = 'Notification.StarsPrize';
-    stars = action.stars.toJSNumber();
-    transactionId = action.transactionId;
-  } else if (action instanceof GramJs.MessageActionBoostApply) {
-    type = 'chatBoost';
-    if (action.boosts === 1) {
-      text = senderId === currentUserId ? 'BoostingBoostsGroupByYouServiceMsg' : 'BoostingBoostsGroupByUserServiceMsg';
-      translationValues.push('%action_origin%');
-    } else {
-      text = senderId === currentUserId ? 'BoostingBoostsGroupByYouServiceMsgCount'
-        : 'BoostingBoostsGroupByUserServiceMsgCount';
-      translationValues.push(action.boosts.toString());
-      if (senderId !== currentUserId) {
-        translationValues.unshift('%action_origin%');
-      }
-      pluralValue = action.boosts;
-    }
-  } else if (action instanceof GramJs.MessageActionPaymentRefunded) {
-    text = 'ActionRefunded';
-    amount = Number(action.totalAmount);
-    currency = action.currency;
-  } else if (action instanceof GramJs.MessageActionRequestedPeer) {
-    text = 'ActionRequestedPeer';
-    if (action.peers) {
-      targetUserIds = action.peers?.map((peer) => getApiChatIdFromMtpPeer(peer));
-    }
-    if (targetPeerId) {
-      translationValues.unshift('%action_origin%');
-    }
-  } else if (action instanceof GramJs.MessageActionGiftStars) {
-    type = 'giftStars';
-    text = isOutgoing ? 'ActionGiftOutbound' : targetPeerId ? 'ActionGiftInbound' : 'BoostingReceivedGiftNoName';
-    if (isOutgoing) {
-      translationValues.push('%gift_payment_amount%');
-    } else {
-      translationValues.push('%action_origin%', '%gift_payment_amount%');
-    }
-    if (targetPeerId) {
-      targetUserIds.push(targetPeerId);
-      targetChatId = targetPeerId;
-    }
-
-    if (action.cryptoCurrency) {
-      giftCryptoInfo = {
-        currency: action.cryptoCurrency,
-        amount: action.cryptoAmount!.toJSNumber(),
-      };
-    }
-
-    currency = action.currency;
-    amount = action.amount.toJSNumber();
-    stars = action.stars.toJSNumber();
-    transactionId = action.transactionId;
-  } else {
-    text = 'ChatList.UnsupportedMessage';
-  }
-
-  if ('photo' in action && action.photo instanceof GramJs.Photo) {
-    addPhotoToLocalDb(action.photo);
-    photo = buildApiPhoto(action.photo);
-  }
-
-  return {
-    mediaType: 'action',
-    text,
-    type,
-    targetUserIds,
-    targetChatId,
-    photo, // TODO Only used internally now, will be used for the UI in future
-    amount,
-    stars,
-    currency,
-    giftCryptoInfo,
-    isGiveaway,
-    slug,
-    translationValues,
-    call,
-    phoneCall,
-    score,
-    months,
-    topicEmojiIconId,
-    isTopicAction,
-    isUnclaimed,
-    pluralValue,
-    transactionId,
-  };
-}
-
-function buildReplyButtons(message: UniversalMessage, shouldSkipBuyButton?: boolean): ApiReplyKeyboard | undefined {
-  const { replyMarkup, media } = message;
-
-  if (!(replyMarkup instanceof GramJs.ReplyKeyboardMarkup || replyMarkup instanceof GramJs.ReplyInlineMarkup)) {
-    return undefined;
-  }
-
-  const markup = replyMarkup.rows.map(({ buttons }) => {
-    return buttons.map((button): ApiKeyboardButton | undefined => {
-      const { text } = button;
-
-      if (button instanceof GramJs.KeyboardButton) {
-        return {
-          type: 'command',
-          text,
-        };
-      }
-
-      if (button instanceof GramJs.KeyboardButtonUrl) {
-        if (button.url.includes('?startgroup=')) {
-          return {
-            type: 'unsupported',
-            text,
-          };
-        }
-
-        return {
-          type: 'url',
-          text,
-          url: button.url,
-        };
-      }
-
-      if (button instanceof GramJs.KeyboardButtonCallback) {
-        if (button.requiresPassword) {
-          return {
-            type: 'unsupported',
-            text,
-          };
-        }
-
-        return {
-          type: 'callback',
-          text,
-          data: serializeBytes(button.data),
-        };
-      }
-
-      if (button instanceof GramJs.KeyboardButtonRequestPoll) {
-        return {
-          type: 'requestPoll',
-          text,
-          isQuiz: button.quiz,
-        };
-      }
-
-      if (button instanceof GramJs.KeyboardButtonRequestPhone) {
-        return {
-          type: 'requestPhone',
-          text,
-        };
-      }
-
-      if (button instanceof GramJs.KeyboardButtonBuy) {
-        if (media instanceof GramJs.MessageMediaInvoice && media.receiptMsgId) {
-          return {
-            type: 'receipt',
-            receiptMessageId: media.receiptMsgId,
-          };
-        }
-        if (shouldSkipBuyButton) return undefined;
-        return {
-          type: 'buy',
-          text,
-        };
-      }
-
-      if (button instanceof GramJs.KeyboardButtonGame) {
-        return {
-          type: 'game',
-          text,
-        };
-      }
-
-      if (button instanceof GramJs.KeyboardButtonSwitchInline) {
-        return {
-          type: 'switchBotInline',
-          text,
-          query: button.query,
-          isSamePeer: button.samePeer,
-        };
-      }
-
-      if (button instanceof GramJs.KeyboardButtonUserProfile) {
-        return {
-          type: 'userProfile',
-          text,
-          userId: button.userId.toString(),
-        };
-      }
-
-      if (button instanceof GramJs.KeyboardButtonSimpleWebView) {
-        return {
-          type: 'simpleWebView',
-          text,
-          url: button.url,
-        };
-      }
-
-      if (button instanceof GramJs.KeyboardButtonWebView) {
-        return {
-          type: 'webView',
-          text,
-          url: button.url,
-        };
-      }
-
-      if (button instanceof GramJs.KeyboardButtonUrlAuth) {
-        return {
-          type: 'urlAuth',
-          text,
-          url: button.url,
-          buttonId: button.buttonId,
-        };
-      }
-
-      return {
-        type: 'unsupported',
-        text,
-      };
-    }).filter(Boolean);
-  });
-
-  if (markup.every((row) => !row.length)) return undefined;
-
-  return {
-    [replyMarkup instanceof GramJs.ReplyKeyboardMarkup ? 'keyboardButtons' : 'inlineButtons']: markup,
-    ...(replyMarkup instanceof GramJs.ReplyKeyboardMarkup && {
-      keyboardPlaceholder: replyMarkup.placeholder,
-      isKeyboardSingleUse: replyMarkup.singleUse,
-      isKeyboardSelective: replyMarkup.selective,
-    }),
-  };
-}
-
 function buildNewPoll(poll: ApiNewPoll, localId: number): ApiPoll {
   return {
     mediaType: 'poll',
@@ -856,16 +415,25 @@ function buildNewPoll(poll: ApiNewPoll, localId: number): ApiPoll {
   };
 }
 
+function buildNewTodo(todo: ApiNewMediaTodo): ApiMediaTodo {
+  return {
+    mediaType: 'todo',
+    todo: todo.todo,
+  };
+}
+
 export function buildLocalMessage(
   chat: ApiChat,
   lastMessageId?: number,
   text?: string,
   entities?: ApiMessageEntity[],
   replyInfo?: ApiInputReplyInfo,
+  suggestedPostInfo?: ApiInputSuggestedPostInfo,
   attachment?: ApiAttachment,
   sticker?: ApiSticker,
   gif?: ApiVideo,
   poll?: ApiNewPoll,
+  todo?: ApiNewMediaTodo,
   contact?: ApiContact,
   groupedId?: string,
   scheduledAt?: number,
@@ -873,34 +441,38 @@ export function buildLocalMessage(
   story?: ApiStory | ApiStorySkipped,
   isInvertedMedia?: true,
   effectId?: string,
-): ApiMessage {
+  isPending?: true,
+  messagePriceInStars?: number,
+) {
   const localId = getNextLocalMessageId(lastMessageId);
   const media = attachment && buildUploadingMedia(attachment);
   const isChannel = chat.type === 'chatTypeChannel';
 
   const resultReplyInfo = replyInfo && buildReplyInfo(replyInfo, chat.isForum);
 
+  const localPoll = poll && buildNewPoll(poll, localId);
+  const localTodo = todo && buildNewTodo(todo);
+
+  const formattedText = text ? addTimestampEntities({ text, entities }) : undefined;
+
   const message = {
     id: localId,
     chatId: chat.id,
-    content: {
-      ...(text && {
-        text: {
-          text,
-          entities,
-        },
-      }),
+    content: omitUndefined({
+      text: formattedText,
       ...media,
-      ...(sticker && { sticker }),
-      ...(gif && { video: gif }),
-      ...(poll && { poll: buildNewPoll(poll, localId) }),
-      ...(contact && { contact }),
-      ...(story && { storyData: { mediaType: 'storyData', ...story } }),
-    },
+      sticker,
+      video: gif || media?.video,
+      contact,
+      storyData: story && { mediaType: 'storyData', ...story },
+      pollId: localPoll?.id,
+      todo: localTodo,
+    }),
     date: scheduledAt || Math.round(Date.now() / 1000) + getServerTimeOffset(),
     isOutgoing: !isChannel,
-    senderId: sendAs?.id || currentUserId,
+    senderId: chat.type !== 'chatTypePrivate' ? (sendAs?.id || currentUserId) : undefined,
     replyInfo: resultReplyInfo,
+    suggestedPostInfo,
     ...(groupedId && {
       groupedId,
       ...(media && (media.photo || media.video) && { isInAlbum: true }),
@@ -909,13 +481,20 @@ export function buildLocalMessage(
     isForwardingAllowed: true,
     isInvertedMedia,
     effectId,
+    ...(isPending && { sendingState: 'messageSendingStatePending' }),
+    ...(messagePriceInStars && { paidMessageStars: messagePriceInStars }),
   } satisfies ApiMessage;
 
   const emojiOnlyCount = getEmojiOnlyCountForMessage(message.content, message.groupedId);
 
-  return {
+  const finalMessage: ApiMessage = {
     ...message,
     ...(emojiOnlyCount && { emojiOnlyCount }),
+  };
+
+  return {
+    message: finalMessage,
+    poll: localPoll,
   };
 }
 
@@ -928,6 +507,7 @@ export function buildLocalForwardedMessage({
   noCaptions,
   isCurrentUserPremium,
   lastMessageId,
+  sendAs,
 }: {
   toChat: ApiChat;
   toThreadId?: number;
@@ -937,6 +517,7 @@ export function buildLocalForwardedMessage({
   noCaptions?: boolean;
   isCurrentUserPremium?: boolean;
   lastMessageId?: number;
+  sendAs?: ApiPeer;
 }): ApiMessage {
   const localId = getNextLocalMessageId(lastMessageId);
   const {
@@ -959,11 +540,12 @@ export function buildLocalForwardedMessage({
     text: content.text.text,
     entities: content.text.entities.filter((entity) => entity.type !== ApiMessageEntityTypes.CustomEmoji),
   } : content.text;
+  const textWithTimestamps = strippedText && addTimestampEntities(strippedText);
   const emojiOnlyCount = getEmojiOnlyCountForMessage(content, groupedId);
 
   const updatedContent = {
     ...content,
-    text: !shouldHideText ? strippedText : undefined,
+    text: !shouldHideText ? textWithTimestamps : undefined,
   };
 
   // TODO Prepare reply info between forwarded messages locally, to prevent height jumps
@@ -981,7 +563,7 @@ export function buildLocalForwardedMessage({
     content: updatedContent,
     date: scheduledAt || Math.round(Date.now() / 1000) + getServerTimeOffset(),
     isOutgoing: !asIncomingInChatWithSelf && toChat.type !== 'chatTypeChannel',
-    senderId: currentUserId,
+    senderId: toChat.type !== 'chatTypePrivate' ? (sendAs?.id || currentUserId) : undefined,
     sendingState: 'messageSendingStatePending',
     groupedId,
     isInAlbum,
@@ -991,7 +573,7 @@ export function buildLocalForwardedMessage({
     ...(toThreadId && toChat?.isForum && { isTopicReply: true }),
 
     ...(emojiOnlyCount && { emojiOnlyCount }),
-    // Forward info doesn't get added when users forwards his own messages, also when forwarding audio
+    // Forward info doesn't get added when user forwards own messages and when forwarding audio
     ...(message.chatId !== currentUserId && !isAudio && !noAuthors && {
       forwardInfo: {
         date: message.forwardInfo?.date || message.date,
@@ -1023,6 +605,7 @@ function buildReplyInfo(inputInfo: ApiInputReplyInfo, isForum?: boolean): ApiRep
     replyToTopId: inputInfo.replyToTopId,
     replyToPeerId: inputInfo.replyToPeerId,
     quoteText: inputInfo.quoteText,
+    quoteOffset: inputInfo.quoteOffset,
     isForumTopic: isForum && inputInfo.replyToTopId ? true : undefined,
     ...(Boolean(inputInfo.quoteText) && { isQuote: true }),
   };
@@ -1177,5 +760,82 @@ export function buildApiQuickReply(reply: GramJs.TypeQuickReply): ApiQuickReply 
     id: shortcutId,
     shortcut,
     topMessageId: topMessage,
+  };
+}
+
+export function buildApiReportResult(
+  result: GramJs.TypeReportResult,
+): ApiMessageReportResult {
+  if (result instanceof GramJs.ReportResultReported) {
+    return {
+      type: 'reported',
+    };
+  }
+
+  if (result instanceof GramJs.ReportResultAddComment) {
+    return {
+      type: 'comment',
+      isOptional: result.optional,
+      option: serializeBytes(result.option),
+    };
+  }
+
+  const title = result.title;
+  const options = result.options.map((option) => ({
+    text: option.text,
+    option: serializeBytes(option.option),
+  }));
+
+  return {
+    type: 'selectOption',
+    title,
+    options,
+  };
+}
+
+function processInlineBotResult(queryId: string, result: GramJs.TypeBotInlineResult) {
+  if (result instanceof GramJs.BotInlineMediaResult) {
+    if (result.document instanceof GramJs.Document) {
+      addDocumentToLocalDb(result.document);
+    }
+
+    if (result.photo instanceof GramJs.Photo) {
+      addPhotoToLocalDb(result.photo);
+    }
+
+    return buildApiBotInlineMediaResult(result, queryId);
+  }
+
+  if (result.thumb) {
+    addWebDocumentToLocalDb(result.thumb);
+  }
+
+  return buildApiBotInlineResult(result, queryId);
+}
+
+export function buildPreparedInlineMessage(
+  result: GramJs.messages.TypePreparedInlineMessage,
+): ApiPreparedInlineMessage {
+  const queryId = result.queryId.toString();
+
+  return {
+    queryId,
+    result: processInlineBotResult(queryId, result.result),
+    peerTypes: result.peerTypes?.map(buildApiInlineQueryPeerType),
+    cacheTime: result.cacheTime,
+  };
+}
+
+export function buildApiSearchPostsFlood(
+  searchFlood: GramJs.SearchPostsFlood,
+  query?: string,
+): ApiSearchPostsFlood {
+  return {
+    query,
+    queryIsFree: searchFlood.queryIsFree,
+    totalDaily: searchFlood.totalDaily,
+    remains: searchFlood.remains,
+    waitTill: searchFlood.waitTill,
+    starsAmount: searchFlood.starsAmount.toJSNumber(),
   };
 }

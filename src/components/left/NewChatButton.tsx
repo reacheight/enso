@@ -1,12 +1,14 @@
 import type { FC } from '../../lib/teact/teact';
-import React, {
+import {
   useCallback, useEffect, useMemo, useState,
 } from '../../lib/teact/teact';
+import { getActions } from '../../global';
 
 import buildClassName from '../../util/buildClassName';
 
 import useOldLang from '../../hooks/useOldLang';
 
+import Icon from '../common/icons/Icon';
 import Button from '../ui/Button';
 import Menu from '../ui/Menu';
 import MenuItem from '../ui/MenuItem';
@@ -18,6 +20,7 @@ type OwnProps = {
   onNewPrivateChat: () => void;
   onNewChannel: () => void;
   onNewGroup: () => void;
+  isAccountFrozen?: boolean;
 };
 
 const NewChatButton: FC<OwnProps> = ({
@@ -25,8 +28,10 @@ const NewChatButton: FC<OwnProps> = ({
   onNewPrivateChat,
   onNewChannel,
   onNewGroup,
+  isAccountFrozen,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { openFrozenAccountModal } = getActions();
 
   useEffect(() => {
     if (!isShown) {
@@ -43,8 +48,12 @@ const NewChatButton: FC<OwnProps> = ({
   );
 
   const toggleIsMenuOpen = useCallback(() => {
+    if (isAccountFrozen) {
+      openFrozenAccountModal();
+      return;
+    }
     setIsMenuOpen(!isMenuOpen);
-  }, [isMenuOpen]);
+  }, [isMenuOpen, isAccountFrozen]);
 
   const handleClose = useCallback(() => {
     setIsMenuOpen(false);
@@ -68,8 +77,8 @@ const NewChatButton: FC<OwnProps> = ({
         ariaLabel={lang(isMenuOpen ? 'Close' : 'NewMessageTitle')}
         tabIndex={-1}
       >
-        <i className="icon icon-new-chat-filled" />
-        <i className="icon icon-close" />
+        <Icon name="new-chat-filled" />
+        <Icon name="close" />
       </Button>
       <Menu
         isOpen={isMenuOpen}

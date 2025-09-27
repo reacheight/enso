@@ -1,8 +1,8 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useRef } from '../../../lib/teact/teact';
+import { memo, useRef } from '../../../lib/teact/teact';
 
 import type { ApiMessage } from '../../../api/types';
-import type { ISettings } from '../../../types';
+import type { ThemeKey } from '../../../types';
 
 import { CUSTOM_APPENDIX_ATTRIBUTE, MESSAGE_CONTENT_SELECTOR } from '../../../config';
 import { requestMutation } from '../../../lib/fasterdom/fasterdom';
@@ -12,6 +12,7 @@ import { formatCurrency } from '../../../util/formatCurrency';
 import renderText from '../../common/helpers/renderText';
 import getCustomAppendixBg from './helpers/getCustomAppendixBg';
 
+import useLang from '../../../hooks/useLang';
 import useLayoutEffectWithPrevDeps from '../../../hooks/useLayoutEffectWithPrevDeps';
 import useMedia from '../../../hooks/useMedia';
 import useOldLang from '../../../hooks/useOldLang';
@@ -26,7 +27,7 @@ type OwnProps = {
   shouldAffectAppendix?: boolean;
   isInSelectMode?: boolean;
   isSelected?: boolean;
-  theme: ISettings['theme'];
+  theme: ThemeKey;
   forcedWidth?: number;
 };
 
@@ -38,15 +39,15 @@ const Invoice: FC<OwnProps> = ({
   theme,
   forcedWidth,
 }) => {
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>();
 
-  const lang = useOldLang();
+  const oldLang = useOldLang();
+  const lang = useLang();
   const invoice = getMessageInvoice(message);
 
   const {
     title,
-    text,
+    description,
     amount,
     currency,
     isTest,
@@ -93,8 +94,8 @@ const Invoice: FC<OwnProps> = ({
       {title && (
         <p className="title">{renderText(title)}</p>
       )}
-      {text && (
-        <div>{renderText(text, ['emoji', 'br'])}</div>
+      {description && (
+        <div className="info">{renderText(description, ['emoji', 'br'])}</div>
       )}
       <div className={`description ${photo ? 'has-image' : ''}`}>
         {Boolean(photo) && (
@@ -120,8 +121,8 @@ const Invoice: FC<OwnProps> = ({
           </div>
         )}
         <p className="description-text">
-          {formatCurrency(amount, currency, lang.code, { iconClassName: 'invoice-currency-icon' })}
-          {isTest && <span className="test-invoice">{lang('PaymentTestInvoice')}</span>}
+          {formatCurrency(lang, amount, currency, { iconClassName: 'invoice-currency-icon' })}
+          {isTest && <span className="test-invoice">{oldLang('PaymentTestInvoice')}</span>}
         </p>
       </div>
     </div>

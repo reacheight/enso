@@ -1,4 +1,4 @@
-import React, { memo } from '../../lib/teact/teact';
+import { memo } from '../../lib/teact/teact';
 
 import type { ApiSticker } from '../../api/types';
 import type { OwnProps as AnimatedIconProps } from './AnimatedIcon';
@@ -20,7 +20,7 @@ function AnimatedIconFromSticker(props: OwnProps) {
   } = props;
 
   const thumbDataUri = sticker?.thumbnail?.dataUri;
-  const localMediaHash = sticker && `sticker${sticker.id}`;
+  const localMediaHash = sticker && getStickerMediaHash(sticker, 'full');
   const previewBlobUrl = useMedia(
     sticker ? getStickerMediaHash(sticker, 'preview') : undefined,
     noLoad && !forcePreview,
@@ -33,7 +33,7 @@ function AnimatedIconFromSticker(props: OwnProps) {
       tgsUrl={tgsUrl}
       previewUrl={previewBlobUrl}
       thumbDataUri={thumbDataUri}
-      // eslint-disable-next-line react/jsx-props-no-spreading
+
       {...otherProps}
     />
   );

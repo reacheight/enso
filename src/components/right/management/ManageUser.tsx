@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react';
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo, useCallback, useEffect, useRef, useState,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
@@ -8,12 +8,13 @@ import { getActions, withGlobal } from '../../../global';
 import type { ApiPhoto, ApiUser } from '../../../api/types';
 import { ManagementProgress } from '../../../types';
 
-import { SERVICE_NOTIFICATIONS_USER_ID } from '../../../config';
-import { isUserBot, selectIsChatMuted } from '../../../global/helpers';
+import { MUTE_INDEFINITE_TIMESTAMP, SERVICE_NOTIFICATIONS_USER_ID, UNMUTE_TIMESTAMP } from '../../../config';
+import { isUserBot } from '../../../global/helpers';
+import { getIsChatMuted } from '../../../global/helpers/notifications';
 import {
   selectChat,
-  selectNotifyExceptions,
-  selectNotifySettings,
+  selectNotifyDefaults,
+  selectNotifyException,
   selectTabState,
   selectUser,
   selectUserFullInfo,
@@ -24,6 +25,7 @@ import useHistoryBack from '../../../hooks/useHistoryBack';
 import useOldLang from '../../../hooks/useOldLang';
 
 import Avatar from '../../common/Avatar';
+import Icon from '../../common/icons/Icon';
 import PrivateChatInfo from '../../common/PrivateChatInfo';
 import Checkbox from '../../ui/Checkbox';
 import ConfirmDialog from '../../ui/ConfirmDialog';
@@ -66,12 +68,14 @@ const ManageUser: FC<OwnProps & StateProps> = ({
     deleteContact,
     closeManagement,
     uploadContactProfilePhoto,
+    updateChatMutedState,
   } = getActions();
 
   const [isDeleteDialogOpen, openDeleteDialog, closeDeleteDialog] = useFlag();
   const [isResetPersonalPhotoDialogOpen, openResetPersonalPhotoDialog, closeResetPersonalPhotoDialog] = useFlag();
-  const [isProfileFieldsTouched, setIsProfileFieldsTouched] = useState(false);
+  const [isProfileFieldsTouched, markProfileFieldsTouched, unmarkProfileFieldsTouched] = useFlag();
   const [error, setError] = useState<string | undefined>();
+  const [isNotificationsTouched, markNotificationsTouched, unmarkNotificationsTouched] = useFlag();
   const lang = useOldLang();
 
   useHistoryBack({
@@ -91,7 +95,8 @@ const ManageUser: FC<OwnProps & StateProps> = ({
   }, [isMuted]);
 
   useEffect(() => {
-    setIsProfileFieldsTouched(false);
+    unmarkProfileFieldsTouched();
+    unmarkNotificationsTouched();
     closeDeleteDialog();
   }, [closeDeleteDialog, userId]);
 
@@ -102,7 +107,7 @@ const ManageUser: FC<OwnProps & StateProps> = ({
 
   useEffect(() => {
     if (progress === ManagementProgress.Complete) {
-      setIsProfileFieldsTouched(false);
+      unmarkProfileFieldsTouched();
       setError(undefined);
       closeDeleteDialog();
     }
@@ -110,7 +115,7 @@ const ManageUser: FC<OwnProps & StateProps> = ({
 
   const handleFirstNameChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setFirstName(e.target.value);
-    setIsProfileFieldsTouched(true);
+    markProfileFieldsTouched();
 
     if (error === ERROR_FIRST_NAME_MISSING) {
       setError(undefined);
@@ -119,12 +124,13 @@ const ManageUser: FC<OwnProps & StateProps> = ({
 
   const handleLastNameChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setLastName(e.target.value);
-    setIsProfileFieldsTouched(true);
+    markProfileFieldsTouched();
   }, []);
 
   const handleNotificationChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setIsNotificationsEnabled(e.target.checked);
-    setIsProfileFieldsTouched(true);
+    markNotificationsTouched();
+    markProfileFieldsTouched();
   }, []);
 
   const handleProfileSave = useCallback(() => {
@@ -138,11 +144,16 @@ const ManageUser: FC<OwnProps & StateProps> = ({
 
     updateContact({
       userId,
-      isMuted: !isNotificationsEnabled,
       firstName: trimmedFirstName,
       lastName: trimmedLastName,
     });
-  }, [firstName, lastName, updateContact, userId, isNotificationsEnabled]);
+
+    if (isNotificationsTouched) {
+      updateChatMutedState({
+        chatId: userId, mutedUntil: isNotificationsEnabled ? UNMUTE_TIMESTAMP : MUTE_INDEFINITE_TIMESTAMP,
+      });
+    }
+  }, [firstName, isNotificationsEnabled, isNotificationsTouched, lastName, userId]);
 
   const handleDeleteContact = useCallback(() => {
     deleteContact({ userId });
@@ -150,8 +161,7 @@ const ManageUser: FC<OwnProps & StateProps> = ({
     closeManagement();
   }, [closeDeleteDialog, closeManagement, deleteContact, userId]);
 
-  // eslint-disable-next-line no-null/no-null
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>();
   const isSuggestRef = useRef(false);
 
   const handleSuggestPhoto = useCallback(() => {
@@ -166,12 +176,12 @@ const ManageUser: FC<OwnProps & StateProps> = ({
 
   const handleResetPersonalAvatar = useCallback(() => {
     closeResetPersonalPhotoDialog();
-    setIsProfileFieldsTouched(true);
+    markProfileFieldsTouched();
     uploadContactProfilePhoto({ userId });
   }, [closeResetPersonalPhotoDialog, uploadContactProfilePhoto, userId]);
 
   const handleSelectAvatar = useCallback((file: File) => {
-    setIsProfileFieldsTouched(true);
+    markProfileFieldsTouched();
     uploadContactProfilePhoto({ userId, file, isSuggest: isSuggestRef.current });
   }, [uploadContactProfilePhoto, userId]);
 
@@ -193,19 +203,21 @@ const ManageUser: FC<OwnProps & StateProps> = ({
             noEmojiStatus
             withFullInfo
           />
-          <InputText
-            id="user-first-name"
-            label={lang('UserInfo.FirstNamePlaceholder')}
-            onChange={handleFirstNameChange}
-            value={firstName}
-            error={error === ERROR_FIRST_NAME_MISSING ? error : undefined}
-          />
-          <InputText
-            id="user-last-name"
-            label={lang('UserInfo.LastNamePlaceholder')}
-            onChange={handleLastNameChange}
-            value={lastName}
-          />
+          <div className="settings-edit">
+            <InputText
+              id="user-first-name"
+              label={lang('UserInfo.FirstNamePlaceholder')}
+              onChange={handleFirstNameChange}
+              value={firstName}
+              error={error === ERROR_FIRST_NAME_MISSING ? error : undefined}
+            />
+            <InputText
+              id="user-last-name"
+              label={lang('UserInfo.LastNamePlaceholder')}
+              onChange={handleLastNameChange}
+              value={lastName}
+            />
+          </div>
           <div className="ListItem narrow">
             <Checkbox
               checked={isNotificationsEnabled}
@@ -242,7 +254,7 @@ const ManageUser: FC<OwnProps & StateProps> = ({
                 {lang('UserInfo.ResetCustomPhoto')}
               </ListItem>
             )}
-            <p className="text-muted" dir="auto">{lang('UserInfo.CustomPhotoInfo', user.firstName)}</p>
+            <p className="section-help" dir="auto">{lang('UserInfo.CustomPhotoInfo', user.firstName)}</p>
           </div>
         )}
         <div className="section">
@@ -260,7 +272,7 @@ const ManageUser: FC<OwnProps & StateProps> = ({
         {isLoading ? (
           <Spinner color="white" />
         ) : (
-          <i className="icon icon-check" />
+          <Icon name="check" />
         )}
       </FloatingActionButton>
       <ConfirmDialog
@@ -288,12 +300,12 @@ const ManageUser: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { userId }): StateProps => {
+  (global, { userId }): Complete<StateProps> => {
     const user = selectUser(global, userId);
     const chat = selectChat(global, userId);
     const userFullInfo = selectUserFullInfo(global, userId);
     const { progress } = selectTabState(global).management;
-    const isMuted = chat && selectIsChatMuted(chat, selectNotifySettings(global), selectNotifyExceptions(global));
+    const isMuted = chat && getIsChatMuted(chat, selectNotifyDefaults(global), selectNotifyException(global, chat.id));
     const personalPhoto = userFullInfo?.personalPhoto;
     const notPersonalPhoto = userFullInfo?.profilePhoto || userFullInfo?.fallbackPhoto;
 

@@ -1,5 +1,5 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo, useCallback, useMemo, useRef,
 } from '../../../lib/teact/teact';
 import { withGlobal } from '../../../global';
@@ -19,6 +19,7 @@ import useOldLang from '../../../hooks/useOldLang';
 
 import Avatar from '../../common/Avatar';
 import FullNameTitle from '../../common/FullNameTitle';
+import Icon from '../../common/icons/Icon';
 import ListItem from '../../ui/ListItem';
 import GroupCallParticipantMenu from './GroupCallParticipantMenu';
 import OutlinedMicrophoneIcon from './OutlinedMicrophoneIcon';
@@ -37,10 +38,8 @@ const GroupCallParticipant: FC<OwnProps & StateProps> = ({
   participant,
   peer,
 }) => {
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const menuRef = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>();
+  const menuRef = useRef<HTMLDivElement>();
   const lang = useOldLang();
 
   const {
@@ -128,9 +127,9 @@ const GroupCallParticipant: FC<OwnProps & StateProps> = ({
     >
       <FullNameTitle peer={peer} withEmojiStatus className={styles.title} />
       <span className={buildClassName(styles.subtitle, 'subtitle', aboutColor)}>
-        {hasPresentationStream && <i className="icon icon-share-screen" aria-hidden />}
-        {hasVideoStream && <i className="icon icon-video" aria-hidden />}
-        {hasCustomVolume && <i className="icon icon-speaker" aria-hidden />}
+        {hasPresentationStream && <Icon name="share-screen" />}
+        {hasVideoStream && <Icon name="video" />}
+        {hasCustomVolume && <Icon name="speaker" />}
         <span className={styles.subtitleText}>{renderText(aboutText)}</span>
       </span>
       <GroupCallParticipantMenu
@@ -150,7 +149,7 @@ const GroupCallParticipant: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { participant }): StateProps => {
+  (global, { participant }): Complete<StateProps> => {
     return {
       peer: selectUser(global, participant.id) || selectChat(global, participant.id),
     };

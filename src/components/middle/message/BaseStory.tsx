@@ -1,12 +1,12 @@
-import React, { memo, useEffect } from '../../../lib/teact/teact';
+import { memo, useEffect } from '../../../lib/teact/teact';
 import { getActions } from '../../../global';
 
 import type { ApiMessageStoryData, ApiTypeStory } from '../../../api/types';
 
 import { getStoryMediaHash } from '../../../global/helpers';
+import { IS_CANVAS_FILTER_SUPPORTED } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
 import { formatMediaDuration } from '../../../util/dates/dateFormat';
-import { IS_CANVAS_FILTER_SUPPORTED } from '../../../util/windowEnvironment';
 
 import useAppLayout from '../../../hooks/useAppLayout';
 import useCanvasBlur from '../../../hooks/useCanvasBlur';
@@ -16,6 +16,7 @@ import useMedia from '../../../hooks/useMedia';
 import useOldLang from '../../../hooks/useOldLang';
 import useShowTransitionDeprecated from '../../../hooks/useShowTransitionDeprecated';
 
+import Icon from '../../common/icons/Icon';
 import MediaAreaOverlay from '../../story/mediaArea/MediaAreaOverlay';
 
 import styles from './BaseStory.module.scss';
@@ -99,13 +100,13 @@ function BaseStory({
       )}
       {isExpired && (
         <span>
-          <i className={buildClassName(styles.expiredIcon, 'icon icon-story-expired')} aria-hidden />
+          <Icon name="story-expired" className={styles.expiredIcon} />
           {lang('StoryExpiredSubtitle')}
         </span>
       )}
       {Boolean(video?.duration) && (
         <div className="message-media-duration">
-          {formatMediaDuration(video!.duration)}
+          {formatMediaDuration(video.duration)}
         </div>
       )}
       {isProtected && <span className="protector" />}

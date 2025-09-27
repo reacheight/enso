@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useState } from '../../lib/teact/teact';
+import { memo, useEffect, useState } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
 import type { ApiStealthMode } from '../../api/types';
@@ -10,6 +10,7 @@ import { getServerTime } from '../../util/serverTime';
 import useLastCallback from '../../hooks/useLastCallback';
 import useOldLang from '../../hooks/useOldLang';
 
+import Icon from '../common/icons/Icon';
 import Button from '../ui/Button';
 import ListItem from '../ui/ListItem';
 import Modal from '../ui/Modal';
@@ -23,7 +24,7 @@ type StateProps = {
   isCurrentUserPremium?: boolean;
 };
 
-const StealthModeModal = ({ isOpen, stealthMode, isCurrentUserPremium } : StateProps) => {
+const StealthModeModal = ({ isOpen, stealthMode, isCurrentUserPremium }: StateProps) => {
   const {
     toggleStealthModal,
     activateStealthMode,
@@ -80,10 +81,10 @@ const StealthModeModal = ({ isOpen, stealthMode, isCurrentUserPremium } : StateP
         ariaLabel={lang('Close')}
         onClick={handleClose}
       >
-        <i className="icon icon-close" />
+        <Icon name="close" />
       </Button>
       <div className={styles.stealthIcon}>
-        <i className="icon icon-eye-closed-outline" />
+        <Icon name="eye-crossed-outline" />
       </div>
       <div className={styles.title}>{lang('StealthMode')}</div>
       <div className={styles.description}>
@@ -93,7 +94,7 @@ const StealthModeModal = ({ isOpen, stealthMode, isCurrentUserPremium } : StateP
         className={buildClassName(styles.listItem, 'smaller-icon')}
         multiline
         inactive
-        leftElement={<i className={buildClassName('icon icon-stealth-past', styles.icon)} />}
+        leftElement={<Icon name="stealth-past" className={styles.icon} />}
       >
         <span className="title">{lang('HideRecentViews')}</span>
         <span className={buildClassName('subtitle', styles.subtitle)}>{lang('HideRecentViewsDescription')}</span>
@@ -102,14 +103,13 @@ const StealthModeModal = ({ isOpen, stealthMode, isCurrentUserPremium } : StateP
         className={buildClassName(styles.listItem, 'smaller-icon')}
         multiline
         inactive
-        leftElement={<i className={buildClassName('icon icon-stealth-future', styles.icon)} aria-hidden />}
+        leftElement={<Icon name="stealth-future" className={styles.icon} aria-hidden />}
       >
         <span className="title">{lang('HideNextViews')}</span>
         <span className={buildClassName('subtitle', styles.subtitle)}>{lang('HideNextViewsDescription')}</span>
       </ListItem>
       <Button
         className={styles.button}
-        size="smaller"
         disabled={isOnCooldown}
         isShiny={!isCurrentUserPremium}
         withPremiumGradient={!isCurrentUserPremium}
@@ -124,7 +124,7 @@ const StealthModeModal = ({ isOpen, stealthMode, isCurrentUserPremium } : StateP
   );
 };
 
-export default memo(withGlobal((global): StateProps => {
+export default memo(withGlobal((global): Complete<StateProps> => {
   const tabState = selectTabState(global);
 
   return {

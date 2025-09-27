@@ -1,4 +1,6 @@
-import React, { memo, useEffect, useRef } from '../../../lib/teact/teact';
+import {
+  memo, useEffect, useRef, useState,
+} from '../../../lib/teact/teact';
 import { getActions } from '../../../global';
 
 import type { ApiMediaArea, ApiStory } from '../../../api/types';
@@ -11,32 +13,38 @@ import buildStyle from '../../../util/buildStyle';
 import useWindowSize from '../../../hooks/window/useWindowSize';
 
 import MediaAreaSuggestedReaction from './MediaAreaSuggestedReaction';
+import MediaAreaWeather from './MediaAreaWeather';
 
 import styles from './MediaArea.module.scss';
 
 type OwnProps = {
   story: ApiStory;
   isActive?: boolean;
+  isStoryPlaying?: boolean;
   className?: string;
 };
 
 const STORY_ASPECT_RATIO = 9 / 16;
+const PERCENTAGE_BASE = 100;
+
+const NO_SHINY_TYPES = new Set<ApiMediaArea['type']>(['channelPost', 'uniqueGift']);
 
 const MediaAreaOverlay = ({
-  story, isActive, className,
+  story, isActive, className, isStoryPlaying,
 }: OwnProps) => {
   const {
-    openMapModal, focusMessage, closeStoryViewer, openUrl,
+    openMapModal, openUniqueGiftBySlug, focusMessage, closeStoryViewer, openUrl,
   } = getActions();
 
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>();
+  const [mediaWidth, setMediaWidth] = useState(0);
 
   const windowSize = useWindowSize();
 
   useEffect(() => {
-    if (!ref.current || !isActive) return;
+    if (!ref.current) return;
     const element = ref.current;
+    setMediaWidth(element.clientWidth);
 
     if (windowSize.width > MOBILE_SCREEN_MAX_WIDTH) {
       requestMutation(() => {
@@ -78,6 +86,10 @@ const MediaAreaOverlay = ({
         openUrl({ url: mediaArea.url });
         break;
       }
+      case 'uniqueGift': {
+        openUniqueGiftBySlug({ slug: mediaArea.slug });
+        break;
+      }
     }
   };
 
@@ -93,8 +105,9 @@ const MediaAreaOverlay = ({
           case 'geoPoint':
           case 'venue':
           case 'channelPost':
-          case 'url': {
-            const isShiny = isActive && (mediaArea.type !== 'channelPost');
+          case 'url':
+          case 'uniqueGift': {
+            const isShiny = isActive && !NO_SHINY_TYPES.has(mediaArea.type);
             return (
               <div
                 className={buildClassName(styles.mediaArea, isShiny && styles.shiny)}
@@ -106,7 +119,7 @@ const MediaAreaOverlay = ({
           case 'suggestedReaction':
             return (
               <MediaAreaSuggestedReaction
-                // eslint-disable-next-line react/no-array-index-key
+
                 key={`${mediaArea.type}-${i}`}
                 story={story}
                 mediaArea={mediaArea}
@@ -116,6 +129,18 @@ const MediaAreaOverlay = ({
                 style={prepareStyle(mediaArea)}
               />
             );
+          case 'weather': {
+            return (
+              <MediaAreaWeather
+
+                key={`${mediaArea.type}-${i}`}
+                mediaArea={mediaArea}
+                className={styles.mediaArea}
+                style={prepareStyle(mediaArea, mediaWidth)}
+                isPreview={!isActive || isStoryPlaying}
+              />
+            );
+          }
           default:
             return undefined;
         }
@@ -124,10 +149,18 @@ const MediaAreaOverlay = ({
   );
 };
 
-function prepareStyle(mediaArea: ApiMediaArea) {
+function prepareStyle(mediaArea: ApiMediaArea, mediaWidth?: number) {
   const {
     x, y, width, height, rotation, radius,
   } = mediaArea.coordinates;
+
+  let pixelRadius = '';
+
+  if (mediaWidth && radius && mediaWidth > 0) {
+    const pixelWidth = (mediaWidth * (width / PERCENTAGE_BASE));
+    const pixelHeight = (mediaWidth * (height / PERCENTAGE_BASE));
+    pixelRadius = `${Math.min(pixelWidth, pixelHeight) * (radius / PERCENTAGE_BASE)}px`;
+  }
 
   return buildStyle(
     `left: ${x}%`,
@@ -135,7 +168,7 @@ function prepareStyle(mediaArea: ApiMediaArea) {
     `width: ${width}%`,
     `height: ${height}%`,
     `transform: rotate(${rotation}deg) translate(-50%, -50%)`,
-    Boolean(radius) && `border-radius: ${radius}%`,
+    pixelRadius && `border-radius: ${pixelRadius}`,
   );
 }
 

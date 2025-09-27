@@ -1,5 +1,6 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import type React from '../../../lib/teact/teact';
+import {
   memo,
   useCallback, useEffect, useState,
 } from '../../../lib/teact/teact';
@@ -13,6 +14,7 @@ import { selectTabState } from '../../../global/selectors';
 import useHistoryBack from '../../../hooks/useHistoryBack';
 import useOldLang from '../../../hooks/useOldLang';
 
+import Icon from '../../common/icons/Icon';
 import PrivateChatInfo from '../../common/PrivateChatInfo';
 import AvatarEditable from '../../ui/AvatarEditable';
 import Button from '../../ui/Button';
@@ -36,7 +38,7 @@ type StateProps = {
 
 const MAX_MEMBERS_FOR_GENERATE_CHAT_NAME = 4;
 
-const NewChatStep2: FC<OwnProps & StateProps > = ({
+const NewChatStep2: FC<OwnProps & StateProps> = ({
   isChannel,
   isActive,
   memberIds,
@@ -131,6 +133,7 @@ const NewChatStep2: FC<OwnProps & StateProps > = ({
       about,
       photo,
       memberIds,
+      isChannel: true,
     });
   }, [title, createChannel, about, photo, memberIds, channelTitleEmptyError]);
 
@@ -153,11 +156,11 @@ const NewChatStep2: FC<OwnProps & StateProps > = ({
           round
           size="smaller"
           color="translucent"
-          // eslint-disable-next-line react/jsx-no-bind
+
           onClick={() => onReset()}
           ariaLabel="Return to member selection"
         >
-          <i className="icon icon-arrow-left" />
+          <Icon name="arrow-left" />
         </Button>
         <h3>{lang(isChannel ? 'NewChannel' : 'NewGroup')}</h3>
       </div>
@@ -211,7 +214,7 @@ const NewChatStep2: FC<OwnProps & StateProps > = ({
         {isLoading ? (
           <Spinner color="white" />
         ) : (
-          <i className="icon icon-arrow-right" />
+          <Icon name="arrow-right" />
         )}
       </FloatingActionButton>
     </div>
@@ -219,7 +222,7 @@ const NewChatStep2: FC<OwnProps & StateProps > = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     const {
       progress: creationProgress,
       error: creationError,

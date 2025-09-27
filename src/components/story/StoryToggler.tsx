@@ -1,4 +1,4 @@
-import React, {
+import {
   beginHeavyAnimation, memo, useEffect, useMemo,
 } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
@@ -135,7 +135,7 @@ function StoryToggler({
   );
 }
 
-export default memo(withGlobal<OwnProps>((global, { isArchived }): StateProps => {
+export default memo(withGlobal<OwnProps>((global, { isArchived }): Complete<StateProps> => {
   const { orderedPeerIds: { archived, active }, byPeerId } = global.stories;
   const { storyViewer: { isRibbonShown, isArchivedRibbonShown } } = selectTabState(global);
   const isForumPanelOpen = selectIsForumPanelOpen(global);

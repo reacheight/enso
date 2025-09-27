@@ -5,25 +5,37 @@ import type {
   ApiMessageEntityCustomEmoji,
   ApiMessageForwardInfo,
   ApiMessageOutgoingStatus,
-  ApiPeer, ApiSponsoredMessage,
+  ApiPeer, ApiRestrictionReason, ApiSponsoredMessage,
   ApiStickerSetInfo,
+  MediaContainer,
 } from '../../api/types';
-import type { ThreadId } from '../../types';
+import type {
+  ChatTranslatedMessages,
+  MessageListType,
+  TabThread,
+  Thread,
+  ThreadId,
+} from '../../types';
 import type { IAllowedAttachmentOptions } from '../helpers';
 import type {
-  ChatTranslatedMessages, GlobalState, MessageListType, TabArgs, TabThread, Thread,
+  GlobalState, TabArgs,
 } from '../types';
 import { ApiMessageEntityTypes, MAIN_THREAD_ID } from '../../api/types';
 
 import {
-  ANONYMOUS_USER_ID, GENERAL_TOPIC_ID, REPLIES_USER_ID, SERVICE_NOTIFICATIONS_USER_ID,
+  ANONYMOUS_USER_ID, GENERAL_TOPIC_ID, SERVICE_NOTIFICATIONS_USER_ID,
+  WEB_APP_PLATFORM,
 } from '../../config';
+import { IS_TRANSLATION_SUPPORTED } from '../../util/browser/windowEnvironment';
+import { isUserId } from '../../util/entities/ids';
 import { getCurrentTabId } from '../../util/establishMultitabRole';
 import { findLast } from '../../util/iteratees';
 import { getMessageKey, isLocalMessageId } from '../../util/keys/messageKey';
+import { isIpRevealingMedia } from '../../util/media/ipRevealingMedia';
 import { MEMO_EMPTY_ARRAY } from '../../util/memo';
 import { getServerTime } from '../../util/serverTime';
-import { IS_TRANSLATION_SUPPORTED } from '../../util/windowEnvironment';
+import { getDocumentExtension } from '../../components/common/helpers/documentInfo';
+import { API_GENERAL_ID_LIMIT } from '../../limits';
 import {
   canSendReaction,
   getAllowedAttachmentOptions,
@@ -37,9 +49,9 @@ import {
   getMessagePhoto,
   getMessageVideo,
   getMessageVoice,
-  getMessageWebPagePhoto,
-  getMessageWebPageVideo,
   getSendingState,
+  getWebPagePhoto,
+  getWebPageVideo,
   hasMessageTtl,
   isActionMessage,
   isChatBasicGroup,
@@ -55,7 +67,6 @@ import {
   isMessageTranslatable,
   isOwnMessage,
   isServiceNotificationMessage,
-  isUserId,
   isUserRightBanned,
 } from '../helpers';
 import { getMessageReplyInfo } from '../helpers/replies';
@@ -63,19 +74,21 @@ import {
   selectChat,
   selectChatFullInfo,
   selectChatLastMessageId,
+  selectIsChatRestricted,
+  selectIsChatWithBot,
   selectIsChatWithSelf,
   selectRequestedChatTranslationLanguage,
 } from './chats';
-import { selectPeer } from './peers';
+import { selectCurrentLimit } from './limits';
+import { selectMessageDownloadableMedia } from './media';
+import { selectPeer, selectPeerPaidMessagesStars } from './peers';
 import { selectPeerStory } from './stories';
-import { selectIsStickerFavorite } from './symbols';
+import { selectCustomEmoji, selectIsStickerFavorite } from './symbols';
 import { selectTabState } from './tabs';
 import { selectTopic } from './topics';
 import {
-  selectBot, selectIsCurrentUserPremium, selectUser, selectUserStatus,
+  selectBot, selectUser, selectUserStatus,
 } from './users';
-
-const MESSAGE_EDIT_ALLOWED_TIME = 172800; // 48 hours
 
 export function selectCurrentMessageList<T extends GlobalState>(
   global: T,
@@ -357,23 +370,6 @@ export function selectEditingMessage<T extends GlobalState>(
   }
 }
 
-export function selectChatMessageByPollId<T extends GlobalState>(global: T, pollId: string) {
-  let messageWithPoll: ApiMessage | undefined;
-
-  // eslint-disable-next-line no-restricted-syntax
-  for (const chatMessages of Object.values(global.messages.byChatId)) {
-    const { byId } = chatMessages;
-    messageWithPoll = Object.values(byId).find((message) => {
-      return message.content.poll && message.content.poll.id === pollId;
-    });
-    if (messageWithPoll) {
-      break;
-    }
-  }
-
-  return messageWithPoll;
-}
-
 export function selectFocusedMessageId<T extends GlobalState>(
   global: T, chatId: string, ...[tabId = getCurrentTabId()]: TabArgs<T>
 ) {
@@ -412,8 +408,9 @@ export function selectOutgoingStatus<T extends GlobalState>(
 export function selectSender<T extends GlobalState>(global: T, message: ApiMessage): ApiPeer | undefined {
   const { senderId } = message;
   const chat = selectChat(global, message.chatId);
+  const currentUser = selectUser(global, global.currentUserId!);
   if (!senderId) {
-    return chat;
+    return message.isOutgoing ? currentUser : chat;
   }
 
   if (chat && isChatChannel(chat) && !chat.areProfilesShown) return chat;
@@ -423,18 +420,13 @@ export function selectSender<T extends GlobalState>(global: T, message: ApiMessa
 
 export function getSendersFromSelectedMessages<T extends GlobalState>(
   global: T,
-  chat: ApiChat | undefined,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
+  chatId: string,
+  messageIds: number[],
 ) {
-  const { messageIds: selectedMessageIds } = selectTabState(global, tabId).selectedMessages || {};
-  if (!chat?.id || !selectedMessageIds) {
-    return undefined;
-  }
-
-  return selectedMessageIds.map((id) => {
-    const message = selectChatMessage(global, chat.id, id);
+  return messageIds.map((id) => {
+    const message = selectChatMessage(global, chatId, id);
     return message && selectSender(global, message);
-  });
+  }).filter(Boolean);
 }
 
 export function selectSenderFromMessage<T extends GlobalState>(
@@ -475,13 +467,50 @@ export function selectForwardedSender<T extends GlobalState>(
 
   if (forwardInfo.isChannelPost && forwardInfo.fromChatId) {
     return selectChat(global, forwardInfo.fromChatId);
-  } else if (forwardInfo.fromId) {
+  }
+
+  if (forwardInfo.hiddenUserName) {
+    return undefined;
+  }
+
+  if (forwardInfo.fromId) {
     return selectPeer(global, forwardInfo.fromId);
-  } else if (forwardInfo.savedFromPeerId) {
+  }
+
+  if (forwardInfo.savedFromPeerId) {
     return selectPeer(global, forwardInfo.savedFromPeerId);
   }
 
   return undefined;
+}
+
+export function selectPoll<T extends GlobalState>(global: T, pollId: string) {
+  return global.messages.pollById[pollId];
+}
+
+export function selectPollFromMessage<T extends GlobalState>(global: T, message: MediaContainer) {
+  if (!message.content.pollId) return undefined;
+  return selectPoll(global, message.content.pollId);
+}
+
+export function selectWebPage<T extends GlobalState>(global: T, webPageId: string) {
+  return global.messages.webPageById[webPageId];
+}
+
+export function selectWebPageFromMessage<T extends GlobalState>(global: T, message: MediaContainer) {
+  if (!message.content.webPage) return undefined;
+  return selectWebPage(global, message.content.webPage.id);
+}
+
+export function selectFullWebPage<T extends GlobalState>(global: T, webPageId: string) {
+  const webPage = selectWebPage(global, webPageId);
+  if (!webPage || webPage.webpageType !== 'full') return undefined;
+  return webPage;
+}
+
+export function selectFullWebPageFromMessage<T extends GlobalState>(global: T, message: MediaContainer) {
+  if (!message.content.webPage) return undefined;
+  return selectFullWebPage(global, message.content.webPage.id);
 }
 
 export function selectTopicFromMessage<T extends GlobalState>(global: T, message: ApiMessage) {
@@ -565,7 +594,7 @@ export function selectThreadIdFromMessage<T extends GlobalState>(global: T, mess
   const chat = selectChat(global, message.chatId);
   const { content } = message;
   const { replyToMsgId, replyToTopId, isForumTopic } = getMessageReplyInfo(message) || {};
-  if ('action' in content && content.action?.type === 'topicCreate') {
+  if (content.action?.type === 'topicCreate') {
     return message.id;
   }
 
@@ -583,7 +612,8 @@ export function selectThreadIdFromMessage<T extends GlobalState>(global: T, mess
 
 export function selectCanReplyToMessage<T extends GlobalState>(global: T, message: ApiMessage, threadId: ThreadId) {
   const chat = selectChat(global, message.chatId);
-  if (!chat || chat.isRestricted || chat.isForbidden) return false;
+  const isRestricted = selectIsChatRestricted(global, message.chatId);
+  if (!chat || isRestricted || chat.isForbidden) return false;
 
   const isLocal = isMessageLocal(message);
   const isServiceNotification = isServiceNotificationMessage(message);
@@ -601,15 +631,42 @@ export function selectCanReplyToMessage<T extends GlobalState>(global: T, messag
   return !messageTopic || !messageTopic.isClosed || messageTopic.isOwner || getHasAdminRight(chat, 'manageTopics');
 }
 
+export function selectCanForwardMessage<T extends GlobalState>(global: T, message: ApiMessage) {
+  const isLocal = isMessageLocal(message);
+  const isServiceNotification = isServiceNotificationMessage(message);
+  const isAction = isActionMessage(message);
+  const hasTtl = hasMessageTtl(message);
+  const { content } = message;
+
+  const webPage = selectFullWebPageFromMessage(global, message);
+
+  const story = content.storyData
+    ? selectPeerStory(global, content.storyData.peerId, content.storyData.id)
+    : (webPage?.story
+      ? selectPeerStory(global, webPage.story.peerId, webPage.story.id)
+      : undefined
+    );
+  const isChatProtected = selectIsChatProtected(global, message.chatId);
+  const isStoryForwardForbidden = story && ('isDeleted' in story || ('noForwards' in story && story.noForwards));
+  const canForward = (
+    !isLocal && !isAction && !isChatProtected && !isStoryForwardForbidden
+    && (message.isForwardingAllowed || isServiceNotification) && !hasTtl
+  );
+
+  return canForward;
+}
+
 // This selector is slow and not to be used within lists (e.g. Message component)
 export function selectAllowedMessageActionsSlow<T extends GlobalState>(
   global: T, message: ApiMessage, threadId: ThreadId,
 ) {
   const chat = selectChat(global, message.chatId);
-  if (!chat || chat.isRestricted) {
+  const isRestricted = selectIsChatRestricted(global, message.chatId);
+  if (!chat || isRestricted) {
     return {};
   }
 
+  const chatFullInfo = selectChatFullInfo(global, message.chatId);
   const isPrivate = isUserId(chat.id);
   const isChatWithSelf = selectIsChatWithSelf(global, message.chatId);
   const isBasicGroup = isChatBasicGroup(chat);
@@ -625,17 +682,48 @@ export function selectAllowedMessageActionsSlow<T extends GlobalState>(
   const hasTtl = hasMessageTtl(message);
   const { content } = message;
   const isDocumentSticker = isMessageDocumentSticker(message);
-  const isBoostMessage = message.content.action?.type === 'chatBoost';
+  const isBoostMessage = message.content.action?.type === 'boostApply';
+  const isMonoforum = chat.isMonoforum;
 
-  const canEditMessagesIndefinitely = isChatWithSelf
-    || (isSuperGroup && getHasAdminRight(chat, 'pinMessages'))
-    || (isChannel && getHasAdminRight(chat, 'editMessages'));
+  // https://github.com/telegramdesktop/tdesktop/blob/6627de646022af1394134974477109cd1439e1bb/Telegram/SourceFiles/data/data_peer_values.cpp#L367C2-L372C3
+  const canPinMessage = (() => {
+    if (isPrivate || chat.isCreator) return true;
+
+    if (isChannel) {
+      return getHasAdminRight(chat, 'editMessages');
+    }
+
+    const hasPinMessageRight = getHasAdminRight(chat, 'pinMessages');
+    const isPinMessageRightBanned = isUserRightBanned(chat, 'pinMessages', chatFullInfo);
+
+    if (isSuperGroup) {
+      const hasUsernameOrGeo = chat.hasUsername || chat.hasGeo;
+      return (hasPinMessageRight || !hasUsernameOrGeo) && !isPinMessageRightBanned;
+    }
+
+    if (isBasicGroup) {
+      return !chat.isForbidden && !chat.isNotJoined && hasPinMessageRight && !isPinMessageRightBanned;
+    }
+
+    return hasPinMessageRight;
+  })();
+
+  // https://github.com/telegramdesktop/tdesktop/blob/335095a332607c41a8d20b47e61f5bbd66366d4b/Telegram/SourceFiles/data/data_peer.cpp#L653
+  const canEditMessagesIndefinitely = (() => {
+    if (content.todo) return true;
+    if (isPrivate) return isChatWithSelf;
+    if (isBasicGroup) return false;
+    if (isSuperGroup) return canPinMessage;
+    if (isChannel) return chat.isCreator || getHasAdminRight(chat, 'editMessages');
+    return false;
+  })();
+
   const isMessageEditable = (
     (
       canEditMessagesIndefinitely
-      || getServerTime() - message.date < MESSAGE_EDIT_ALLOWED_TIME
+      || getServerTime() - message.date < (global.config?.editTimeLimit || Infinity)
     ) && !(
-      content.sticker || content.contact || content.poll || content.action
+      content.sticker || content.contact || content.pollId || content.action
       || (content.video?.isRound) || content.location || content.invoice || content.giveaway || content.giveawayResults
       || isDocumentSticker
     )
@@ -650,13 +738,7 @@ export function selectAllowedMessageActionsSlow<T extends GlobalState>(
   const canReplyGlobally = canReply || (!isSavedDialog && !isLocal && !isServiceNotification
     && (isSuperGroup || isBasicGroup || isChatChannel(chat)));
 
-  const hasPinPermission = isPrivate || (
-    chat.isCreator
-    || (!isChannel && !isUserRightBanned(chat, 'pinMessages'))
-    || getHasAdminRight(chat, 'pinMessages')
-  );
-
-  let canPin = !isLocal && !isServiceNotification && !isAction && hasPinPermission && !isSavedDialog;
+  let canPin = !isLocal && !isServiceNotification && !isAction && canPinMessage && !isSavedDialog;
   let canUnpin = false;
 
   const pinnedMessageIds = selectPinnedIds(global, chat.id, threadId);
@@ -690,35 +772,19 @@ export function selectAllowedMessageActionsSlow<T extends GlobalState>(
 
   const canEdit = !isLocal && !isAction && isMessageEditable && hasMessageEditRight;
 
-  const story = content.storyData
-    ? selectPeerStory(global, content.storyData.peerId, content.storyData.id)
-    : (content.webPage?.story
-      ? selectPeerStory(global, content.webPage.story.peerId, content.webPage.story.id)
-      : undefined
-    );
-
-  const isChatProtected = selectIsChatProtected(global, message.chatId);
-  const isStoryForwardForbidden = story && ('isDeleted' in story || ('noForwards' in story && story.noForwards));
-  const canForward = (
-    !isLocal && !isAction && !isChatProtected && !isStoryForwardForbidden
-    && (message.isForwardingAllowed || isServiceNotification) && !hasTtl
-  );
-
   const hasSticker = Boolean(message.content.sticker);
   const hasFavoriteSticker = hasSticker && selectIsStickerFavorite(global, message.content.sticker!);
   const canFaveSticker = !isAction && hasSticker && !hasFavoriteSticker;
   const canUnfaveSticker = !isAction && hasFavoriteSticker;
   const canCopy = !isAction;
-  const canCopyLink = !isLocal && !isAction && (isChannel || isSuperGroup);
+  const canCopyLink = !isLocal && !isAction && (isChannel || isSuperGroup) && !isMonoforum;
   const canSelect = !isLocal && !isAction;
 
-  const canDownload = Boolean(content.webPage?.document || content.webPage?.video || content.webPage?.photo
-      || content.audio || content.voice || content.photo || content.video || content.document || content.sticker)
-    && !hasTtl;
+  const canDownload = selectMessageDownloadableMedia(global, message) && !hasTtl;
 
   const canSaveGif = message.content.video?.isGif;
 
-  const poll = content.poll;
+  const poll = content.pollId ? selectPoll(global, content.pollId) : undefined;
   const canRevote = !poll?.summary.closed && !poll?.summary.quiz && poll?.results.results?.some((r) => r.isChosen);
   const canClosePoll = hasMessageEditRight && poll && !poll.summary.closed && !isForwarded;
 
@@ -731,7 +797,6 @@ export function selectAllowedMessageActionsSlow<T extends GlobalState>(
     canReport,
     canDelete,
     canDeleteForAll,
-    canForward,
     canFaveSticker,
     canUnfaveSticker,
     canCopy,
@@ -753,7 +818,6 @@ export function selectAllowedMessageActionsSlow<T extends GlobalState>(
     canReport,
     canDelete,
     canDeleteForAll,
-    canForward,
     canFaveSticker,
     canUnfaveSticker,
     canCopy,
@@ -766,19 +830,19 @@ export function selectAllowedMessageActionsSlow<T extends GlobalState>(
   };
 }
 
-// This selector always returns a new object which can not be safely used in shallow-equal checks
-export function selectCanDeleteSelectedMessages<T extends GlobalState>(
+export function selectCanDeleteMessages<T extends GlobalState>(
   global: T,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
+  chatId: string,
+  threadId: ThreadId,
+  messageIds: number[],
 ) {
-  const { messageIds: selectedMessageIds } = selectTabState(global, tabId).selectedMessages || {};
-  const { chatId, threadId } = selectCurrentMessageList(global, tabId) || {};
-  const chatMessages = chatId && selectChatMessages(global, chatId);
-  if (!chatMessages || !selectedMessageIds || !threadId) {
+  const chatMessages = selectChatMessages(global, chatId);
+
+  if (messageIds.length > API_GENERAL_ID_LIMIT) {
     return {};
   }
 
-  const messageActions = selectedMessageIds
+  const messageActions = messageIds
     .map((id) => chatMessages[id] && selectAllowedMessageActionsSlow(global, chatMessages[id], threadId))
     .filter(Boolean);
 
@@ -786,6 +850,21 @@ export function selectCanDeleteSelectedMessages<T extends GlobalState>(
     canDelete: messageActions.every((actions) => actions.canDelete),
     canDeleteForAll: messageActions.every((actions) => actions.canDeleteForAll),
   };
+}
+
+export function selectCanDeleteSelectedMessages<T extends GlobalState>(
+  global: T,
+  messageIds?: number[],
+  ...[tabId = getCurrentTabId()]: TabArgs<T>
+) {
+  const { messageIds: selectedMessageIds } = selectTabState(global, tabId).selectedMessages || {};
+  const { chatId, threadId } = selectCurrentMessageList(global, tabId) || {};
+  const messageIdList = messageIds?.length ? messageIds : selectedMessageIds;
+  if (!chatId || !threadId || !messageIdList) {
+    return {};
+  }
+
+  return selectCanDeleteMessages(global, chatId, threadId, messageIdList);
 }
 
 export function selectCanReportSelectedMessages<T extends GlobalState>(
@@ -909,9 +988,7 @@ export function selectFirstUnreadId<T extends GlobalState>(
       return (
         (!lastReadId || id > lastReadId)
         && byId[id]
-        // For some reason outgoing topic actions are not marked as read, thus we need to mark them as read
-        // when the edit message hits the viewport
-        && ((!byId[id].isOutgoing || byId[id].content.action?.isTopicAction) || byId[id].isFromScheduled)
+        && (!byId[id].isOutgoing || byId[id].isFromScheduled)
         && id > lastReadServiceNotificationId
       );
     });
@@ -1108,8 +1185,9 @@ export function selectCanAutoLoadMedia<T extends GlobalState>(
 
   const sender = 'id' in message ? selectSender(global, message) : undefined;
 
-  const isPhoto = Boolean(getMessagePhoto(message) || getMessageWebPagePhoto(message));
-  const isVideo = Boolean(getMessageVideo(message) || getMessageWebPageVideo(message));
+  const webPage = selectWebPageFromMessage(global, message);
+  const isPhoto = Boolean(getMessagePhoto(message) || getWebPagePhoto(webPage));
+  const isVideo = Boolean(getMessageVideo(message) || getWebPageVideo(webPage));
   const isFile = Boolean(getMessageAudio(message) || getMessageVoice(message) || getMessageDocument(message));
 
   const {
@@ -1244,9 +1322,26 @@ export function selectCanForwardMessages<T extends GlobalState>(global: T, chatI
       && (message.isForwardingAllowed || isServiceNotificationMessage(message)));
 }
 
+export function selectHasIpRevealingMedia<T extends GlobalState>(global: T, chatId: string, messageIds: number[]) {
+  const messages = selectChatMessages(global, chatId);
+
+  return messageIds
+    .map((id) => messages[id])
+    .some((message) => {
+      if (!message) return false;
+
+      const document = getMessageDocument(message);
+      if (!document) return false;
+
+      const extension = getDocumentExtension(document);
+      if (!extension) return false;
+
+      return isIpRevealingMedia({ mimeType: document.mimeType, extension });
+    });
+}
+
 export function selectSponsoredMessage<T extends GlobalState>(global: T, chatId: string) {
-  const chat = selectChat(global, chatId);
-  const message = chat && isChatChannel(chat) ? global.messages.sponsoredByChatId[chatId] : undefined;
+  const message = global.messages.sponsoredByChatId[chatId];
 
   return message && message.expiresAt >= Math.round(Date.now() / 1000) ? message : undefined;
 }
@@ -1273,9 +1368,7 @@ export function selectDefaultReaction<T extends GlobalState>(global: T, chatId: 
 }
 
 export function selectMaxUserReactions<T extends GlobalState>(global: T): number {
-  const isPremium = selectIsCurrentUserPremium(global);
-  const { maxUserReactionsPremium = 3, maxUserReactionsDefault = 1 } = global.appConfig || {};
-  return isPremium ? maxUserReactionsPremium : maxUserReactionsDefault;
+  return selectCurrentLimit(global, 'maxReactions');
 }
 
 // Slow, not to be used in `withGlobal`
@@ -1306,12 +1399,21 @@ export function selectShouldSchedule<T extends GlobalState>(
   return selectCurrentMessageList(global, tabId)?.type === 'scheduled';
 }
 
+export function selectCanSchedule<T extends GlobalState>(
+  global: T,
+  ...[tabId = getCurrentTabId()]: TabArgs<T>
+) {
+  const chatId = selectCurrentMessageList(global, tabId)?.chatId;
+  const paidMessagesStars = chatId ? selectPeerPaidMessagesStars(global, chatId) : undefined;
+  return !paidMessagesStars;
+}
+
 export function selectCanScheduleUntilOnline<T extends GlobalState>(global: T, id: string) {
   const isChatWithSelf = selectIsChatWithSelf(global, id);
-  const chatBot = id === REPLIES_USER_ID && selectBot(global, id);
-  return Boolean(
-    !isChatWithSelf && !chatBot && isUserId(id) && selectUserStatus(global, id)?.wasOnline,
-  );
+  const chatBot = selectBot(global, id);
+  const paidMessagesStars = selectPeerPaidMessagesStars(global, id);
+  return Boolean(!paidMessagesStars
+    && !isChatWithSelf && !chatBot && isUserId(id) && selectUserStatus(global, id)?.wasOnline);
 }
 
 export function selectCustomEmojis(message: ApiMessage) {
@@ -1326,7 +1428,7 @@ export function selectMessageCustomEmojiSets<T extends GlobalState>(
 ): ApiStickerSetInfo[] | undefined {
   const customEmojis = selectCustomEmojis(message);
   if (!customEmojis) return MEMO_EMPTY_ARRAY;
-  const documents = customEmojis.map((entity) => global.customEmojis.byId[entity.documentId]);
+  const documents = customEmojis.map((entity) => selectCustomEmoji(global, entity.documentId));
   // If some emoji still loading, do not return empty array
   if (!documents.every(Boolean)) return undefined;
   const sets = documents.map((doc) => doc.stickerSetInfo);
@@ -1388,7 +1490,7 @@ export function selectReplyCanBeSentToChat<T extends GlobalState>(
   if (!replyInfo.replyToMsgId) return false;
   const fromRealChatId = replyInfo?.replyToPeerId ?? fromChatId;
   if (toChatId === fromRealChatId) return true;
-  const chatMessages = selectChatMessages(global, fromRealChatId!);
+  const chatMessages = selectChatMessages(global, fromRealChatId);
   const message = chatMessages[replyInfo.replyToMsgId];
 
   return !isExpiredMessage(message);
@@ -1408,7 +1510,10 @@ export function selectForwardsCanBeSentToChat<T extends GlobalState>(
 
   const chatFullInfo = selectChatFullInfo(global, toChatId);
   const chatMessages = selectChatMessages(global, fromChatId!);
-  const options = getAllowedAttachmentOptions(chat, chatFullInfo);
+
+  const isSavedMessages = toChatId ? selectIsChatWithSelf(global, toChatId) : undefined;
+  const isChatWithBot = toChatId ? selectIsChatWithBot(global, chat) : undefined;
+  const options = getAllowedAttachmentOptions(chat, chatFullInfo, isChatWithBot, isSavedMessages);
   return !messageIds!.some((messageId) => сheckMessageSendingDenied(chatMessages[messageId], options));
 }
 function сheckMessageSendingDenied(message: ApiMessage, options: IAllowedAttachmentOptions) {
@@ -1477,4 +1582,28 @@ export function selectMessageReplyInfo<T extends GlobalState>(
   };
 
   return replyInfo;
+}
+
+export function selectReplyMessage<T extends GlobalState>(global: T, message: ApiMessage) {
+  const { replyToMsgId, replyToPeerId } = getMessageReplyInfo(message) || {};
+  const replyMessage = replyToMsgId
+    ? selectChatMessage(global, replyToPeerId || message.chatId, replyToMsgId) : undefined;
+
+  return replyMessage;
+}
+
+export function selectActiveRestrictionReasons<T extends GlobalState>(
+  global: T, restrictionReasons?: ApiRestrictionReason[],
+): ApiRestrictionReason[] {
+  if (!restrictionReasons) return [];
+
+  const { ignoreRestrictionReasons } = global.appConfig;
+
+  return restrictionReasons.filter((reason) => {
+    const isForCurrentPlatform = reason.platform === 'all' || reason.platform === WEB_APP_PLATFORM;
+    if (!isForCurrentPlatform) return false;
+
+    const shouldIgnore = ignoreRestrictionReasons?.includes(reason.reason);
+    return !shouldIgnore;
+  });
 }

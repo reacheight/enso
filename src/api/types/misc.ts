@@ -1,5 +1,11 @@
-import type { ApiLimitType, ApiPremiumSection, CallbackAction } from '../../global/types';
+import type { TeactNode } from '../../lib/teact/teact';
+
+import type { CallbackAction } from '../../global/types';
+import type { IconName } from '../../types/icons';
+import type { RegularLangFnParameters } from '../../util/localization';
 import type { ApiDocument, ApiPhoto, ApiReaction } from './messages';
+import type { ApiPremiumSection } from './payments';
+import type { ApiStarsSubscriptionPricing } from './stars';
 import type { ApiUser } from './users';
 
 export interface ApiInitialArgs {
@@ -16,6 +22,8 @@ export interface ApiInitialArgs {
   shouldForceHttpTransport?: boolean;
   shouldDebugExportedSenders?: boolean;
   langCode: string;
+  isTestServerRequested?: boolean;
+  accountIds?: string[];
 }
 
 export interface ApiOnProgress {
@@ -28,6 +36,7 @@ export interface ApiOnProgress {
 }
 
 export interface ApiAttachment {
+  blob: Blob;
   blobUrl: string;
   compressedBlobUrl?: string;
   filename: string;
@@ -54,6 +63,7 @@ export interface ApiAttachment {
 
   uniqueId?: string;
   ttlSeconds?: number;
+  shouldSendInHighQuality?: boolean;
 }
 
 export interface ApiWallpaper {
@@ -95,25 +105,27 @@ export interface ApiWebSession {
 
 export interface ApiSessionData {
   mainDcId: number;
-  keys: Record<number, string | number[]>;
-  hashes: Record<number, string | number[]>;
+  keys: Record<number, string>;
+  isTest?: true;
 }
-
-export type ApiNotifyException = {
-  chatId: string;
-  isMuted: boolean;
-  isSilent?: boolean;
-  shouldShowPreviews?: boolean;
-};
 
 export type ApiNotification = {
   localId: string;
-  title?: string;
-  message: string;
-  actionText?: string;
+  containerSelector?: string;
+  type?: 'paidMessage' | undefined;
+  title?: string | RegularLangFnParameters;
+  message: TeactNode | RegularLangFnParameters;
+  cacheBreaker?: string;
+  actionText?: string | RegularLangFnParameters;
   action?: CallbackAction | CallbackAction[];
   className?: string;
   duration?: number;
+  disableClickDismiss?: boolean;
+  shouldShowTimer?: boolean;
+  icon?: IconName;
+  customEmojiIconId?: string;
+  shouldUseCustomIcon?: boolean;
+  dismissAction?: CallbackAction;
 };
 
 export type ApiError = {
@@ -126,16 +138,6 @@ export type ApiError = {
 export type ApiFieldError = {
   field: string;
   message: string;
-};
-
-export type ApiInviteInfo = {
-  title: string;
-  about?: string;
-  hash: string;
-  isChannel?: boolean;
-  participantsCount?: number;
-  isRequestNeeded?: true;
-  photo?: ApiPhoto;
 };
 
 export type ApiExportedInvite = {
@@ -151,6 +153,27 @@ export type ApiExportedInvite = {
   requested?: number;
   title?: string;
   adminId: string;
+};
+
+export type ApiChatInviteInfo = {
+  title: string;
+  about?: string;
+  photo?: ApiPhoto;
+  isScam?: boolean;
+  isFake?: boolean;
+  isChannel?: boolean;
+  isVerified?: boolean;
+  isSuperGroup?: boolean;
+  isPublic?: boolean;
+  participantsCount?: number;
+  participantIds?: string[];
+  color: number;
+  isBroadcast?: boolean;
+  isRequestNeeded?: boolean;
+  subscriptionFormId?: string;
+  canRefulfillSubscription?: boolean;
+  subscriptionPricing?: ApiStarsSubscriptionPricing;
+  botVerification?: ApiBotVerification;
 };
 
 export type ApiChatInviteImporter = {
@@ -182,7 +205,8 @@ export interface ApiAppConfig {
   readDateExpiresAt: number;
   autologinDomains: string[];
   urlAuthDomains: string[];
-  premiumInvoiceSlug: string;
+  whitelistedDomains: string[];
+  premiumInvoiceSlug?: string;
   premiumBotUsername: string;
   isPremiumPurchaseBlocked: boolean;
   isGiveawayGiftsPurchaseAvailable: boolean;
@@ -194,24 +218,61 @@ export interface ApiAppConfig {
   defaultEmojiStatusesStickerSetId: string;
   maxUniqueReactions: number;
   topicsPinnedLimit: number;
-  maxUserReactionsDefault: number;
-  maxUserReactionsPremium: number;
   hiddenMembersMinCount: number;
   limits: Record<ApiLimitType, readonly [number, number]>;
-  canDisplayAutoarchiveSetting: boolean;
-  areStoriesHidden?: boolean;
-  storyExpirePeriod: number;
+  canDisplayAutoarchiveSetting?: boolean;
   storyViewersExpirePeriod: number;
   storyChangelogUserId: string;
-  maxPinnedStoriesCount?: number;
-  groupTranscribeLevelMin?: number;
-  canLimitNewMessagesWithoutPremium?: boolean;
+  maxPinnedStoriesCount: number;
+  groupTranscribeLevelMin: number;
+  canLimitNewMessagesWithoutPremium: boolean;
+  starsPaidMessagesAvailable?: boolean;
+  starsPaidMessageCommissionPermille?: number;
+  starsPaidMessageAmountMax?: number;
+  starsUsdWithdrawRateX1000: number;
   bandwidthPremiumNotifyPeriod?: number;
   bandwidthPremiumUploadSpeedup?: number;
   bandwidthPremiumDownloadSpeedup?: number;
   channelRestrictAdsLevelMin?: number;
+  channelAutoTranslationLevelMin?: number;
+  channelLevelMax: number;
+  paidReactionMaxAmount?: number;
   isChannelRevenueWithdrawalEnabled?: boolean;
-  isStarsGiftsEnabled?: boolean;
+  isStarsGiftEnabled?: boolean;
+  starGiftMaxMessageLength?: number;
+  starGiftMaxConvertPeriod?: number;
+  starRefStartPrefixes?: string[];
+  tonExplorerUrl?: string;
+  savedGiftPinLimit?: number;
+  freezeSinceDate?: number;
+  freezeUntilDate?: number;
+  freezeAppealUrl?: string;
+  starsStargiftResaleAmountMin?: number;
+  starsStargiftResaleAmountMax?: number;
+  starsStargiftResaleCommissionPermille?: number;
+  starsSuggestedPostAmountMax: number;
+  starsSuggestedPostAmountMin: number;
+  starsSuggestedPostCommissionPermille: number;
+  starsSuggestedPostAgeMin: number;
+  starsSuggestedPostFutureMax: number;
+  starsSuggestedPostFutureMin: number;
+  tonSuggestedPostCommissionPermille: number;
+  tonSuggestedPostAmountMax: number;
+  tonSuggestedPostAmountMin: number;
+  tonStargiftResaleAmountMax?: number;
+  tonStargiftResaleAmountMin?: number;
+  tonStargiftResaleCommissionPermille?: number;
+  tonUsdRate?: number;
+  tonTopupUrl: string;
+  pollMaxAnswers?: number;
+  todoItemsMax: number;
+  todoTitleLengthMax: number;
+  todoItemLengthMax: number;
+  ignoreRestrictionReasons?: string[];
+  needAgeVideoVerification?: boolean;
+  verifyAgeBotUsername?: string;
+  verifyAgeCountry?: string;
+  verifyAgeMin?: number;
 }
 
 export interface ApiConfig {
@@ -220,18 +281,20 @@ export interface ApiConfig {
   gifSearchUsername?: string;
   maxGroupSize: number;
   autologinToken?: string;
+  isTestServer?: boolean;
+  maxMessageLength: number;
+  editTimeLimit: number;
+  maxForwardedCount: number;
 }
 
 export type ApiPeerColorSet = string[];
 
 export interface ApiPeerColors {
-  general: {
-    [key: number]: {
-      isHidden?: true;
-      colors?: ApiPeerColorSet;
-      darkColors?: ApiPeerColorSet;
-    };
-  };
+  general: Record<number, {
+    isHidden?: true;
+    colors?: ApiPeerColorSet;
+    darkColors?: ApiPeerColorSet;
+  }>;
   generalHash?: number;
 }
 
@@ -271,7 +334,7 @@ type ApiUrlAuthResultDefault = {
 
 export type ApiUrlAuthResult = ApiUrlAuthResultRequest | ApiUrlAuthResultAccepted | ApiUrlAuthResultDefault;
 
-export interface ApiCollectionInfo {
+export interface ApiCollectibleInfo {
   amount: number;
   currency: string;
   cryptoAmount: number;
@@ -287,4 +350,52 @@ export interface ApiPeerPhotos {
   count: number;
   nextOffset?: number;
   isLoading?: boolean;
+}
+
+export interface ApiBotVerification {
+  botId: string;
+  iconId: string;
+  description: string;
+}
+
+export type ApiLimitType =
+  | 'uploadMaxFileparts'
+  | 'stickersFaved'
+  | 'savedGifs'
+  | 'dialogFiltersChats'
+  | 'dialogFilters'
+  | 'dialogFolderPinned'
+  | 'captionLength'
+  | 'channels'
+  | 'channelsPublic'
+  | 'aboutLength'
+  | 'chatlistInvites'
+  | 'chatlistJoined'
+  | 'recommendedChannels'
+  | 'savedDialogsPinned'
+  | 'maxReactions'
+  | 'moreAccounts';
+
+export type ApiLimitTypeWithModal = Exclude<ApiLimitType, (
+  'captionLength' | 'aboutLength' | 'stickersFaved' | 'savedGifs' | 'recommendedChannels' | 'moreAccounts'
+  | 'maxReactions'
+)>;
+
+export type ApiLimitTypeForPromo = Exclude<ApiLimitType,
+'uploadMaxFileparts' | 'chatlistInvites' | 'chatlistJoined' | 'savedDialogsPinned' | 'maxReactions'
+>;
+
+export type ApiPeerNotifySettings = {
+  mutedUntil?: number;
+  hasSound?: boolean;
+  isSilentPosting?: boolean;
+  shouldShowPreviews?: boolean;
+};
+
+export type ApiNotifyPeerType = 'users' | 'groups' | 'channels';
+
+export interface ApiRestrictionReason {
+  reason: string;
+  text: string;
+  platform: string;
 }

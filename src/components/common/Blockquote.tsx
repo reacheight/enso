@@ -1,4 +1,4 @@
-import React, {
+import {
   type TeactNode,
   useRef,
 } from '../../lib/teact/teact';
@@ -23,8 +23,7 @@ type OwnProps = {
 const MAX_LINES = 4;
 
 const Blockquote = ({ canBeCollapsible, isToggleDisabled, children }: OwnProps) => {
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLQuoteElement>(null);
+  const ref = useRef<HTMLQuoteElement>();
   const {
     isCollapsed, isCollapsible, setIsCollapsed,
   } = useCollapsibleLines(ref, MAX_LINES, undefined, !canBeCollapsible);
@@ -40,12 +39,16 @@ const Blockquote = ({ canBeCollapsible, isToggleDisabled, children }: OwnProps) 
   });
 
   return (
-    <span className={styles.root} onClick={canExpand ? handleExpand : undefined}>
+    <span
+      className={buildClassName(styles.root, isCollapsed && styles.collapsed)}
+      onClick={canExpand ? handleExpand : undefined}
+    >
       <blockquote
+        className={styles.blockquote}
         ref={ref}
         data-entity-type={ApiMessageEntityTypes.Blockquote}
       >
-        <div className={buildClassName(styles.gradientContainer, isCollapsed && styles.collapsed)}>
+        <div className={styles.gradientContainer}>
           {children}
         </div>
         {isCollapsible && (

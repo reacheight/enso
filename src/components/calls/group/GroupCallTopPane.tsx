@@ -1,6 +1,6 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
-  memo, useCallback, useEffect, useMemo,
+import {
+  memo, useCallback, useMemo,
 } from '../../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../../global';
 
@@ -12,7 +12,7 @@ import buildClassName from '../../../util/buildClassName';
 
 import useCurrentOrPrev from '../../../hooks/useCurrentOrPrev';
 import useOldLang from '../../../hooks/useOldLang';
-import useShowTransitionDeprecated from '../../../hooks/useShowTransitionDeprecated';
+import useHeaderPane, { type PaneState } from '../../middle/hooks/useHeaderPane';
 
 import AvatarList from '../../common/AvatarList';
 import Button from '../../ui/Button';
@@ -21,8 +21,8 @@ import './GroupCallTopPane.scss';
 
 type OwnProps = {
   chatId: string;
-  hasPinnedOffset: boolean;
   className?: string;
+  onPaneStateChange?: (state: PaneState) => void;
 };
 
 type StateProps = {
@@ -37,11 +37,10 @@ const GroupCallTopPane: FC<OwnProps & StateProps> = ({
   isActive,
   className,
   groupCall,
-  hasPinnedOffset,
+  onPaneStateChange,
 }) => {
   const {
     requestMasterAndJoinGroupCall,
-    subscribeToGroupCallUpdates,
   } = getActions();
 
   const lang = useOldLang();
@@ -69,40 +68,24 @@ const GroupCallTopPane: FC<OwnProps & StateProps> = ({
       .filter(Boolean);
   }, [participants]);
 
-  useEffect(() => {
-    if (!groupCall?.id) return undefined;
-    if (!isActive && groupCall.isLoaded) return undefined;
-
-    subscribeToGroupCallUpdates({
-      id: groupCall.id,
-      subscribed: true,
-    });
-
-    return () => {
-      subscribeToGroupCallUpdates({
-        id: groupCall.id,
-        subscribed: false,
-      });
-    };
-  }, [groupCall?.id, groupCall?.isLoaded, isActive, subscribeToGroupCallUpdates]);
-
-  const {
-    shouldRender,
-    transitionClassNames,
-  } = useShowTransitionDeprecated(Boolean(groupCall && isActive));
-
   const renderingParticipantCount = useCurrentOrPrev(groupCall?.participantsCount, true);
   const renderingFetchedParticipants = useCurrentOrPrev(fetchedParticipants, true);
+
+  const isRendering = Boolean(groupCall && isActive);
+
+  const { ref, shouldRender } = useHeaderPane({
+    isOpen: isRendering,
+    onStateChange: onPaneStateChange,
+  });
 
   if (!shouldRender) return undefined;
 
   return (
     <div
+      ref={ref}
       className={buildClassName(
         'GroupCallTopPane',
-        hasPinnedOffset && 'has-pinned-offset',
         className,
-        transitionClassNames,
       )}
       onClick={handleJoinGroupCall}
     >
@@ -121,7 +104,7 @@ const GroupCallTopPane: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { chatId }): StateProps => {
+  (global, { chatId }): Complete<StateProps> => {
     const chat = selectChat(global, chatId)!;
     const groupCall = selectChatGroupCall(global, chatId);
     const activeGroupCallId = selectTabState(global).isMasterTab ? global.groupCalls.activeGroupCallId : undefined;

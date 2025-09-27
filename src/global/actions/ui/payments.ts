@@ -1,9 +1,14 @@
+import type { ApiSavedGifts } from '../../../api/types';
 import type { ActionReturnType } from '../../types';
 
+import { DEFAULT_GIFT_PROFILE_FILTER_OPTIONS } from '../../../config';
+import { selectActiveGiftsCollectionId } from '../../../global/selectors';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
-import { addActionHandler } from '../../index';
+import { addActionHandler, setGlobal } from '../../index';
 import {
-  clearPayment, closeInvoice, openStarsTransactionModal, updatePayment,
+  clearPayment,
+  updatePayment,
+  updateStarsPayment,
 } from '../../reducers';
 import { updateTabState } from '../../reducers/tabs';
 import { selectTabState } from '../../selectors';
@@ -12,26 +17,27 @@ addActionHandler('closePaymentModal', (global, actions, payload): ActionReturnTy
   const { tabId = getCurrentTabId() } = payload || {};
   const payment = selectTabState(global, tabId).payment;
   const status = payment.status || 'cancelled';
-  const originPayment = selectTabState(global, tabId).starsBalanceModal?.originPayment;
+  const starsBalanceModal = selectTabState(global, tabId).starsBalanceModal;
+
+  actions.processOriginStarsPayment({
+    originData: starsBalanceModal,
+    status,
+    tabId,
+  });
+
   global = clearPayment(global, tabId);
-  global = closeInvoice(global, tabId);
-  global = updateTabState(global, {
-    payment: {
-      ...selectTabState(global, tabId).payment,
-      status,
-    },
-    ...(originPayment && {
-      starsBalanceModal: undefined,
-    }),
+  global = updatePayment(global, {
+    status,
   }, tabId);
 
-  // Re-open previous payment modal
-  if (originPayment) {
-    global = updatePayment(global, originPayment, tabId);
-    global = updateTabState(global, {
-      isStarPaymentModalOpen: true,
-    }, tabId);
-  }
+  return global;
+});
+
+addActionHandler('resetPaymentStatus', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+
+  global = updatePayment(global, { status: undefined }, tabId);
+  global = updateStarsPayment(global, { status: undefined }, tabId);
   return global;
 });
 
@@ -47,6 +53,14 @@ addActionHandler('addPaymentError', (global, actions, payload): ActionReturnType
   }, tabId);
 });
 
+addActionHandler('closeGiveawayModal', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+
+  return updateTabState(global, {
+    giveawayModal: undefined,
+  }, tabId);
+});
+
 addActionHandler('closeGiftCodeModal', (global, actions, payload): ActionReturnType => {
   const { tabId = getCurrentTabId() } = payload || {};
 
@@ -55,35 +69,124 @@ addActionHandler('closeGiftCodeModal', (global, actions, payload): ActionReturnT
   }, tabId);
 });
 
-addActionHandler('openStarsBalanceModal', (global, actions, payload): ActionReturnType => {
-  const { originPayment, tabId = getCurrentTabId() } = payload || {};
+addActionHandler('updateGiftProfileFilter', (global, actions, payload): ActionReturnType => {
+  const { filter, peerId, tabId = getCurrentTabId() } = payload || {};
+  const tabState = selectTabState(global, tabId);
 
-  global = clearPayment(global, tabId);
+  const prevFilter = tabState.savedGifts.filter;
+  let updatedFilter = {
+    ...prevFilter,
+    ...filter,
+  };
+
+  if (!updatedFilter.shouldIncludeUnlimited
+    && !updatedFilter.shouldIncludeLimited
+    && !updatedFilter.shouldIncludeUnique
+    && !updatedFilter.shouldIncludeUpgradable) {
+    updatedFilter = {
+      ...prevFilter,
+      shouldIncludeUnlimited: true,
+      shouldIncludeLimited: true,
+      shouldIncludeUnique: true,
+      shouldIncludeUpgradable: true,
+      ...filter,
+    };
+  }
+
+  if (!updatedFilter.shouldIncludeDisplayed && !updatedFilter.shouldIncludeHidden) {
+    updatedFilter = {
+      ...prevFilter,
+      shouldIncludeDisplayed: true,
+      shouldIncludeHidden: true,
+      ...filter,
+    };
+  }
+
+  const activeCollectionId = selectActiveGiftsCollectionId(global, peerId, tabId);
+
+  global = updateTabState(global, {
+    savedGifts: {
+      ...tabState.savedGifts,
+      collectionsByPeerId: {
+        [peerId]: {
+          [activeCollectionId]: tabState.savedGifts.collectionsByPeerId[peerId]?.[activeCollectionId],
+        } as Record<number | 'all', ApiSavedGifts>,
+      },
+      filter: updatedFilter,
+    },
+  }, tabId);
+  setGlobal(global);
+
+  actions.loadPeerSavedGifts({
+    peerId, shouldRefresh: true, tabId: tabState.id,
+  });
+});
+
+addActionHandler('resetGiftProfileFilter', (global, actions, payload): ActionReturnType => {
+  const { peerId, tabId = getCurrentTabId() } = payload || {};
+  const tabState = selectTabState(global, tabId);
+
+  const activeCollectionId = selectActiveGiftsCollectionId(global, peerId, tabId);
+
+  global = updateTabState(global, {
+    savedGifts: {
+      ...tabState.savedGifts,
+      collectionsByPeerId: {
+        [peerId]: {
+          [activeCollectionId]: tabState.savedGifts.collectionsByPeerId[peerId]?.[activeCollectionId],
+        } as Record<number | 'all', ApiSavedGifts>,
+      },
+      filter: {
+        ...DEFAULT_GIFT_PROFILE_FILTER_OPTIONS,
+      },
+    },
+  }, tabId);
+  setGlobal(global);
+
+  actions.loadPeerSavedGifts({
+    peerId, shouldRefresh: true, tabId: tabState.id,
+  });
+});
+
+addActionHandler('openPaymentMessageConfirmDialogOpen', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
 
   return updateTabState(global, {
-    starsBalanceModal: {
-      originPayment,
+    isPaymentMessageConfirmDialogOpen: true,
+  }, tabId);
+});
+
+addActionHandler('closePaymentMessageConfirmDialogOpen', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+
+  return updateTabState(global, {
+    isPaymentMessageConfirmDialogOpen: false,
+  }, tabId);
+});
+
+addActionHandler('openPriceConfirmModal', (global, actions, payload): ActionReturnType => {
+  const {
+    originalAmount,
+    newAmount,
+    currency,
+    directInfo,
+    tabId = getCurrentTabId(),
+  } = payload;
+
+  return updateTabState(global, {
+    priceConfirmModal: {
+      originalAmount,
+      newAmount,
+      currency,
+      directInfo,
     },
   }, tabId);
 });
 
-addActionHandler('closeStarsBalanceModal', (global, actions, payload): ActionReturnType => {
+addActionHandler('closePriceConfirmModal', (global, actions, payload): ActionReturnType => {
   const { tabId = getCurrentTabId() } = payload || {};
 
   return updateTabState(global, {
-    starsBalanceModal: undefined,
-  }, tabId);
-});
-
-addActionHandler('openStarsTransactionModal', (global, actions, payload): ActionReturnType => {
-  const { transaction, tabId = getCurrentTabId() } = payload;
-  return openStarsTransactionModal(global, transaction, tabId);
-});
-
-addActionHandler('closeStarsTransactionModal', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-
-  return updateTabState(global, {
-    starsTransactionModal: undefined,
+    priceConfirmModal: undefined,
   }, tabId);
 });

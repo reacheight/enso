@@ -1,16 +1,25 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useMemo } from '../../../lib/teact/teact';
+import type React from '../../../lib/teact/teact';
+import { memo, useMemo } from '../../../lib/teact/teact';
+import { getActions } from '../../../global';
 
 import type { ApiChat, ApiTopic } from '../../../api/types';
 import type { Signal } from '../../../util/signals';
 
 import buildClassName from '../../../util/buildClassName';
+import { getServerTime } from '../../../util/serverTime';
 import { isSignal } from '../../../util/signals';
 import { formatIntegerCompact } from '../../../util/textFormat';
+import { extractCurrentThemeParams } from '../../../util/themeStyle';
 
 import useDerivedState from '../../../hooks/useDerivedState';
+import useLang from '../../../hooks/useLang';
+import useLastCallback from '../../../hooks/useLastCallback';
+import useOldLang from '../../../hooks/useOldLang';
 
 import AnimatedCounter from '../../common/AnimatedCounter';
+import Icon from '../../common/icons/Icon';
+import Button from '../../ui/Button';
 import ShowTransition from '../../ui/ShowTransition';
 
 import './ChatBadge.scss';
@@ -23,8 +32,10 @@ type OwnProps = {
   isMuted?: boolean;
   isSavedDialog?: boolean;
   shouldShowOnlyMostImportant?: boolean;
+  hasMiniApp?: boolean;
   forceHidden?: boolean | Signal<boolean>;
   topics?: Record<number, ApiTopic>;
+  isSelected?: boolean;
 };
 
 const ChatBadge: FC<OwnProps> = ({
@@ -37,7 +48,14 @@ const ChatBadge: FC<OwnProps> = ({
   wasTopicOpened,
   forceHidden,
   isSavedDialog,
+  hasMiniApp,
+  isSelected,
 }) => {
+  const { requestMainWebView } = getActions();
+
+  const oldLang = useOldLang();
+  const lang = useLang();
+
   const {
     unreadMentionsCount = 0, unreadReactionsCount = 0,
   } = !chat.isForum ? chat : {}; // TODO[forums] Unread mentions and reactions temporarily disabled for forums
@@ -48,20 +66,29 @@ const ChatBadge: FC<OwnProps> = ({
     isForum && topics ? Object.values(topics).filter(({ unreadCount }) => unreadCount) : undefined
   ), [topics, isForum]);
 
-  const unreadCount = useMemo(() => (
-    isForum
-      // If we have unmuted topics, display the count of those. Otherwise, display the count of all topics.
-      ? ((isMuted && topicsWithUnread?.filter((acc) => acc.isMuted === false).length)
-        || topicsWithUnread?.length)
-      : (topic || chat).unreadCount
-  ), [chat, topic, topicsWithUnread, isForum, isMuted]);
+  const unreadCount = useMemo(() => {
+    if (!isForum) {
+      return (topic || chat).unreadCount;
+    }
 
-  const shouldBeMuted = useMemo(() => {
-    const hasUnmutedUnreadTopics = topics
-      && Object.values(topics).some((acc) => !acc.isMuted && acc.unreadCount);
+    return topicsWithUnread?.length;
+  }, [chat, topic, topicsWithUnread, isForum]);
 
-    return isMuted || (topics && !hasUnmutedUnreadTopics);
-  }, [topics, isMuted]);
+  const shouldBeUnMuted = useMemo(() => {
+    if (!isForum) {
+      return !isMuted || topic?.notifySettings.mutedUntil === 0;
+    }
+
+    if (isMuted) {
+      return topicsWithUnread?.some((acc) => acc.notifySettings.mutedUntil === 0);
+    }
+
+    const isEveryUnreadMuted = topicsWithUnread?.every((acc) => (
+      acc.notifySettings.mutedUntil && acc.notifySettings.mutedUntil > getServerTime()
+    ));
+
+    return !isEveryUnreadMuted;
+  }, [isForum, isMuted, topicsWithUnread, topic?.notifySettings.mutedUntil]);
 
   const hasUnreadMark = topic ? false : chat.hasUnreadMark;
 
@@ -71,44 +98,67 @@ const ChatBadge: FC<OwnProps> = ({
   );
   const isShown = !resolvedForceHidden && Boolean(
     unreadCount || unreadMentionsCount || hasUnreadMark || isPinned || unreadReactionsCount
-    || isTopicUnopened,
+    || isTopicUnopened || hasMiniApp,
   );
 
   const isUnread = Boolean((unreadCount || hasUnreadMark) && !isSavedDialog);
   const className = buildClassName(
     'ChatBadge',
-    shouldBeMuted && 'muted',
+    !shouldBeUnMuted && 'muted',
     !isUnread && isPinned && 'pinned',
     isUnread && 'unread',
   );
 
+  const handleOpenApp = useLastCallback((e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    e.stopPropagation();
+
+    const theme = extractCurrentThemeParams();
+    requestMainWebView({
+      botId: chat.id,
+      peerId: chat.id,
+      theme,
+    });
+  });
+
   function renderContent() {
     const unreadReactionsElement = unreadReactionsCount && (
-      <div className={buildClassName('ChatBadge reaction', shouldBeMuted && 'muted')}>
-        <i className="icon icon-heart" />
+      <div className={buildClassName('ChatBadge reaction', !shouldBeUnMuted && 'muted')}>
+        <Icon name="heart" />
       </div>
     );
 
     const unreadMentionsElement = unreadMentionsCount && (
       <div className="ChatBadge mention">
-        <i className="icon icon-mention" />
+        <Icon name="mention" />
       </div>
     );
 
     const unopenedTopicElement = isTopicUnopened && (
-      <div className={buildClassName('ChatBadge unopened', shouldBeMuted && 'muted')} />
+      <div className={buildClassName('ChatBadge unopened', !shouldBeUnMuted && 'muted')} />
     );
 
     const unreadCountElement = (hasUnreadMark || unreadCount) ? (
       <div className={className}>
-        {!hasUnreadMark && <AnimatedCounter text={formatIntegerCompact(unreadCount!)} />}
+        {!hasUnreadMark && <AnimatedCounter text={formatIntegerCompact(lang, unreadCount!)} />}
       </div>
     ) : undefined;
 
     const pinnedElement = isPinned && (
       <div className={className}>
-        <i className="icon icon-pinned-chat" />
+        <Icon name="pinned-chat" />
       </div>
+    );
+
+    const miniAppButton = hasMiniApp && (
+      <Button
+        color={isSelected ? 'secondary' : 'primary'}
+        className="ChatBadge miniapp"
+        pill
+        size="tiny"
+        onClick={handleOpenApp}
+      >
+        {oldLang('BotOpen')}
+      </Button>
     );
 
     const visiblePinnedElement = !unreadCountElement && !unreadMentionsElement && !unreadReactionsElement
@@ -119,6 +169,9 @@ const ChatBadge: FC<OwnProps> = ({
     ].filter(Boolean);
 
     if (isSavedDialog) return pinnedElement;
+
+    // Show only if empty or have pinned icon
+    if (hasMiniApp && (elements.length === 0 || visiblePinnedElement)) return miniAppButton;
 
     if (elements.length === 0) return undefined;
 

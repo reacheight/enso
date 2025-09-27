@@ -1,5 +1,6 @@
 import type { FC } from '../../lib/teact/teact';
-import React, {
+import type React from '../../lib/teact/teact';
+import {
   memo,
   useEffect,
   useMemo,
@@ -29,6 +30,7 @@ type OwnProps = {
   topics?: Record<number, ApiTopic>;
   renderLastMessage: () => React.ReactNode;
   observeIntersection?: ObserveFn;
+  noForumTitle?: boolean;
 };
 
 const NO_CORNER_THRESHOLD = Number(REM);
@@ -39,13 +41,12 @@ const ChatForumLastMessage: FC<OwnProps> = ({
   topics,
   renderLastMessage,
   observeIntersection,
+  noForumTitle,
 }) => {
   const { openThread } = getActions();
 
-  // eslint-disable-next-line no-null/no-null
-  const lastMessageRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const mainColumnRef = useRef<HTMLDivElement>(null);
+  const lastMessageRef = useRef<HTMLDivElement>();
+  const mainColumnRef = useRef<HTMLDivElement>();
 
   const lang = useOldLang();
 
@@ -103,53 +104,63 @@ const ChatForumLastMessage: FC<OwnProps> = ({
       dir={lang.isRtl ? 'rtl' : undefined}
       style={overwrittenWidth ? `--overwritten-width: ${overwrittenWidth}px` : undefined}
     >
-      {lastActiveTopic && (
-        <div className={styles.titleRow}>
-          <div
-            className={buildClassName(
-              styles.mainColumn,
-              lastActiveTopic.unreadCount && styles.unread,
-            )}
-            ref={mainColumnRef}
-            onClick={handleOpenTopicClick}
-            onMouseDown={handleOpenTopicMouseDown}
-          >
-            <TopicIcon
-              topic={lastActiveTopic}
-              observeIntersection={observeIntersection}
-            />
-            <div className={styles.title}>{renderText(lastActiveTopic.title)}</div>
-            {!overwrittenWidth && isReversedCorner && (
-              <div className={styles.afterWrapper}>
-                <div className={styles.after} />
+      {
+        !noForumTitle && (
+          <>
+            {lastActiveTopic && (
+              <div className={styles.titleRow}>
+                <div
+                  className={buildClassName(
+                    styles.mainColumn,
+                    lastActiveTopic.unreadCount && styles.unread,
+                  )}
+                  ref={mainColumnRef}
+                  onClick={handleOpenTopicClick}
+                  onMouseDown={handleOpenTopicMouseDown}
+                >
+                  <TopicIcon
+                    topic={lastActiveTopic}
+                    observeIntersection={observeIntersection}
+                  />
+                  <div className={styles.title}>{renderText(lastActiveTopic.title)}</div>
+                  {!overwrittenWidth && isReversedCorner && (
+                    <div className={styles.afterWrapper}>
+                      <div className={styles.after} />
+                    </div>
+                  )}
+                </div>
+
+                <div className={styles.otherColumns}>
+                  {otherTopics.map((topic) => (
+                    <div
+                      className={buildClassName(
+                        styles.otherColumn, topic.unreadCount && styles.unread,
+                      )}
+                      key={topic.id}
+                    >
+                      <TopicIcon
+                        topic={topic}
+                        className={styles.otherColumnIcon}
+                        observeIntersection={observeIntersection}
+                      />
+                      <span className={styles.otherColumnTitle}>{renderText(topic.title)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className={styles.ellipsis} />
               </div>
             )}
-          </div>
-
-          <div className={styles.otherColumns}>
-            {otherTopics.map((topic) => (
-              <div
-                className={buildClassName(
-                  styles.otherColumn, topic.unreadCount && styles.unread,
-                )}
-                key={topic.id}
-              >
-                <TopicIcon
-                  topic={topic}
-                  className={styles.otherColumnIcon}
-                  observeIntersection={observeIntersection}
-                />
-                <span className={styles.otherColumnTitle}>{renderText(topic.title)}</span>
+            {!lastActiveTopic && (
+              <div className={buildClassName(styles.titleRow, styles.loading)}>
+                {lang('Loading')}
               </div>
-            ))}
-          </div>
-
-          <div className={styles.ellipsis} />
-        </div>
-      )}
-      {!lastActiveTopic && <div className={buildClassName(styles.titleRow, styles.loading)}>{lang('Loading')}</div>}
+            )}
+          </>
+        )
+      }
       <div
-        className={buildClassName(styles.lastMessage, lastActiveTopic?.unreadCount && styles.unread)}
+        className={buildClassName(styles.lastMessage, lastActiveTopic?.unreadCount && !noForumTitle && styles.unread)}
         ref={lastMessageRef}
         onClick={handleOpenTopicClick}
         onMouseDown={handleOpenTopicMouseDown}

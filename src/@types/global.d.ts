@@ -12,8 +12,13 @@ declare namespace React {
     teactExperimentControlled?: boolean;
   }
 
-  // Teact feature
+  // Teact features
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-wrapper-object-types
   interface CSSProperties extends String {}
+
+  interface ClassAttributes<T> extends RefAttributes<T> {
+    ref?: ((instance: T | undefined) => void) | React.RefObject<T | undefined> | undefined; // Teact ref
+  }
 
   interface Attributes {
     // Optimization for DOM nodes reordering. Requires `teactFastList` for parent
@@ -22,6 +27,7 @@ declare namespace React {
 
   interface VideoHTMLAttributes {
     srcObject?: MediaStream;
+    defaultMuted?: boolean;
   }
 
   interface MouseEvent {
@@ -41,6 +47,10 @@ type AnyToVoidFunction = (...args: any[]) => void;
 type BooleanToVoidFunction = (value: boolean) => void;
 type NoneToVoidFunction = () => void;
 
+type Complete<T> = {
+  [P in keyof Required<T>]: Pick<T, P> extends Required<Pick<T, P>> ? T[P] : (T[P] | undefined);
+};
+
 type EmojiCategory = {
   id: string;
   name: string;
@@ -59,16 +69,35 @@ type EmojiWithSkins = Record<number, Emoji>;
 
 type AllEmojis = Record<string, Emoji | EmojiWithSkins>;
 
-// Declare supported for import formats as modules
-declare module '*.png';
-declare module '*.svg';
-declare module '*.tgs';
-declare module '*.wasm';
-declare module '*.strings';
+// Declare supported formats as modules
+declare module '*.png' {
+  const url: string;
+  export default url;
+}
 
+declare module '*.jpg' {
+  const url: string;
+  export default url;
+}
+declare module '*.svg' {
+  const url: string;
+  export default url;
+}
 declare module '*.txt' {
-  const content: string;
-  export default content;
+  const url: string;
+  export default url;
+}
+declare module '*.tgs' {
+  const url: string;
+  export default url;
+}
+declare module '*.wasm' {
+  const url: string;
+  export default url;
+}
+declare module '*.strings' {
+  const url: string;
+  export default url;
 }
 
 declare module 'pako/dist/pako_inflate' {
@@ -77,9 +106,10 @@ declare module 'pako/dist/pako_inflate' {
 
 declare module 'opus-recorder' {
   export interface IOpusRecorder extends Omit<MediaRecorder, 'start' | 'ondataavailable'> {
+    // eslint-disable-next-line @typescript-eslint/no-misused-new
     new(options: AnyLiteral): IOpusRecorder;
 
-    start(stream?: MediaStreamAudioSourceNode): void;
+    start(stream?: MediaStreamAudioSourceNode): Promise<void>;
 
     sourceNode: MediaStreamAudioSourceNode;
 
@@ -102,8 +132,8 @@ interface IWebpWorker extends Worker {
 }
 
 interface Document {
-  mozFullScreenElement: any;
-  webkitFullscreenElement: any;
+  mozFullScreenElement: HTMLElement;
+  webkitFullscreenElement: HTMLElement;
   mozCancelFullScreen?: () => Promise<void>;
   webkitCancelFullScreen?: () => Promise<void>;
   webkitExitFullscreen?: () => Promise<void>;
@@ -136,14 +166,16 @@ type Falsy = false | 0 | '' | null | undefined;
 interface BooleanConstructor {
   new<T>(value: T | Falsy): value is T;
   <T>(value: T | Falsy): value is T;
+  // eslint-disable-next-line @typescript-eslint/no-wrapper-object-types
   readonly prototype: Boolean;
 }
 
 interface Array<T> {
-  filter<S extends T>(predicate: BooleanConstructor, thisArg?: any): Exclude<S, Falsy>[];
+  filter<S extends T>(predicate: BooleanConstructor, thisArg?: unknown): Exclude<S, Falsy>[];
+  at(index: number): T; // Make it behave like arr[arr.length - 1]
 }
 interface ReadonlyArray<T> {
-  filter<S extends T>(predicate: BooleanConstructor, thisArg?: any): Exclude<S, Falsy>[];
+  filter<S extends T>(predicate: BooleanConstructor, thisArg?: unknown): Exclude<S, Falsy>[];
 }
 
 // Missing type definitions for OPFS (Origin Private File System) API
@@ -160,7 +192,7 @@ interface FileSystemSyncAccessHandle {
 
   truncate: (size: number) => Promise<undefined>;
   getSize: () => Promise<number>;
-  flush: () => Promise<undefined> ;
+  flush: () => Promise<undefined>;
   close: () => Promise<undefined>;
 }
 

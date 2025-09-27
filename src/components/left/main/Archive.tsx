@@ -1,8 +1,9 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useCallback, useMemo } from '../../../lib/teact/teact';
+import { memo, useCallback, useMemo } from '../../../lib/teact/teact';
 import { getActions, getGlobal } from '../../../global';
 
 import type { GlobalState } from '../../../global/types';
+import type { CustomPeer } from '../../../types';
 
 import { ARCHIVED_FOLDER_ID } from '../../../config';
 import { getChatTitle } from '../../../global/helpers';
@@ -12,8 +13,10 @@ import { formatIntegerCompact } from '../../../util/textFormat';
 import renderText from '../../common/helpers/renderText';
 
 import { useFolderManagerForOrderedIds, useFolderManagerForUnreadCounters } from '../../../hooks/useFolderManager';
-import useOldLang from '../../../hooks/useOldLang';
+import useLang from '../../../hooks/useLang';
 
+import Avatar from '../../common/Avatar';
+import Icon from '../../common/icons/Icon';
 import Badge from '../../ui/Badge';
 import ListItem, { type MenuItemContextAction } from '../../ui/ListItem';
 
@@ -26,6 +29,12 @@ type OwnProps = {
 };
 
 const PREVIEW_SLICE = 5;
+const ARCHIVE_CUSTOM_PEER: CustomPeer = {
+  isCustomPeer: true,
+  title: 'Archived Chats',
+  avatarIcon: 'archive-filled',
+  customPeerAvatarColor: '#9EAAB5',
+};
 
 const Archive: FC<OwnProps> = ({
   archiveSettings,
@@ -33,7 +42,7 @@ const Archive: FC<OwnProps> = ({
   onClick,
 }) => {
   const { updateArchiveSettings } = getActions();
-  const lang = useOldLang();
+  const lang = useLang();
 
   const orderedChatIds = useFolderManagerForOrderedIds(ARCHIVED_FOLDER_ID);
   const unreadCounters = useFolderManagerForUnreadCounters();
@@ -66,7 +75,7 @@ const Archive: FC<OwnProps> = ({
 
   const contextActions = useMemo(() => {
     const actionMinimize = !archiveSettings.isMinimized && {
-      title: lang('lng_context_archive_collapse'),
+      title: lang('ContextArchiveCollapse'),
       icon: 'collapse',
       handler: () => {
         updateArchiveSettings({ isMinimized: true });
@@ -74,7 +83,7 @@ const Archive: FC<OwnProps> = ({
     } satisfies MenuItemContextAction;
 
     const actionExpand = archiveSettings.isMinimized && {
-      title: lang('lng_context_archive_expand'),
+      title: lang('ContextArchiveExpand'),
       icon: 'expand',
       handler: () => {
         updateArchiveSettings({ isMinimized: false });
@@ -82,7 +91,7 @@ const Archive: FC<OwnProps> = ({
     } satisfies MenuItemContextAction;
 
     const actionHide = {
-      title: lang('lng_context_archive_to_menu'),
+      title: lang('ContextArchiveToMenu'),
       icon: 'archive-to-main',
       handler: () => {
         updateArchiveSettings({ isHidden: true });
@@ -103,13 +112,13 @@ const Archive: FC<OwnProps> = ({
         <div className="info-row">
           <div className={buildClassName('title', styles.title)}>
             <h3 dir="auto" className={buildClassName(styles.name, 'fullName')}>
-              <i className={buildClassName(styles.icon, 'icon', 'icon-archive-filled')} />
+              <Icon name="archive-filled" className={styles.icon} />
               {lang('ArchivedChats')}
             </h3>
           </div>
           <Badge
             className={styles.unreadCount}
-            text={archiveUnreadCount ? formatIntegerCompact(archiveUnreadCount) : undefined}
+            text={archiveUnreadCount ? formatIntegerCompact(lang, archiveUnreadCount) : undefined}
           />
         </div>
       </div>
@@ -120,9 +129,7 @@ const Archive: FC<OwnProps> = ({
     return (
       <>
         <div className={buildClassName('status', styles.avatarWrapper)}>
-          <div className={buildClassName('Avatar', styles.avatar)}>
-            <i className="icon icon-archive-filled" />
-          </div>
+          <Avatar peer={ARCHIVE_CUSTOM_PEER} />
         </div>
         <div className={buildClassName(styles.info, 'info')}>
           <div className="info-row">
@@ -136,7 +143,7 @@ const Archive: FC<OwnProps> = ({
             </div>
             <Badge
               className={styles.unreadCount}
-              text={archiveUnreadCount ? formatIntegerCompact(archiveUnreadCount) : undefined}
+              text={archiveUnreadCount ? formatIntegerCompact(lang, archiveUnreadCount) : undefined}
             />
           </div>
         </div>

@@ -1,4 +1,5 @@
-import React, {
+import type React from '../../lib/teact/teact';
+import {
   memo, useEffect, useLayoutEffect, useMemo, useRef, useSignal, useState,
 } from '../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../global';
@@ -14,6 +15,7 @@ import {
   selectPeer,
   selectTabState,
 } from '../../global/selectors';
+import { IS_IOS } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
 import buildStyle from '../../util/buildStyle';
 import {
@@ -25,7 +27,6 @@ import {
 import focusEditableElement from '../../util/focusEditableElement';
 import { clamp } from '../../util/math';
 import { disableScrolling, enableScrolling } from '../../util/scrollLock';
-import { IS_IOS } from '../../util/windowEnvironment';
 import { calculateOffsetX } from './helpers/dimensions';
 
 import useAppLayout from '../../hooks/useAppLayout';
@@ -43,7 +44,6 @@ import styles from './StoryViewer.module.scss';
 
 interface OwnProps {
   isOpen?: boolean;
-  isReportModalOpen?: boolean;
   isDeleteModalOpen?: boolean;
   onDelete: (story: ApiTypeStory) => void;
   onReport: NoneToVoidFunction;
@@ -80,15 +80,13 @@ function StorySlides({
   isPrivate,
   isArchive,
   byPeerId,
-  isReportModalOpen,
   isDeleteModalOpen,
   onDelete,
   onClose,
   onReport,
 }: OwnProps & StateProps) {
   const { stopActiveReaction } = getActions();
-  // eslint-disable-next-line no-null/no-null
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>();
   const [renderingPeerId, setRenderingPeerId] = useState(currentPeerId);
   const [renderingStoryId, setRenderingStoryId] = useState(currentStoryId);
   const prevPeerId = usePreviousDeprecated(currentPeerId);
@@ -102,7 +100,7 @@ function StorySlides({
   const isReleasedRef = useRef(false);
   const { isMobile } = useAppLayout();
 
-  const rendersRef = useRef<Record<string, { current: HTMLDivElement | null }>>({});
+  const rendersRef = useRef<Record<string, { current: HTMLDivElement }>>({});
   const [getIsAnimating, setIsAnimating] = useSignal(false);
 
   useHistoryBack({
@@ -111,7 +109,7 @@ function StorySlides({
     shouldBeReplaced: true,
   });
 
-  function setRef(ref: HTMLDivElement | null, peerId: string) {
+  function setRef(ref: HTMLDivElement | undefined, peerId: string) {
     if (!ref) {
       return;
     }
@@ -380,7 +378,6 @@ function StorySlides({
             dimensions={slideSizes.activeSlide}
             isPrivateStories={renderingIsPrivate}
             isArchivedStories={renderingIsArchive}
-            isReportModalOpen={isReportModalOpen}
             isDeleteModalOpen={isDeleteModalOpen}
             isSingleStory={isSingleStory}
             getIsAnimating={getIsAnimating}
@@ -438,7 +435,6 @@ function StorySlides({
           dimensions={slideSizes.activeSlide}
           isPrivateStories={renderingIsPrivate}
           isArchivedStories={renderingIsArchive}
-          isReportModalOpen={isReportModalOpen}
           isDeleteModalOpen={isDeleteModalOpen}
           isSingleStory={isSingleStory}
           getIsAnimating={getIsAnimating}
@@ -471,7 +467,7 @@ function StorySlides({
   );
 }
 
-export default memo(withGlobal<OwnProps>((global): StateProps => {
+export default memo(withGlobal<OwnProps>((global): Complete<StateProps> => {
   const {
     storyViewer: {
       peerId: currentPeerId, storyId: currentStoryId, isSinglePeer, isSingleStory, isPrivate, isArchive, storyList,

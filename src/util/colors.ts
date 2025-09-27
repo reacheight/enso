@@ -1,11 +1,8 @@
-/* eslint-disable eqeqeq */
-/* eslint-disable prefer-template */
 /* eslint-disable prefer-const */
-/* eslint-disable prefer-destructuring */
-/* eslint-disable one-var */
-/* eslint-disable one-var-declaration-per-line */
 
 import { preloadImage } from './files';
+
+const LUMA_THRESHOLD = 128;
 
 /**
  * HEX > RGB
@@ -29,7 +26,7 @@ export function rgb2hex(param: [number, number, number]) {
   const p0 = param[0].toString(16);
   const p1 = param[1].toString(16);
   const p2 = param[2].toString(16);
-  return (p0.length == 1 ? '0' + p0 : p0) + (p1.length == 1 ? '0' + p1 : p1) + (p2.length == 1 ? '0' + p2 : p2);
+  return (p0.length === 1 ? '0' + p0 : p0) + (p1.length === 1 ? '0' + p1 : p1) + (p2.length === 1 ? '0' + p2 : p2);
 }
 
 /**
@@ -52,9 +49,9 @@ export function rgb2hsb([r, g, b]: [number, number, number]): [number, number, n
   let h!: number, s: number, v: number = max;
 
   let d = max - min;
-  s = max == 0 ? 0 : d / max;
+  s = max === 0 ? 0 : d / max;
 
-  if (max == min) {
+  if (max === min) {
     h = 0; // achromatic
   } else {
     switch (max) {
@@ -169,7 +166,6 @@ export async function getAverageColor(url: string): Promise<[number, number, num
 
   length = data.data.length;
 
-  // eslint-disable-next-line no-cond-assign
   while ((i += blockSize * 4) < length) {
     if (data.data[i + 3] === 0) continue; // Ignore fully transparent pixels
     ++count;
@@ -190,6 +186,12 @@ export function getColorLuma(rgbColor: [number, number, number]) {
   const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
   return luma;
 }
+// https://stackoverflow.com/a/64090995
+export function hsl2rgb([h, s, l]: [number, number, number]): [number, number, number] {
+  let a = s * Math.min(l, 1 - l);
+  let f = (n: number, k = (n + h / 30) % 12) => l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+  return [f(0), f(8), f(4)];
+}
 
 // Function was adapted from https://github.com/telegramdesktop/tdesktop/blob/35ff621b5b52f7e3553fb0f990ea13ade7101b8e/Telegram/SourceFiles/data/data_wall_paper.cpp#L518
 export function getPatternColor(rgbColor: [number, number, number]) {
@@ -200,5 +202,29 @@ export function getPatternColor(rgbColor: [number, number, number]) {
     ? Math.max(0, value * 0.65)
     : Math.max(0, Math.min(1, 1 - value * 0.65));
 
-  return `hsla(${hue * 360}, ${saturation * 100}%, ${value * 100}%, .4)`;
+  const rgb = hsl2rgb([hue * 360, saturation, value]);
+  const hex = rgb2hex(rgb.map((c) => Math.floor(c * 255)) as [number, number, number]);
+  return `#${hex}66`;
 }
+
+export const convertToRGBA = (color: number): string => {
+  const alpha = (color >> 24) & 0xff;
+  const red = (color >> 16) & 0xff;
+  const green = (color >> 8) & 0xff;
+  const blue = color & 0xff;
+
+  const alphaFloat = alpha / 255;
+  return `rgba(${red}, ${green}, ${blue}, ${alphaFloat})`;
+};
+
+export const numberToHexColor = (color: number): string => {
+  return `#${color.toString(16).padStart(6, '0')}`;
+};
+
+export const getTextColor = (color: number): string => {
+  const r = (color >> 16) & 0xff;
+  const g = (color >> 8) & 0xff;
+  const b = color & 0xff;
+  const luma = getColorLuma([r, g, b]);
+  return luma > LUMA_THRESHOLD ? 'black' : 'white';
+};

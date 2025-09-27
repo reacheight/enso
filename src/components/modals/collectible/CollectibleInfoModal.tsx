@@ -1,5 +1,5 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo,
   useMemo,
 } from '../../../lib/teact/teact';
@@ -21,7 +21,7 @@ import useOldLang from '../../../hooks/useOldLang';
 
 import AnimatedIconWithPreview from '../../common/AnimatedIconWithPreview';
 import Icon from '../../common/icons/Icon';
-import PickerSelectedItem from '../../common/pickers/PickerSelectedItem';
+import PeerChip from '../../common/PeerChip';
 import Button from '../../ui/Button';
 import Modal from '../../ui/Modal';
 
@@ -63,13 +63,12 @@ const CollectibleInfoModal: FC<OwnProps & StateProps> = ({
   const handleOpenUrl = useLastCallback(() => {
     openUrl({
       url: modal!.url,
-      shouldSkipModal: true,
     });
     handleClose();
   });
 
   const handleCopy = useLastCallback(() => {
-    const text = isUsername ? formatUsername(modal!.collectible)
+    const text = isUsername ? formatUsername(modal.collectible)
       : formatPhoneNumberWithCode(phoneCodeList, modal!.collectible);
     copyTextToClipboard(text);
     showNotification({
@@ -123,8 +122,7 @@ const CollectibleInfoModal: FC<OwnProps & StateProps> = ({
       <h3 className={styles.title}>
         {title && renderText(title, ['simple_markdown'])}
       </h3>
-      <PickerSelectedItem
-        fluid
+      <PeerChip
         className={styles.chip}
         peerId={modal?.peerId}
         forceShowSelf
@@ -147,7 +145,7 @@ const CollectibleInfoModal: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     const { countryList } = global;
 
     return {

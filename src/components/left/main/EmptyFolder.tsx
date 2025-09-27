@@ -1,6 +1,6 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useCallback } from '../../../lib/teact/teact';
-import { withGlobal } from '../../../global';
+import { memo, useCallback } from '../../../lib/teact/teact';
+import { getActions, withGlobal } from '../../../global';
 
 import type { ApiChatFolder, ApiSticker } from '../../../api/types';
 import type { FolderEditDispatch } from '../../../hooks/reducers/useFoldersReducer';
@@ -12,6 +12,7 @@ import useAppLayout from '../../../hooks/useAppLayout';
 import useOldLang from '../../../hooks/useOldLang';
 
 import AnimatedIconFromSticker from '../../common/AnimatedIconFromSticker';
+import Icon from '../../common/icons/Icon';
 import Button from '../../ui/Button';
 
 import styles from './EmptyFolder.module.scss';
@@ -20,7 +21,6 @@ type OwnProps = {
   folderId?: number;
   folderType: 'all' | 'archived' | 'saved' | 'folder';
   foldersDispatch: FolderEditDispatch;
-  onSettingsScreenSelect: (screen: SettingsScreens) => void;
 };
 
 type StateProps = {
@@ -31,15 +31,16 @@ type StateProps = {
 const ICON_SIZE = 96;
 
 const EmptyFolder: FC<OwnProps & StateProps> = ({
-  chatFolder, animatedEmoji, foldersDispatch, onSettingsScreenSelect,
+  chatFolder, animatedEmoji, foldersDispatch,
 }) => {
+  const { openSettingsScreen } = getActions();
   const lang = useOldLang();
   const { isMobile } = useAppLayout();
 
   const handleEditFolder = useCallback(() => {
     foldersDispatch({ type: 'editFolder', payload: chatFolder });
-    onSettingsScreenSelect(SettingsScreens.FoldersEditFolderFromChatList);
-  }, [chatFolder, foldersDispatch, onSettingsScreenSelect]);
+    openSettingsScreen({ screen: SettingsScreens.FoldersEditFolderFromChatList });
+  }, [chatFolder, foldersDispatch]);
 
   return (
     <div className={styles.root}>
@@ -56,10 +57,9 @@ const EmptyFolder: FC<OwnProps & StateProps> = ({
           fluid
           pill
           onClick={handleEditFolder}
-          size="smaller"
           isRtl={lang.isRtl}
         >
-          <i className="icon icon-settings" />
+          <Icon name="settings" />
           <div className={styles.buttonText}>
             {lang('ChatList.EmptyChatListEditFilter')}
           </div>
@@ -69,7 +69,7 @@ const EmptyFolder: FC<OwnProps & StateProps> = ({
   );
 };
 
-export default memo(withGlobal<OwnProps>((global, { folderId, folderType }): StateProps => {
+export default memo(withGlobal<OwnProps>((global, { folderId, folderType }): Complete<StateProps> => {
   const chatFolder = folderId && folderType === 'folder' ? selectChatFolder(global, folderId) : undefined;
 
   return {

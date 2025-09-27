@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import type { ElementRef } from '../lib/teact/teact';
 import { useEffect, useRef, useState } from '../lib/teact/teact';
 
 import type { Scheduler } from '../util/schedulers';
@@ -38,7 +38,7 @@ export function useIntersectionObserver({
   threshold,
   isDisabled,
 }: {
-  rootRef: RefObject<HTMLDivElement>;
+  rootRef: ElementRef<HTMLDivElement>;
   throttleMs?: number;
   throttleScheduler?: Scheduler;
   debounceMs?: number;
@@ -163,6 +163,7 @@ export function useIntersectionObserver({
     function destroy() {
       callbacks.clear();
       observer.disconnect();
+      entriesAccumulator.clear();
     }
 
     controllerRef.current = {
@@ -198,7 +199,7 @@ export function useIntersectionObserver({
 }
 
 export function useOnIntersect(
-  targetRef: RefObject<HTMLDivElement>, observe?: ObserveFn, callback?: TargetCallback,
+  targetRef: ElementRef<HTMLDivElement>, observe?: ObserveFn, callback?: TargetCallback,
 ) {
   const lastCallback = useLastCallback(callback);
 
@@ -208,7 +209,7 @@ export function useOnIntersect(
 }
 
 export function useIsIntersecting(
-  targetRef: RefObject<HTMLDivElement>, observe?: ObserveFn, callback?: TargetCallback,
+  targetRef: ElementRef<HTMLDivElement>, observe?: ObserveFn, callback?: TargetCallback,
 ) {
   const [isIntersecting, setIsIntersecting] = useState(!observe);
 

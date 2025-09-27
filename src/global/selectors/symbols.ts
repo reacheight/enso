@@ -1,8 +1,9 @@
 import type { ApiSticker, ApiStickerSet, ApiStickerSetInfo } from '../../api/types';
 import type { GlobalState, TabArgs } from '../types';
 
-import { RESTRICTED_EMOJI_SET_ID } from '../../config';
+import { RESTRICTED_EMOJI_SET_ID, TON_CURRENCY_CODE } from '../../config';
 import { getCurrentTabId } from '../../util/establishMultitabRole';
+import { convertCurrencyFromBaseUnit } from '../../util/formatCurrency';
 import { selectTabState } from './tabs';
 import { selectIsCurrentUserPremium } from './users';
 
@@ -19,6 +20,12 @@ const STAR_EMOTICON: Record<number, string> = {
   1000: `${2}\u{FE0F}\u20E3`,
   2500: `${3}\u{FE0F}\u20E3`,
   5000: `${4}\u{FE0F}\u20E3`,
+};
+
+const TON_EMOTICON: Record<number, string> = {
+  1: `${1}\u{FE0F}\u20E3`,
+  10: `${2}\u{FE0F}\u20E3`,
+  50: `${3}\u{FE0F}\u20E3`,
 };
 
 export function selectIsStickerFavorite<T extends GlobalState>(global: T, sticker: ApiSticker) {
@@ -133,6 +140,21 @@ export function selectAnimatedEmoji<T extends GlobalState>(global: T, emoji: str
   return animatedEmojis.stickers.find((sticker) => sticker.emoji === emoji || sticker.emoji === cleanedEmoji);
 }
 
+export function selectRestrictedEmoji<T extends GlobalState>(global: T, emoji: string) {
+  const { restrictedEmoji } = global;
+  if (!restrictedEmoji || !restrictedEmoji.stickers) {
+    return undefined;
+  }
+
+  const cleanedEmoji = cleanEmoji(emoji);
+
+  return restrictedEmoji.stickers.find((sticker) => {
+    if (!sticker.emoji) return undefined;
+    const cleanedStickerEmoji = cleanEmoji(sticker.emoji);
+    return cleanedStickerEmoji === cleanedEmoji;
+  });
+}
+
 export function selectAnimatedEmojiEffect<T extends GlobalState>(global: T, emoji: string) {
   const { animatedEmojiEffects } = global;
   if (!animatedEmojiEffects || !animatedEmojiEffects.stickers) {
@@ -145,14 +167,14 @@ export function selectAnimatedEmojiEffect<T extends GlobalState>(global: T, emoj
 }
 
 export function selectAnimatedEmojiSound<T extends GlobalState>(global: T, emoji: string) {
-  return global?.appConfig?.emojiSounds[cleanEmoji(emoji)];
+  return global?.appConfig.emojiSounds[cleanEmoji(emoji)];
 }
 
 export function selectIsAlwaysHighPriorityEmoji<T extends GlobalState>(
   global: T, stickerSet: ApiStickerSetInfo | ApiStickerSet,
 ) {
   if (!('id' in stickerSet)) return false;
-  return stickerSet.id === global.appConfig?.defaultEmojiStatusesStickerSetId
+  return stickerSet.id === global.appConfig.defaultEmojiStatusesStickerSetId
     || stickerSet.id === RESTRICTED_EMOJI_SET_ID;
 }
 
@@ -178,4 +200,25 @@ export function selectGiftStickerForStars<T extends GlobalState>(global: T, star
   }
 
   return stickers.find((sticker) => sticker.emoji === emoji) || stickers[0];
+}
+
+export function selectGiftStickerForTon<T extends GlobalState>(global: T, amount?: number) {
+  const stickers = global.tonGifts?.stickers;
+  if (!stickers || !amount) return undefined;
+  const convertedAmount = convertCurrencyFromBaseUnit(amount, TON_CURRENCY_CODE);
+
+  let emoji;
+  if (convertedAmount < 10) {
+    emoji = TON_EMOTICON[1];
+  } else if (convertedAmount < 50) {
+    emoji = TON_EMOTICON[10];
+  } else {
+    emoji = TON_EMOTICON[50];
+  }
+
+  return stickers.find((sticker) => sticker.emoji === emoji) || stickers[0];
+}
+
+export function selectCustomEmoji<T extends GlobalState>(global: T, documentId: string) {
+  return global.customEmojis.byId[documentId];
 }

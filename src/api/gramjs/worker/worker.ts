@@ -7,7 +7,7 @@ import type { OriginMessageEvent, WorkerPayload } from './types';
 import { DEBUG } from '../../../config';
 import { DEBUG_LEVELS } from '../../../util/debugConsole';
 import { throttleWithTickEnd } from '../../../util/schedulers';
-import { log } from '../helpers';
+import { log } from '../helpers/misc';
 import { callApi, cancelApiProgress, initApi } from '../methods/init';
 
 declare const self: WorkerGlobalScope;
@@ -54,14 +54,15 @@ onmessage = ({ data }: OriginMessageEvent) => {
     switch (payload.type) {
       case 'initApi': {
         const { messageId, args } = payload;
-        await initApi(onUpdate, args[0], args[1]);
-        if (messageId) {
-          sendToOrigin({
-            type: 'methodResponse',
-            messageId,
-            response: true,
-          });
-        }
+        initApi(onUpdate, args[0], args[1]).then(() => {
+          if (messageId) {
+            sendToOrigin({
+              type: 'methodResponse',
+              messageId,
+              response: true,
+            });
+          }
+        });
         break;
       }
       case 'callMethod': {

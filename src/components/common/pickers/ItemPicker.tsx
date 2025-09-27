@@ -1,5 +1,6 @@
 import type { TeactNode } from '../../../lib/teact/teact';
-import React, {
+import type React from '../../../lib/teact/teact';
+import {
   memo, useCallback, useEffect,
   useMemo,
   useRef,
@@ -62,6 +63,7 @@ type OwnProps = {
   noScrollRestore?: boolean;
   isViewOnly?: boolean;
   withDefaultPadding?: boolean;
+  forceRenderAllItems?: boolean;
   onFilterChange?: (value: string) => void;
   onDisabledClick?: (value: string, isSelected: boolean) => void;
   onLoadMore?: () => void;
@@ -86,14 +88,14 @@ const ItemPicker = ({
   itemInputType,
   itemClassName,
   withDefaultPadding,
+  forceRenderAllItems,
   onFilterChange,
   onDisabledClick,
   onLoadMore,
   ...optionalProps
 }: OwnProps) => {
   const lang = useOldLang();
-  // eslint-disable-next-line no-null/no-null
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>();
 
   const allowMultiple = optionalProps.allowMultiple;
   const lockedSelectedValues = allowMultiple ? optionalProps.lockedSelectedValues : undefined;
@@ -163,7 +165,7 @@ const ItemPicker = ({
   });
 
   const [viewportValuesList, getMore] = useInfiniteScroll(
-    onLoadMore, sortedItemValuesList, Boolean(filterValue),
+    onLoadMore, sortedItemValuesList, Boolean(forceRenderAllItems || filterValue),
   );
 
   const handleFilterChange = useLastCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -202,9 +204,9 @@ const ItemPicker = ({
         inactive={isViewOnly}
         ripple
         inputElement={getInputElement()}
-        // eslint-disable-next-line react/jsx-no-bind
+
         onClick={() => handleItemClick(value)}
-        // eslint-disable-next-line react/jsx-no-bind
+
         onDisabledClick={onDisabledClick && (() => onDisabledClick(value, isAlwaysSelected))}
       />
     );

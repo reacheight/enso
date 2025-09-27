@@ -1,15 +1,16 @@
 import type {
-  ChangeEvent, FormEvent, RefObject,
+  ChangeEvent, FormEvent,
 } from 'react';
-import type { FC } from '../../lib/teact/teact';
-import React, { memo } from '../../lib/teact/teact';
+import type { ElementRef, FC } from '../../lib/teact/teact';
+import { memo } from '../../lib/teact/teact';
 
+import { IS_TAURI } from '../../util/browser/globalEnvironment';
 import buildClassName from '../../util/buildClassName';
 
 import useOldLang from '../../hooks/useOldLang';
 
 type OwnProps = {
-  ref?: RefObject<HTMLInputElement>;
+  ref?: ElementRef<HTMLInputElement>;
   id?: string;
   className?: string;
   value?: string;
@@ -80,6 +81,7 @@ const InputText: FC<OwnProps> = ({
         placeholder={placeholder}
         maxLength={maxLength}
         autoComplete={autoComplete}
+        spellCheck={IS_TAURI ? false : undefined}
         inputMode={inputMode}
         disabled={disabled}
         readOnly={readOnly}

@@ -1,5 +1,5 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo, useCallback,
   useEffect,
   useMemo, useState,
@@ -19,6 +19,7 @@ import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
 
 import AvatarList from '../../common/AvatarList';
+import Icon from '../../common/icons/Icon';
 import PeerPicker from '../../common/pickers/PeerPicker';
 import Button from '../../ui/Button';
 import Modal from '../../ui/Modal';
@@ -73,7 +74,7 @@ const InviteViaLinkModal: FC<OwnProps & StateProps> = ({
   const handleClose = useLastCallback(() => closeInviteViaLinkModal());
 
   const handleSendInviteLink = useCallback(() => {
-    sendInviteMessages({ chatId: chat!.id, userIds: selectedMemberIds! });
+    sendInviteMessages({ chatId: chat!.id, userIds: selectedMemberIds });
     closeInviteViaLinkModal();
   }, [selectedMemberIds, chat]);
 
@@ -108,7 +109,7 @@ const InviteViaLinkModal: FC<OwnProps & StateProps> = ({
       params = [
         getUserFullName(topListPeers[0]),
         getUserFullName(topListPeers[1]),
-        (invitableWithPremiumIds!.length - 2).toString(),
+        (invitableWithPremiumIds.length - 2).toString(),
       ];
     }
 
@@ -133,7 +134,7 @@ const InviteViaLinkModal: FC<OwnProps & StateProps> = ({
         ariaLabel={lang('Close')}
         onClick={handleClose}
       >
-        <i className="icon icon-close" />
+        <Icon name="close" />
       </Button>
       {premiumSectionText && (
         <>
@@ -151,7 +152,6 @@ const InviteViaLinkModal: FC<OwnProps & StateProps> = ({
           <Button
             withPremiumGradient
             isShiny
-            size="smaller"
             onClick={handleOpenPremiumModal}
           >
             {lang('InvitePremiumBlockedSubscribe')}
@@ -184,7 +184,6 @@ const InviteViaLinkModal: FC<OwnProps & StateProps> = ({
           {canSendInviteLink && (
             <Button
               className={styles.sendInvites}
-              size="smaller"
               onClick={handleSendInviteLink}
               disabled={!selectedMemberIds.length}
             >
@@ -198,7 +197,7 @@ const InviteViaLinkModal: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { modal }): StateProps => {
+  (global, { modal }): Complete<StateProps> => {
     const chat = modal?.chatId ? selectChat(global, modal.chatId) : undefined;
 
     return {

@@ -1,34 +1,39 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo, useCallback, useEffect, useMemo, useState,
 } from '../../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../../global';
 
+import type { ApiPrivacySettings } from '../../../api/types';
 import type { GlobalState } from '../../../global/types';
-import type { ApiPrivacySettings, CustomPeerType } from '../../../types';
+import type { CustomPeerType, UniqueCustomPeer } from '../../../types';
 import { SettingsScreens } from '../../../types';
 
 import { ALL_FOLDER_ID, ARCHIVED_FOLDER_ID, SERVICE_NOTIFICATIONS_USER_ID } from '../../../config';
 import {
-  filterChatsByName, isChatChannel, isDeletedUser,
+  isChatChannel, isDeletedUser,
 } from '../../../global/helpers';
+import { filterPeersByQuery } from '../../../global/helpers/peers';
 import { unique } from '../../../util/iteratees';
 import { CUSTOM_PEER_PREMIUM } from '../../../util/objects/customPeer';
 import { getPrivacyKey } from './helpers/privacy';
 
 import { useFolderManagerForOrderedIds } from '../../../hooks/useFolderManager';
 import useHistoryBack from '../../../hooks/useHistoryBack';
+import useLang from '../../../hooks/useLang';
 import useOldLang from '../../../hooks/useOldLang';
 
+import Icon from '../../common/icons/Icon';
 import PeerPicker from '../../common/pickers/PeerPicker';
 import FloatingActionButton from '../../ui/FloatingActionButton';
 
 export type OwnProps = {
   isAllowList?: boolean;
   withPremiumCategory?: boolean;
+  withMiniAppsCategory?: boolean;
+  usersOnly?: boolean;
   screen: SettingsScreens;
   isActive?: boolean;
-  onScreenSelect: (screen: SettingsScreens) => void;
   onReset: () => void;
 };
 
@@ -42,16 +47,33 @@ const PREMIUM_CATEGORY = [CUSTOM_PEER_PREMIUM];
 const SettingsPrivacyVisibilityExceptionList: FC<OwnProps & StateProps> = ({
   isAllowList,
   withPremiumCategory,
+  withMiniAppsCategory,
   screen,
   isActive,
   currentUserId,
   settings,
-  onScreenSelect,
+  usersOnly = false,
   onReset,
 }) => {
   const { setPrivacySettings } = getActions();
 
-  const lang = useOldLang();
+  const oldLang = useOldLang();
+  const lang = useLang();
+
+  const customPeerBots: UniqueCustomPeer = useMemo(() => {
+    return {
+      isCustomPeer: true,
+      type: 'bots',
+      title: lang('PrivacyValueBots'),
+      avatarIcon: 'bots',
+      isAvatarSquare: true,
+      peerColorId: 6,
+    };
+  }, [lang]);
+
+  const miniAppsCategory = useMemo(() => {
+    return [customPeerBots];
+  }, [customPeerBots]);
 
   const selectedContactIds = useMemo(() => {
     if (!settings) {
@@ -68,9 +90,14 @@ const SettingsPrivacyVisibilityExceptionList: FC<OwnProps & StateProps> = ({
     if (!settings) {
       return [];
     }
-
-    return [settings.shouldAllowPremium ? CUSTOM_PEER_PREMIUM.type : undefined].filter(Boolean);
-  }, [settings]);
+    if (settings.shouldAllowPremium) {
+      return [CUSTOM_PEER_PREMIUM.type];
+    }
+    if (settings.botsPrivacy === 'allow' && isAllowList) {
+      return [customPeerBots.type];
+    }
+    return [];
+  }, [settings, isAllowList, customPeerBots]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSubmitShown, setIsSubmitShown] = useState<boolean>(false);
   const [newSelectedContactIds, setNewSelectedContactIds] = useState<string[]>(selectedContactIds);
@@ -97,19 +124,22 @@ const SettingsPrivacyVisibilityExceptionList: FC<OwnProps & StateProps> = ({
         const user = usersById[chatId];
         const isDeleted = user && isDeletedUser(user);
         const isChannel = chat && isChatChannel(chat);
-        return chatId !== currentUserId && chatId !== SERVICE_NOTIFICATIONS_USER_ID && !isChannel && !isDeleted;
+        return (!usersOnly || user)
+          && chatId !== currentUserId
+          && chatId !== SERVICE_NOTIFICATIONS_USER_ID
+          && !isChannel && !isDeleted;
       });
 
-    const filteredChats = filterChatsByName(lang, chatIds, chatsById, searchQuery);
+    const filteredChats = filterPeersByQuery({ ids: chatIds, query: searchQuery });
 
     // Show only relevant items
     if (searchQuery) return filteredChats;
 
     return unique([
       ...selectedContactIds,
-      ...filterChatsByName(lang, chatIds, chatsById, searchQuery),
+      ...chatIds,
     ]);
-  }, [folderAllOrderedIds, folderArchivedOrderedIds, selectedContactIds, lang, searchQuery, currentUserId]);
+  }, [folderAllOrderedIds, folderArchivedOrderedIds, selectedContactIds, searchQuery, currentUserId, usersOnly]);
 
   const handleSelectedCategoriesChange = useCallback((value: CustomPeerType[]) => {
     setNewSelectedCategoryTypes(value);
@@ -127,25 +157,41 @@ const SettingsPrivacyVisibilityExceptionList: FC<OwnProps & StateProps> = ({
       isAllowList: Boolean(isAllowList),
       updatedIds: newSelectedContactIds,
       isPremiumAllowed: newSelectedCategoryTypes.includes(CUSTOM_PEER_PREMIUM.type) || undefined,
+      botsPrivacy: (!withMiniAppsCategory) ? 'none'
+        : (newSelectedCategoryTypes.includes(customPeerBots.type) ? 'allow' : 'disallow'),
     });
 
-    onScreenSelect(SettingsScreens.Privacy);
-  }, [isAllowList, newSelectedCategoryTypes, newSelectedContactIds, onScreenSelect, screen]);
+    onReset();
+  }, [
+    isAllowList,
+    withMiniAppsCategory,
+    newSelectedCategoryTypes,
+    newSelectedContactIds,
+    onReset,
+    screen,
+    customPeerBots,
+  ]);
 
   useHistoryBack({
     isActive,
     onBack: onReset,
   });
 
+  function getCustomCategory() {
+    if (withPremiumCategory) return PREMIUM_CATEGORY;
+    if (withMiniAppsCategory && isAllowList) return miniAppsCategory;
+    return undefined;
+  }
+
   return (
     <div className="NewChat-inner step-1">
       <PeerPicker
-        categories={withPremiumCategory ? PREMIUM_CATEGORY : undefined}
+        categories={getCustomCategory()}
         itemIds={displayedIds || []}
         selectedIds={newSelectedContactIds}
         selectedCategories={newSelectedCategoryTypes}
         filterValue={searchQuery}
-        filterPlaceholder={isAllowList ? lang('AlwaysAllowPlaceholder') : lang('NeverAllowPlaceholder')}
+        filterPlaceholder={isAllowList ? oldLang('AlwaysAllowPlaceholder') : oldLang('NeverAllowPlaceholder')}
         categoryPlaceholderKey="PrivacyUserTypes"
         searchInputId="new-group-picker-search"
         isSearchable
@@ -161,9 +207,9 @@ const SettingsPrivacyVisibilityExceptionList: FC<OwnProps & StateProps> = ({
       <FloatingActionButton
         isShown={isSubmitShown}
         onClick={handleSubmit}
-        ariaLabel={isAllowList ? lang('AlwaysAllow') : lang('NeverAllow')}
+        ariaLabel={isAllowList ? oldLang('AlwaysAllow') : oldLang('NeverAllow')}
       >
-        <i className="icon icon-check" />
+        <Icon name="check" />
       </FloatingActionButton>
     </div>
   );
@@ -187,6 +233,9 @@ function getCurrentPrivacySettings(global: GlobalState, screen: SettingsScreens)
     case SettingsScreens.PrivacyBirthdayAllowedContacts:
     case SettingsScreens.PrivacyBirthdayDeniedContacts:
       return privacy.birthday;
+    case SettingsScreens.PrivacyGiftsAllowedContacts:
+    case SettingsScreens.PrivacyGiftsDeniedContacts:
+      return privacy.gifts;
     case SettingsScreens.PrivacyPhoneCallAllowedContacts:
     case SettingsScreens.PrivacyPhoneCallDeniedContacts:
       return privacy.phoneCall;
@@ -202,13 +251,15 @@ function getCurrentPrivacySettings(global: GlobalState, screen: SettingsScreens)
     case SettingsScreens.PrivacyGroupChatsDeniedContacts:
     case SettingsScreens.PrivacyGroupChatsAllowedContacts:
       return privacy.chatInvite;
+    case SettingsScreens.PrivacyNoPaidMessages:
+      return privacy.noPaidMessages;
   }
 
   return undefined;
 }
 
 export default memo(withGlobal<OwnProps>(
-  (global, { screen }): StateProps => {
+  (global, { screen }): Complete<StateProps> => {
     return {
       currentUserId: global.currentUserId,
       settings: getCurrentPrivacySettings(global, screen),

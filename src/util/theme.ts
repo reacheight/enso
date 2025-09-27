@@ -60,13 +60,13 @@ function buildVariables(map: Map<string, string>) {
 export function updatePeerColors(
   peerColors: ApiPeerColors['general'],
 ) {
-  setPeerColor('0', ['#e17076']);
-  setPeerColor('1', ['#faa774']);
-  setPeerColor('2', ['#a695e7']);
-  setPeerColor('3', ['#7bc862']);
-  setPeerColor('4', ['#6ec9cb']);
-  setPeerColor('5', ['#65aadd']);
-  setPeerColor('6', ['#ee7aae']);
+  setPeerColor('0', ['#D45246']);
+  setPeerColor('1', ['#F68136']);
+  setPeerColor('2', ['#6C61DF']);
+  setPeerColor('3', ['#46BA43']);
+  setPeerColor('4', ['#5CAFFA']);
+  setPeerColor('5', ['#408ACF']);
+  setPeerColor('6', ['#D95574']);
 
   Object.entries(peerColors).forEach(([key, value]) => {
     if (!value.colors) return;
@@ -98,7 +98,8 @@ function setPeerColor(n: string, colors: string[], darkColors?: string[]) {
     ));
 
     const lightGradient = `repeating-linear-gradient(-45deg, ${lightGradientColors.join(', ')})`;
-    const darkGradient = darkGradientColors ? `repeating-linear-gradient(-45deg, ${darkGradientColors.join(', ')})`
+    const darkGradient = darkGradientColors
+      ? `repeating-linear-gradient(-45deg, ${darkGradientColors.join(', ')})`
       : undefined;
     setVariable(`color-peer-gradient-${n}`, lightGradient, darkGradient);
   }

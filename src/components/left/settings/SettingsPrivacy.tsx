@@ -1,23 +1,31 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useCallback, useEffect } from '../../../lib/teact/teact';
+import { memo, useCallback, useEffect, useMemo } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
+import type { ApiPrivacySettings } from '../../../api/types';
 import type { GlobalState } from '../../../global/types';
-import type { ApiPrivacySettings } from '../../../types';
 import { SettingsScreens } from '../../../types';
 
-import { selectCanSetPasscode, selectIsCurrentUserPremium } from '../../../global/selectors';
+import { ACCOUNT_TTL_OPTIONS } from '../../../config.ts';
+import {
+  selectCanSetPasscode, selectIsCurrentUserFrozen,
+  selectIsCurrentUserPremium,
+} from '../../../global/selectors';
+import { selectSharedSettings } from '../../../global/selectors/sharedState';
+import { getClosestEntry } from '../../../util/getClosestEntry.ts';
 
 import useHistoryBack from '../../../hooks/useHistoryBack';
+import useLang from '../../../hooks/useLang';
+import useLastCallback from '../../../hooks/useLastCallback.ts';
 import useOldLang from '../../../hooks/useOldLang';
 
 import StarIcon from '../../common/icons/StarIcon';
+import Button from '../../ui/Button';
 import Checkbox from '../../ui/Checkbox';
 import ListItem from '../../ui/ListItem';
 
 type OwnProps = {
   isActive?: boolean;
-  onScreenSelect: (screen: SettingsScreens) => void;
   onReset: () => void;
 };
 
@@ -33,9 +41,15 @@ type StateProps = {
   canDisplayAutoarchiveSetting: boolean;
   shouldArchiveAndMuteNewNonContact?: boolean;
   shouldNewNonContactPeersRequirePremium?: boolean;
+  shouldChargeForMessages: boolean;
   canDisplayChatInTitle?: boolean;
+  isCurrentUserFrozen?: boolean;
+  needAgeVideoVerification?: boolean;
   privacy: GlobalState['settings']['privacy'];
+  accountDaysTtl?: number;
 };
+
+const DAYS_PER_MONTH = 30;
 
 const SettingsPrivacy: FC<OwnProps & StateProps> = ({
   isActive,
@@ -49,37 +63,46 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
   canDisplayAutoarchiveSetting,
   shouldArchiveAndMuteNewNonContact,
   shouldNewNonContactPeersRequirePremium,
+  shouldChargeForMessages,
   canDisplayChatInTitle,
   canSetPasscode,
+  needAgeVideoVerification,
   privacy,
-  onScreenSelect,
   onReset,
+  isCurrentUserFrozen,
+  accountDaysTtl,
 }) => {
   const {
+    openDeleteAccountModal,
     loadPrivacySettings,
     loadBlockedUsers,
-    loadContentSettings,
     updateContentSettings,
     loadGlobalPrivacySettings,
     updateGlobalPrivacySettings,
     loadWebAuthorizations,
-    setSettingOption,
+    setSharedSettingOption,
+    openSettingsScreen,
+    loadAccountDaysTtl,
+    openAgeVerificationModal,
   } = getActions();
 
   useEffect(() => {
-    loadBlockedUsers();
-    loadPrivacySettings();
-    loadContentSettings();
-    loadWebAuthorizations();
-  }, []);
+    if (!isCurrentUserFrozen) {
+      loadBlockedUsers();
+      loadPrivacySettings();
+      loadWebAuthorizations();
+    }
+  }, [isCurrentUserFrozen]);
 
   useEffect(() => {
-    if (isActive) {
+    if (isActive && !isCurrentUserFrozen) {
       loadGlobalPrivacySettings();
+      loadAccountDaysTtl();
     }
-  }, [isActive, loadGlobalPrivacySettings]);
+  }, [isActive, isCurrentUserFrozen, loadGlobalPrivacySettings]);
 
-  const lang = useOldLang();
+  const oldLang = useOldLang();
+  const lang = useLang();
 
   useHistoryBack({
     isActive,
@@ -93,40 +116,63 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
   }, [updateGlobalPrivacySettings]);
 
   const handleChatInTitleChange = useCallback((isChecked: boolean) => {
-    setSettingOption({
+    setSharedSettingOption({
       canDisplayChatInTitle: isChecked,
     });
   }, []);
 
   const handleUpdateContentSettings = useCallback((isChecked: boolean) => {
-    updateContentSettings(isChecked);
+    updateContentSettings({ isSensitiveEnabled: isChecked });
   }, [updateContentSettings]);
 
-  function getVisibilityValue(setting?: ApiPrivacySettings) {
-    if (!setting) return lang('Loading');
+  const handleAgeVerification = useCallback(() => {
+    openAgeVerificationModal();
+  }, [openAgeVerificationModal]);
 
-    const { visibility, shouldAllowPremium } = setting;
+  const handleOpenDeleteAccountModal = useLastCallback(() => {
+    if (!accountDaysTtl) return;
+    openDeleteAccountModal({ days: accountDaysTtl });
+  });
+
+  const dayOption = useMemo(() => {
+    if (!accountDaysTtl) return undefined;
+    return getClosestEntry(ACCOUNT_TTL_OPTIONS, accountDaysTtl / DAYS_PER_MONTH).toString();
+  }, [accountDaysTtl]);
+
+  function getVisibilityValue(setting?: ApiPrivacySettings) {
+    if (!setting) return oldLang('Loading');
+
+    const { visibility, shouldAllowPremium, botsPrivacy } = setting;
+
+    const isAllowBots = botsPrivacy === 'allow';
+    const isVisibilityEverybody = visibility === 'everybody';
+    const shouldShowBotsString = isAllowBots && !isVisibilityEverybody;
+
     const blockCount = setting.blockChatIds.length + setting.blockUserIds.length;
     const allowCount = setting.allowChatIds.length + setting.allowUserIds.length;
     const total = [];
     if (blockCount) total.push(`-${blockCount}`);
-    if (allowCount) total.push(`+${allowCount}`);
+    if (allowCount && !isVisibilityEverybody) total.push(`+${allowCount}`);
 
-    const exceptionString = total.length ? `(${total.join(',')})` : '';
+    const botPrivacyString = shouldShowBotsString ? lang('PrivacyValueBots') : '';
+    const totalString = lang.conjunction(total);
+
+    const exceptionString = [botPrivacyString, totalString].filter(Boolean).join(' ');
+    if (shouldShowBotsString && !isVisibilityEverybody) return exceptionString;
 
     if (shouldAllowPremium) {
-      return lang(exceptionString ? 'ContactsAndPremium' : 'PrivacyPremium');
+      return oldLang(exceptionString ? 'ContactsAndPremium' : 'PrivacyPremium');
     }
 
     switch (visibility) {
       case 'everybody':
-        return `${lang('P2PEverybody')} ${exceptionString}`;
+        return `${oldLang('P2PEverybody')} ${exceptionString}`;
 
       case 'contacts':
-        return `${lang('P2PContacts')} ${exceptionString}`;
+        return `${oldLang('P2PContacts')} ${exceptionString}`;
 
       case 'nobody':
-        return `${lang('P2PNobody')} ${exceptionString}`;
+        return `${oldLang('P2PNobody')} ${exceptionString}`;
     }
 
     return undefined;
@@ -134,29 +180,29 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
 
   return (
     <div className="settings-content custom-scroll">
-      <div className="settings-item pt-3">
+      <div className="settings-item">
         <ListItem
           icon="delete-user"
           narrow
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => onScreenSelect(SettingsScreens.PrivacyBlockedUsers)}
+
+          onClick={() => openSettingsScreen({ screen: SettingsScreens.PrivacyBlockedUsers })}
         >
-          {lang('BlockedUsers')}
+          {oldLang('BlockedUsers')}
           <span className="settings-item__current-value">{blockedCount || ''}</span>
         </ListItem>
         {canSetPasscode && (
           <ListItem
             icon="key"
             narrow
-            // eslint-disable-next-line react/jsx-no-bind
-            onClick={() => onScreenSelect(
-              hasPasscode ? SettingsScreens.PasscodeEnabled : SettingsScreens.PasscodeDisabled,
-            )}
+
+            onClick={() => openSettingsScreen({
+              screen: hasPasscode ? SettingsScreens.PasscodeEnabled : SettingsScreens.PasscodeDisabled,
+            })}
           >
-            <div className="multiline-menu-item">
-              <span className="title">{lang('Passcode')}</span>
+            <div className="multiline-item">
+              <span className="title">{oldLang('Passcode')}</span>
               <span className="subtitle" dir="auto">
-                {lang(hasPasscode ? 'PasswordOn' : 'PasswordOff')}
+                {oldLang(hasPasscode ? 'PasswordOn' : 'PasswordOff')}
               </span>
             </div>
           </ListItem>
@@ -164,15 +210,15 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
         <ListItem
           icon="lock"
           narrow
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => onScreenSelect(
-            hasPassword ? SettingsScreens.TwoFaEnabled : SettingsScreens.TwoFaDisabled,
-          )}
+
+          onClick={() => openSettingsScreen({
+            screen: hasPassword ? SettingsScreens.TwoFaEnabled : SettingsScreens.TwoFaDisabled,
+          })}
         >
-          <div className="multiline-menu-item">
-            <span className="title">{lang('TwoStepVerification')}</span>
+          <div className="multiline-item">
+            <span className="title">{oldLang('TwoStepVerification')}</span>
             <span className="subtitle" dir="auto">
-              {lang(hasPassword ? 'PasswordOn' : 'PasswordOff')}
+              {oldLang(hasPassword ? 'PasswordOn' : 'PasswordOff')}
             </span>
           </div>
         </ListItem>
@@ -180,26 +226,26 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
           <ListItem
             icon="web"
             narrow
-            // eslint-disable-next-line react/jsx-no-bind
-            onClick={() => onScreenSelect(SettingsScreens.ActiveWebsites)}
+
+            onClick={() => openSettingsScreen({ screen: SettingsScreens.ActiveWebsites })}
           >
-            {lang('PrivacySettings.WebSessions')}
+            {oldLang('PrivacySettings.WebSessions')}
             <span className="settings-item__current-value">{webAuthCount}</span>
           </ListItem>
         )}
       </div>
 
       <div className="settings-item">
-        <h4 className="settings-item-header" dir={lang.isRtl ? 'rtl' : undefined}>{lang('PrivacyTitle')}</h4>
+        <h4 className="settings-item-header" dir={oldLang.isRtl ? 'rtl' : undefined}>{oldLang('PrivacyTitle')}</h4>
 
         <ListItem
           narrow
           className="no-icon"
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => onScreenSelect(SettingsScreens.PrivacyPhoneNumber)}
+
+          onClick={() => openSettingsScreen({ screen: SettingsScreens.PrivacyPhoneNumber })}
         >
-          <div className="multiline-menu-item">
-            <span className="title">{lang('PrivacyPhoneTitle')}</span>
+          <div className="multiline-item">
+            <span className="title">{oldLang('PrivacyPhoneTitle')}</span>
             <span className="subtitle" dir="auto">
               {getVisibilityValue(privacy.phoneNumber)}
             </span>
@@ -208,11 +254,11 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
         <ListItem
           narrow
           className="no-icon"
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => onScreenSelect(SettingsScreens.PrivacyLastSeen)}
+
+          onClick={() => openSettingsScreen({ screen: SettingsScreens.PrivacyLastSeen })}
         >
-          <div className="multiline-menu-item">
-            <span className="title">{lang('LastSeenTitle')}</span>
+          <div className="multiline-item">
+            <span className="title">{oldLang('LastSeenTitle')}</span>
             <span className="subtitle" dir="auto">
               {getVisibilityValue(privacy.lastSeen)}
             </span>
@@ -221,11 +267,11 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
         <ListItem
           narrow
           className="no-icon"
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => onScreenSelect(SettingsScreens.PrivacyProfilePhoto)}
+
+          onClick={() => openSettingsScreen({ screen: SettingsScreens.PrivacyProfilePhoto })}
         >
-          <div className="multiline-menu-item">
-            <span className="title">{lang('PrivacyProfilePhotoTitle')}</span>
+          <div className="multiline-item">
+            <span className="title">{oldLang('PrivacyProfilePhotoTitle')}</span>
             <span className="subtitle" dir="auto">
               {getVisibilityValue(privacy.profilePhoto)}
             </span>
@@ -234,11 +280,11 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
         <ListItem
           narrow
           className="no-icon"
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => onScreenSelect(SettingsScreens.PrivacyBio)}
+
+          onClick={() => openSettingsScreen({ screen: SettingsScreens.PrivacyBio })}
         >
-          <div className="multiline-menu-item">
-            <span className="title">{lang('PrivacyBio')}</span>
+          <div className="multiline-item">
+            <span className="title">{oldLang('PrivacyBio')}</span>
             <span className="subtitle" dir="auto">
               {getVisibilityValue(privacy.bio)}
             </span>
@@ -247,11 +293,11 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
         <ListItem
           narrow
           className="no-icon"
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => onScreenSelect(SettingsScreens.PrivacyBirthday)}
+
+          onClick={() => openSettingsScreen({ screen: SettingsScreens.PrivacyBirthday })}
         >
-          <div className="multiline-menu-item">
-            <span className="title">{lang('PrivacyBirthday')}</span>
+          <div className="multiline-item">
+            <span className="title">{oldLang('PrivacyBirthday')}</span>
             <span className="subtitle" dir="auto">
               {getVisibilityValue(privacy.birthday)}
             </span>
@@ -260,11 +306,24 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
         <ListItem
           narrow
           className="no-icon"
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => onScreenSelect(SettingsScreens.PrivacyForwarding)}
+
+          onClick={() => openSettingsScreen({ screen: SettingsScreens.PrivacyGifts })}
         >
-          <div className="multiline-menu-item">
-            <span className="title">{lang('PrivacyForwardsTitle')}</span>
+          <div className="multiline-item">
+            <span className="title">{lang('PrivacyGifts')}</span>
+            <span className="subtitle" dir="auto">
+              {getVisibilityValue(privacy.gifts)}
+            </span>
+          </div>
+        </ListItem>
+        <ListItem
+          narrow
+          className="no-icon"
+
+          onClick={() => openSettingsScreen({ screen: SettingsScreens.PrivacyForwarding })}
+        >
+          <div className="multiline-item">
+            <span className="title">{oldLang('PrivacyForwardsTitle')}</span>
             <span className="subtitle" dir="auto">
               {getVisibilityValue(privacy.forwards)}
             </span>
@@ -273,11 +332,11 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
         <ListItem
           narrow
           className="no-icon"
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => onScreenSelect(SettingsScreens.PrivacyPhoneCall)}
+
+          onClick={() => openSettingsScreen({ screen: SettingsScreens.PrivacyPhoneCall })}
         >
-          <div className="multiline-menu-item">
-            <span className="title">{lang('WhoCanCallMe')}</span>
+          <div className="multiline-item">
+            <span className="title">{oldLang('WhoCanCallMe')}</span>
             <span className="subtitle" dir="auto">
               {getVisibilityValue(privacy.phoneCall)}
             </span>
@@ -288,11 +347,11 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
           allowDisabledClick
           rightElement={isCurrentUserPremium && <StarIcon size="big" type="premium" />}
           className="no-icon"
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => onScreenSelect(SettingsScreens.PrivacyVoiceMessages)}
+
+          onClick={() => openSettingsScreen({ screen: SettingsScreens.PrivacyVoiceMessages })}
         >
-          <div className="multiline-menu-item">
-            <span className="title">{lang('PrivacyVoiceMessagesTitle')}</span>
+          <div className="multiline-item">
+            <span className="title">{oldLang('PrivacyVoiceMessagesTitle')}</span>
             <span className="subtitle" dir="auto">
               {getVisibilityValue(privacy.voiceMessages)}
             </span>
@@ -302,26 +361,27 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
           narrow
           rightElement={isCurrentUserPremium && <StarIcon size="big" type="premium" />}
           className="no-icon"
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => onScreenSelect(SettingsScreens.PrivacyMessages)}
+
+          onClick={() => openSettingsScreen({ screen: SettingsScreens.PrivacyMessages })}
         >
-          <div className="multiline-menu-item">
-            <span className="title">{lang('PrivacyMessagesTitle')}</span>
+          <div className="multiline-item">
+            <span className="title">{oldLang('PrivacyMessagesTitle')}</span>
             <span className="subtitle" dir="auto">
-              {shouldNewNonContactPeersRequirePremium
-                ? lang('PrivacyMessagesContactsAndPremium')
-                : lang('P2PEverybody')}
+              {shouldChargeForMessages ? lang('PrivacyPaidMessagesValue')
+                : shouldNewNonContactPeersRequirePremium
+                  ? oldLang('PrivacyMessagesContactsAndPremium')
+                  : oldLang('P2PEverybody')}
             </span>
           </div>
         </ListItem>
         <ListItem
           narrow
           className="no-icon"
-          // eslint-disable-next-line react/jsx-no-bind
-          onClick={() => onScreenSelect(SettingsScreens.PrivacyGroupChats)}
+
+          onClick={() => openSettingsScreen({ screen: SettingsScreens.PrivacyGroupChats })}
         >
-          <div className="multiline-menu-item">
-            <span className="title">{lang('WhoCanAddMe')}</span>
+          <div className="multiline-item">
+            <span className="title">{oldLang('WhoCanAddMe')}</span>
             <span className="subtitle" dir="auto">
               {getVisibilityValue(privacy.chatInvite)}
             </span>
@@ -330,28 +390,41 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
       </div>
 
       {canChangeSensitive && (
-        <div className="settings-item">
-          <h4 className="settings-item-header" dir={lang.isRtl ? 'rtl' : undefined}>
-            {lang('lng_settings_sensitive_title')}
+        <div className="settings-item fluid-container">
+          <h4 className="settings-item-header" dir={oldLang.isRtl ? 'rtl' : undefined}>
+            {oldLang('lng_settings_sensitive_title')}
           </h4>
           <Checkbox
-            label={lang('lng_settings_sensitive_disable_filtering')}
-            subLabel={lang('lng_settings_sensitive_about')}
+            label={oldLang('lng_settings_sensitive_disable_filtering')}
+            subLabel={oldLang('lng_settings_sensitive_about')}
             checked={Boolean(isSensitiveEnabled)}
-            disabled={!canChangeSensitive}
+            disabled={!canChangeSensitive || (!isSensitiveEnabled && needAgeVideoVerification)}
             onCheck={handleUpdateContentSettings}
           />
+          {!isSensitiveEnabled && needAgeVideoVerification && (
+            <Button
+              color="primary"
+              fluid
+              noForcedUpperCase
+              className="settings-unlock-button"
+              onClick={handleAgeVerification}
+            >
+              <span className="settings-unlock-button-title">
+                {lang('ButtonAgeVerification')}
+              </span>
+            </Button>
+          )}
         </div>
       )}
 
       {canDisplayAutoarchiveSetting && (
         <div className="settings-item">
-          <h4 className="settings-item-header" dir={lang.isRtl ? 'rtl' : undefined}>
-            {lang('NewChatsFromNonContacts')}
+          <h4 className="settings-item-header" dir={oldLang.isRtl ? 'rtl' : undefined}>
+            {oldLang('NewChatsFromNonContacts')}
           </h4>
           <Checkbox
-            label={lang('ArchiveAndMute')}
-            subLabel={lang('ArchiveAndMuteInfo')}
+            label={oldLang('ArchiveAndMute')}
+            subLabel={oldLang('ArchiveAndMuteInfo')}
             checked={Boolean(shouldArchiveAndMuteNewNonContact)}
             onCheck={handleArchiveAndMuteChange}
           />
@@ -359,28 +432,44 @@ const SettingsPrivacy: FC<OwnProps & StateProps> = ({
       )}
 
       <div className="settings-item">
-        <h4 className="settings-item-header" dir={lang.isRtl ? 'rtl' : undefined}>
-          {lang('lng_settings_window_system')}
+        <h4 className="settings-item-header" dir={oldLang.isRtl ? 'rtl' : undefined}>
+          {oldLang('lng_settings_window_system')}
         </h4>
         <Checkbox
-          label={lang('lng_settings_title_chat_name')}
+          label={oldLang('lng_settings_title_chat_name')}
           checked={Boolean(canDisplayChatInTitle)}
           onCheck={handleChatInTitleChange}
         />
+      </div>
+
+      <div className="settings-item">
+        <h4 className="settings-item-header" dir={oldLang.isRtl ? 'rtl' : undefined}>
+          {lang('DeleteMyAccount')}
+        </h4>
+        <ListItem
+          narrow
+          onClick={handleOpenDeleteAccountModal}
+        >
+          {lang('DeleteAccountIfAwayFor')}
+          <span className="settings-item__current-value">
+            {lang('Months', { count: dayOption }, { pluralValue: 1 })}
+          </span>
+        </ListItem>
       </div>
     </div>
   );
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     const {
       settings: {
         byKey: {
           hasPassword, isSensitiveEnabled, canChangeSensitive, shouldArchiveAndMuteNewNonContact,
-          canDisplayChatInTitle, shouldNewNonContactPeersRequirePremium,
+          shouldNewNonContactPeersRequirePremium, nonContactPeersPaidStars,
         },
         privacy,
+        accountDaysTtl,
       },
       blocked,
       passcode: {
@@ -389,20 +478,29 @@ export default memo(withGlobal<OwnProps>(
       appConfig,
     } = global;
 
+    const { canDisplayChatInTitle } = selectSharedSettings(global);
+    const shouldChargeForMessages = Boolean(nonContactPeersPaidStars);
+    const isCurrentUserFrozen = selectIsCurrentUserFrozen(global);
+    const isCurrentUserPremium = selectIsCurrentUserPremium(global);
+
     return {
-      isCurrentUserPremium: selectIsCurrentUserPremium(global),
+      isCurrentUserPremium,
       hasPassword,
       hasPasscode: Boolean(hasPasscode),
       blockedCount: blocked.totalCount,
       webAuthCount: global.activeWebSessions.orderedHashes.length,
       isSensitiveEnabled,
-      canDisplayAutoarchiveSetting: Boolean(appConfig?.canDisplayAutoarchiveSetting),
+      canDisplayAutoarchiveSetting: appConfig.canDisplayAutoarchiveSetting || isCurrentUserPremium,
       shouldArchiveAndMuteNewNonContact,
       canChangeSensitive,
       shouldNewNonContactPeersRequirePremium,
+      shouldChargeForMessages,
+      needAgeVideoVerification: Boolean(appConfig.needAgeVideoVerification),
       privacy,
       canDisplayChatInTitle,
       canSetPasscode: selectCanSetPasscode(global),
+      isCurrentUserFrozen,
+      accountDaysTtl,
     };
   },
 )(SettingsPrivacy));

@@ -1,5 +1,5 @@
 import type { FC } from '../../../../lib/teact/teact';
-import React, {
+import {
   memo,
   useMemo, useRef,
 } from '../../../../lib/teact/teact';
@@ -8,6 +8,7 @@ import { withGlobal } from '../../../../global';
 import type {
   ApiAvailableReaction, ApiChatReactions, ApiMessage,
   ApiReaction,
+  ApiReactionWithPaid,
 } from '../../../../api/types';
 
 import {
@@ -20,26 +21,25 @@ import { REM } from '../../../common/helpers/mediaDimensions';
 import useAppLayout from '../../../../hooks/useAppLayout';
 import useWindowSize from '../../../../hooks/window/useWindowSize';
 
-import ReactionEmoji from '../../../common/ReactionEmoji';
+import ReactionEmoji from '../../../common/reactions/ReactionEmoji';
 
 import styles from './ReactionPickerLimited.module.scss';
 
 type OwnProps = {
   chatId: string;
   loadAndPlay: boolean;
-  onReactionSelect?: (reaction: ApiReaction) => void;
   selectedReactionIds?: string[];
   message?: ApiMessage;
+  onReactionSelect: (reaction: ApiReactionWithPaid) => void;
+  onReactionContext?: (reaction: ApiReactionWithPaid) => void;
 };
 
 type StateProps = {
   enabledReactions?: ApiChatReactions;
   availableReactions?: ApiAvailableReaction[];
   topReactions: ApiReaction[];
-  canAnimate?: boolean;
-  isSavedMessages?: boolean;
+  isWithPaidReaction?: boolean;
   reactionsLimit?: number;
-  isCurrentUserPremium?: boolean;
 };
 
 const REACTION_SIZE = 36;
@@ -56,36 +56,52 @@ const ReactionPickerLimited: FC<OwnProps & StateProps> = ({
   availableReactions,
   topReactions,
   selectedReactionIds,
-  onReactionSelect,
+  isWithPaidReaction,
   message,
   reactionsLimit,
+  onReactionSelect,
+  onReactionContext,
 }) => {
-  // eslint-disable-next-line no-null/no-null
-  const sharedCanvasRef = useRef<HTMLCanvasElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const sharedCanvasHqRef = useRef<HTMLCanvasElement>(null);
+  const sharedCanvasRef = useRef<HTMLCanvasElement>();
+  const sharedCanvasHqRef = useRef<HTMLCanvasElement>();
   const { width: windowWidth } = useWindowSize();
   const { isTouchScreen } = useAppLayout();
 
   const currentReactions = message?.reactions?.results;
 
   const shouldUseCurrentReactions = reactionsLimit && currentReactions
-   && currentReactions.length >= reactionsLimit;
+    && currentReactions.length >= reactionsLimit;
 
   const allAvailableReactions = useMemo(() => {
     if (shouldUseCurrentReactions) {
-      return currentReactions.map(({ reaction }) => reaction);
+      const reactions = currentReactions.map(({ reaction }) => reaction);
+      if (isWithPaidReaction) {
+        reactions.unshift({ type: 'paid' });
+      }
+      return reactions;
     }
+
     if (!enabledReactions) {
       return [];
     }
 
     if (enabledReactions.type === 'all') {
-      return sortReactions((availableReactions || []).map(({ reaction }) => reaction), topReactions);
+      const reactionsToSort: ApiReactionWithPaid[] = (availableReactions || []).map(({ reaction }) => reaction);
+      if (isWithPaidReaction) {
+        reactionsToSort.unshift({ type: 'paid' });
+      }
+      return sortReactions(reactionsToSort, topReactions);
     }
 
-    return sortReactions(enabledReactions.allowed, topReactions);
-  }, [availableReactions, enabledReactions, topReactions, shouldUseCurrentReactions, currentReactions]);
+    const reactionsToSort: ApiReactionWithPaid[] = enabledReactions.allowed.slice();
+    if (isWithPaidReaction) {
+      reactionsToSort.unshift({ type: 'paid' });
+    }
+
+    return sortReactions(reactionsToSort, topReactions);
+  }, [
+    availableReactions, enabledReactions, topReactions, shouldUseCurrentReactions, currentReactions, isWithPaidReaction,
+  ]);
 
   const pickerHeight = useMemo(() => {
     const pickerWidth = Math.min(MODAL_MAX_WIDTH_REM * REM, windowWidth);
@@ -117,7 +133,8 @@ const ReactionPickerLimited: FC<OwnProps & StateProps> = ({
                 isSelected={isSelected}
                 loadAndPlay={loadAndPlay}
                 availableReactions={availableReactions}
-                onClick={onReactionSelect!}
+                onClick={onReactionSelect}
+                onContextMenu={onReactionContext}
                 sharedCanvasRef={sharedCanvasRef}
                 sharedCanvasHqRef={sharedCanvasHqRef}
               />
@@ -130,17 +147,18 @@ const ReactionPickerLimited: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { chatId }): StateProps => {
+  (global, { chatId }): Complete<StateProps> => {
     const { availableReactions, topReactions } = global.reactions;
 
-    const { maxUniqueReactions } = global.appConfig || {};
-    const { enabledReactions } = selectChatFullInfo(global, chatId) || {};
+    const { maxUniqueReactions } = global.appConfig;
+    const { enabledReactions, isPaidReactionAvailable } = selectChatFullInfo(global, chatId) || {};
 
     return {
       enabledReactions,
       availableReactions,
       topReactions,
       reactionsLimit: maxUniqueReactions,
+      isWithPaidReaction: isPaidReactionAvailable,
     };
   },
 )(ReactionPickerLimited));

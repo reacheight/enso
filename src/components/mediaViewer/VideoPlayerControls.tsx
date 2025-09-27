@@ -1,17 +1,20 @@
 import type { FC } from '../../lib/teact/teact';
-import React, {
+import type React from '../../lib/teact/teact';
+import {
   memo, useEffect, useLayoutEffect,
   useMemo,
+  useRef,
   useSignal,
 } from '../../lib/teact/teact';
 
 import type { ApiDimensions } from '../../api/types';
 import type { BufferedRange } from '../../hooks/useBuffering';
+import type { IconName } from '../../types/icons';
 
+import { IS_IOS, IS_TOUCH_ENV } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
 import { formatMediaDuration } from '../../util/dates/dateFormat';
 import { formatFileSize } from '../../util/textFormat';
-import { IS_IOS, IS_TOUCH_ENV } from '../../util/windowEnvironment';
 
 import useAppLayout from '../../hooks/useAppLayout';
 import useCurrentTimeSignal from '../../hooks/useCurrentTimeSignal';
@@ -21,6 +24,7 @@ import useLastCallback from '../../hooks/useLastCallback';
 import useOldLang from '../../hooks/useOldLang';
 import useControlsSignal from './hooks/useControlsSignal';
 
+import Icon from '../common/icons/Icon';
 import Button from '../ui/Button';
 import Menu from '../ui/Menu';
 import MenuItem from '../ui/MenuItem';
@@ -54,6 +58,7 @@ type OwnProps = {
   onPlaybackRateChange: (playbackRate: number) => void;
   onPlayPause: (e: React.MouseEvent<HTMLButtonElement, MouseEvent>) => void;
   onSeek: (position: number) => void;
+  onSeekingChange: (isSeeking: boolean) => void;
 };
 
 const stopEvent = (e: React.MouseEvent<HTMLElement>) => {
@@ -94,11 +99,14 @@ const VideoPlayerControls: FC<OwnProps> = ({
   onPictureInPictureChange,
   onPlayPause,
   onSeek,
+  onSeekingChange,
 }) => {
   const [isPlaybackMenuOpen, openPlaybackMenu, closePlaybackMenu] = useFlag();
   const [getCurrentTime] = useCurrentTimeSignal();
   const currentTime = useDerivedState(() => Math.trunc(getCurrentTime()), [getCurrentTime]);
   const [getIsSeeking, setIsSeeking] = useSignal(false);
+
+  const closeTimeoutRef = useRef<number | undefined>();
 
   const { isMobile } = useAppLayout();
   const [getIsVisible, setVisibility] = useControlsSignal();
@@ -106,16 +114,15 @@ const VideoPlayerControls: FC<OwnProps> = ({
 
   useEffect(() => {
     if (!IS_TOUCH_ENV && !isForceMobileVersion) return undefined;
-    let timeout: number | undefined;
     if (!isVisible || !isPlaying || isPlaybackMenuOpen || getIsSeeking()) {
-      if (timeout) window.clearTimeout(timeout);
+      if (closeTimeoutRef.current) window.clearTimeout(closeTimeoutRef.current);
       return undefined;
     }
-    timeout = window.setTimeout(() => {
+    closeTimeoutRef.current = window.setTimeout(() => {
       setVisibility(false);
     }, HIDE_CONTROLS_TIMEOUT_MS);
     return () => {
-      if (timeout) window.clearTimeout(timeout);
+      if (closeTimeoutRef.current) window.clearTimeout(closeTimeoutRef.current);
     };
   }, [isPlaying, isVisible, setVisibility, isPlaybackMenuOpen, getIsSeeking, isForceMobileVersion]);
 
@@ -141,17 +148,19 @@ const VideoPlayerControls: FC<OwnProps> = ({
   const handleSeek = useLastCallback((position: number) => {
     setIsSeeking(false);
     onSeek(position);
+    onSeekingChange(false);
   });
 
   const handleSeekStart = useLastCallback(() => {
     setIsSeeking(true);
+    onSeekingChange(true);
   });
 
-  const volumeIcon = useMemo(() => {
-    if (volume === 0 || isMuted) return 'icon-muted';
-    if (volume < 0.3) return 'icon-volume-1';
-    if (volume < 0.6) return 'icon-volume-2';
-    return 'icon-volume-3';
+  const volumeIcon: IconName = useMemo(() => {
+    if (volume === 0 || isMuted) return 'muted';
+    if (volume < 0.3) return 'volume-1';
+    if (volume < 0.6) return 'volume-2';
+    return 'volume-3';
   }, [volume, isMuted]);
 
   return (
@@ -182,7 +191,7 @@ const VideoPlayerControls: FC<OwnProps> = ({
           round
           onClick={onPlayPause}
         >
-          <i className={buildClassName('icon', isPlaying ? 'icon-pause' : 'icon-play')} />
+          <Icon name={isPlaying ? 'pause' : 'play'} />
         </Button>
         <Button
           ariaLabel="Volume"
@@ -192,7 +201,7 @@ const VideoPlayerControls: FC<OwnProps> = ({
           round
           onClick={onVolumeClick}
         >
-          <i className={buildClassName('icon', volumeIcon)} />
+          <Icon name={volumeIcon} />
         </Button>
         {!IS_IOS && (
           <RangeSlider bold className="volume-slider" value={isMuted ? 0 : volume * 100} onChange={onVolumeChange} />
@@ -223,7 +232,7 @@ const VideoPlayerControls: FC<OwnProps> = ({
             round
             onClick={onPictureInPictureChange}
           >
-            <i className="icon icon-pip" />
+            <Icon name="pip" />
           </Button>
         )}
         {isFullscreenSupported && (
@@ -235,7 +244,7 @@ const VideoPlayerControls: FC<OwnProps> = ({
             round
             onClick={onChangeFullscreen}
           >
-            <i className={buildClassName('icon ', isFullscreen ? 'icon-smallscreen' : 'icon-fullscreen')} />
+            <Icon name={isFullscreen ? 'smallscreen' : 'fullscreen'} />
           </Button>
         )}
       </div>
@@ -252,7 +261,7 @@ const VideoPlayerControls: FC<OwnProps> = ({
         onClose={closePlaybackMenu}
       >
         {PLAYBACK_RATES.map((rate) => (
-          // eslint-disable-next-line react/jsx-no-bind
+
           <MenuItem disabled={playbackRate === rate} onClick={() => onPlaybackRateChange(rate)}>
             {`${rate}x`}
           </MenuItem>

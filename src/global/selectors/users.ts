@@ -1,6 +1,8 @@
 import type {
-  ApiUser, ApiUserCommonChats, ApiUserFullInfo, ApiUserStatus,
+  ApiUser, ApiUserCommonChats,
+  ApiUserFullInfo, ApiUserStatus,
 } from '../../api/types';
+import type { BotAppPermissions } from '../../types';
 import type { GlobalState } from '../types';
 
 import { isUserBot } from '../helpers';
@@ -33,15 +35,21 @@ export function selectIsCurrentUserPremium<T extends GlobalState>(global: T) {
   return Boolean(global.users.byId[global.currentUserId].isPremium);
 }
 
+export function selectIsCurrentUserFrozen<T extends GlobalState>(global: T) {
+  return Boolean(global.appConfig.freezeUntilDate);
+}
+
 export function selectIsPremiumPurchaseBlocked<T extends GlobalState>(global: T) {
-  return global.appConfig?.isPremiumPurchaseBlocked ?? true;
+  return global.appConfig.isPremiumPurchaseBlocked ?? true;
 }
 
 export function selectIsGiveawayGiftsPurchaseAvailable<T extends GlobalState>(global: T) {
-  return global.appConfig?.isGiveawayGiftsPurchaseAvailable ?? true;
+  return global.appConfig.isGiveawayGiftsPurchaseAvailable ?? true;
 }
 
-// Slow, not to be used in `withGlobal`
+/**
+ * Slow, not to be used in `withGlobal`
+ */
 export function selectUserByPhoneNumber<T extends GlobalState>(global: T, phoneNumber: string) {
   const phoneNumberCleaned = phoneNumber.replace(/[^0-9]/g, '');
 
@@ -55,4 +63,10 @@ export function selectBot<T extends GlobalState>(global: T, userId: string): Api
   }
 
   return user;
+}
+
+export function selectBotAppPermissions<T extends GlobalState>(
+  global: T, userId: string,
+): BotAppPermissions | undefined {
+  return global.users.botAppPermissionsById[userId];
 }

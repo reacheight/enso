@@ -1,46 +1,54 @@
-import type { ApiInputInvoiceStars, ApiRequestInputInvoice } from '../../../api/types';
+import type {
+  ApiInputInvoice, ApiInputInvoicePremiumGiftStars, ApiInputInvoiceStarGift, ApiInputInvoiceStarGiftResale,
+  ApiRequestInputInvoice,
+} from '../../../api/types';
 import type { ApiCredentials } from '../../../components/payment/PaymentModal';
-import type { ActionReturnType, GlobalState, TabArgs } from '../../types';
+import type { RegularLangFnParameters } from '../../../util/localization';
+import type {
+  ActionReturnType, GlobalState, TabArgs,
+} from '../../types';
 import { PaymentStep } from '../../../types';
 
-import { DEBUG_PAYMENT_SMART_GLOCAL } from '../../../config';
+import { DEBUG_PAYMENT_SMART_GLOCAL, STARS_CURRENCY_CODE, TON_CURRENCY_CODE } from '../../../config';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import * as langProvider from '../../../util/oldLangProvider';
 import { getStripeError } from '../../../util/payments/stripe';
 import { buildQueryString } from '../../../util/requestQuery';
+import { getServerTime } from '../../../util/serverTime';
 import { extractCurrentThemeParams } from '../../../util/themeStyle';
 import { callApi } from '../../../api/gramjs';
 import { isChatChannel, isChatSuperGroup } from '../../helpers';
 import {
-  getPrizeStarsTransactionFromGiveaway,
   getRequestInputInvoice,
-  getStarsTransactionFromGift,
+  getRequestInputSavedStarGift,
 } from '../../helpers/payments';
-import { addActionHandler, getGlobal, setGlobal } from '../../index';
 import {
-  appendStarsTransactions, closeInvoice,
+  addActionHandler, getActions, getGlobal, setGlobal,
+} from '../../index';
+import {
+  closeInvoice,
   openStarsTransactionFromReceipt,
-  openStarsTransactionModal,
-  setInvoiceInfo, setPaymentForm,
   setPaymentStep,
   setReceipt,
   setRequestInfoId,
-  setSmartGlocalCardInfo, setStripeCardInfo,
+  setSmartGlocalCardInfo,
+  setStripeCardInfo,
   updateChatFullInfo,
   updatePayment,
   updateShippingOptions,
-  updateStarsBalance,
+  updateStarsPayment,
 } from '../../reducers';
 import { updateTabState } from '../../reducers/tabs';
 import {
   selectChat,
   selectChatFullInfo,
-  selectChatMessage,
-  selectPaymentFormId,
-  selectPaymentInputInvoice, selectPaymentRequestId,
+  selectIsCurrentUserFrozen,
+  selectPaymentInputInvoice,
+  selectPaymentRequestId,
   selectProviderPublicToken,
   selectProviderPublishableKey,
   selectSmartGlocalCredentials,
+  selectStarsPayment,
   selectStripeCredentials,
   selectTabState,
 } from '../../selectors';
@@ -71,53 +79,101 @@ addActionHandler('openInvoice', async (global, actions, payload): Promise<void> 
     return;
   }
 
-  const result = await getPaymentForm(global, requestInputInvoice, tabId);
+  global = updateTabState(global, {
+    isPaymentFormLoading: true,
+  }, tabId);
+  setGlobal(global);
 
-  if (!result) {
+  const theme = extractCurrentThemeParams();
+  const form = await callApi('getPaymentForm', requestInputInvoice, theme);
+
+  if (!form) {
     return;
   }
 
-  const { form, invoice } = result;
-
   global = getGlobal();
 
-  global = setInvoiceInfo(global, invoice, tabId);
-  global = updatePayment(global, {
-    inputInvoice: payload,
-    isPaymentModalOpen: form.type === 'regular',
-    isExtendedMedia: (payload as any).isExtendedMedia,
-    status: undefined,
+  global = updateTabState(global, {
+    isPaymentFormLoading: false,
   }, tabId);
+
+  if ('error' in form) {
+    setGlobal(global);
+
+    handlePaymentFormError(form.error, tabId);
+    return;
+  }
+
+  if (form.type === 'regular') {
+    global = updatePayment(global, {
+      inputInvoice: payload,
+      form,
+      isPaymentModalOpen: true,
+      isExtendedMedia: (payload as any).isExtendedMedia,
+      status: undefined,
+    }, tabId);
+    global = setPaymentStep(global, PaymentStep.Checkout, tabId);
+  }
+
   if (form.type === 'stars') {
     global = updateTabState(global, {
-      isStarPaymentModalOpen: true,
+      starsPayment: {
+        inputInvoice,
+        form,
+        status: 'pending',
+      },
     }, tabId);
   }
+
   setGlobal(global);
 });
 
-async function getPaymentForm<T extends GlobalState>(
-  global: T, inputInvoice: ApiRequestInputInvoice,
-  ...[tabId = getCurrentTabId()]: TabArgs<T>
-) {
-  const theme = extractCurrentThemeParams();
-  const result = await callApi('getPaymentForm', inputInvoice, theme);
-  if (!result) {
-    return undefined;
-  }
-
+addActionHandler('sendStarGift', (global, actions, payload): ActionReturnType => {
   const {
-    form, invoice,
-  } = result;
+    gift, peerId, message, shouldHideName, shouldUpgrade, tabId = getCurrentTabId(),
+  } = payload;
 
-  global = getGlobal();
+  const inputInvoice: ApiInputInvoiceStarGift = {
+    type: 'stargift',
+    peerId,
+    giftId: gift.id,
+    message,
+    shouldHideName,
+    shouldUpgrade: shouldUpgrade || undefined,
+  };
 
-  global = setPaymentForm(global, form, tabId);
-  global = setPaymentStep(global, PaymentStep.Checkout, tabId);
-  setGlobal(global);
+  payInputStarInvoice(global, inputInvoice, gift.stars, tabId);
+});
 
-  return { form, invoice };
-}
+addActionHandler('buyStarGift', (global, actions, payload): ActionReturnType => {
+  const {
+    slug, peerId, price, tabId = getCurrentTabId(),
+  } = payload;
+
+  const inputInvoice: ApiInputInvoiceStarGiftResale = {
+    type: 'stargiftResale',
+    slug,
+    peerId,
+    currency: price.currency,
+  };
+
+  payInputStarInvoice(global, inputInvoice, price.amount, tabId);
+});
+
+addActionHandler('sendPremiumGiftByStars', (global, actions, payload): ActionReturnType => {
+  const {
+    userId, months, amount, message, tabId = getCurrentTabId(),
+  } = payload;
+
+  const inputInvoice: ApiInputInvoicePremiumGiftStars = {
+    type: 'premiumGiftStars',
+    userId,
+    months,
+    message,
+  };
+
+  payInputStarInvoice(global, inputInvoice, amount, tabId);
+});
 
 addActionHandler('getReceipt', async (global, actions, payload): Promise<void> => {
   const {
@@ -166,7 +222,7 @@ addActionHandler('clearReceipt', (global, actions, payload): ActionReturnType =>
 addActionHandler('sendCredentialsInfo', (global, actions, payload): ActionReturnType => {
   const { credentials, tabId = getCurrentTabId() } = payload;
 
-  const { nativeProvider } = selectTabState(global, tabId).payment;
+  const { nativeProvider } = selectTabState(global, tabId).payment.form!;
   const { data } = credentials;
 
   if (nativeProvider === 'stripe') {
@@ -189,14 +245,15 @@ addActionHandler('sendPaymentForm', async (global, actions, payload): Promise<vo
     shippingOptionId, saveCredentials, savedCredentialId, tipAmount,
     tabId = getCurrentTabId(),
   } = payload;
-  const inputInvoice = selectPaymentInputInvoice(global, tabId);
-  const formId = selectPaymentFormId(global, tabId);
   const requestInfoId = selectPaymentRequestId(global, tabId);
-  const { nativeProvider, temporaryPassword } = selectTabState(global, tabId).payment;
+  const paymentState = selectTabState(global, tabId).payment;
+  const { form, temporaryPassword, inputInvoice } = paymentState;
 
-  if (!inputInvoice || !formId) {
+  if (!inputInvoice || !form) {
     return;
   }
+
+  const { nativeProvider, formId } = form;
 
   const requestInputInvoice = getRequestInputInvoice(global, inputInvoice);
   if (!requestInputInvoice) {
@@ -233,29 +290,26 @@ addActionHandler('sendPaymentForm', async (global, actions, payload): Promise<vo
 
   actions.apiUpdate({
     '@type': 'updatePaymentStateCompleted',
-    inputInvoice,
+    paymentState,
+    tabId,
   });
-
-  if (inputInvoice.type === 'stars') {
-    actions.requestConfetti({ withStars: true, tabId });
-  }
 });
 
 addActionHandler('sendStarPaymentForm', async (global, actions, payload): Promise<void> => {
-  const { tabId = getCurrentTabId() } = payload || {};
-  const starsPayment = selectTabState(global, tabId).isStarPaymentModalOpen;
-  if (!starsPayment) return;
-
-  const inputInvoice = selectPaymentInputInvoice(global, tabId) as ApiInputInvoiceStars;
-  const formId = selectPaymentFormId(global, tabId);
-  if (!inputInvoice || !formId) {
-    return;
-  }
+  const { directInfo, tabId = getCurrentTabId() } = payload;
+  const starPayment = selectStarsPayment(global, tabId);
+  const inputInvoice = starPayment?.inputInvoice || directInfo?.inputInvoice;
+  if (!inputInvoice) return;
 
   const requestInputInvoice = getRequestInputInvoice(global, inputInvoice);
   if (!requestInputInvoice) {
     return;
   }
+
+  const formId = (starPayment.form?.formId || starPayment.subscriptionInfo?.subscriptionFormId || directInfo?.formId)!;
+
+  global = updateStarsPayment(global, { status: 'pending' }, tabId);
+  setGlobal(global);
 
   const result = await callApi('sendStarPaymentForm', {
     inputInvoice: requestInputInvoice,
@@ -263,17 +317,27 @@ addActionHandler('sendStarPaymentForm', async (global, actions, payload): Promis
   });
 
   if (!result) {
+    global = getGlobal();
+    global = updateStarsPayment(global, { status: 'failed' }, tabId);
+    setGlobal(global);
+    actions.closeStarsPaymentModal({ tabId });
+    actions.closeGiftModal({ tabId });
     return;
   }
 
   global = getGlobal();
-  global = updatePayment(global, { status: 'paid' }, tabId);
-  global = closeInvoice(global, tabId);
+  global = updateStarsPayment(global, { status: 'paid' }, tabId);
   setGlobal(global);
+  actions.closeStarsPaymentModal({ tabId });
+
+  if ('channelId' in result) {
+    actions.openChat({ id: result.channelId, tabId });
+  }
 
   actions.apiUpdate({
-    '@type': 'updatePaymentStateCompleted',
-    inputInvoice,
+    '@type': 'updateStarPaymentStateCompleted',
+    paymentState: directInfo ? { inputInvoice } : starPayment,
+    tabId,
   });
   actions.loadStarStatus();
 });
@@ -341,7 +405,7 @@ async function sendSmartGlocalCredentials<T extends GlobalState>(
     },
   };
 
-  const tokenizeUrl = selectTabState(global, tabId).payment.nativeParams?.tokenizeUrl;
+  const tokenizeUrl = selectTabState(global, tabId).payment.form?.nativeParams.tokenizeUrl;
 
   let url;
   if (DEBUG_PAYMENT_SMART_GLOCAL) {
@@ -351,7 +415,7 @@ async function sendSmartGlocalCredentials<T extends GlobalState>(
   }
 
   if (tokenizeUrl?.startsWith('https://')
-      && tokenizeUrl.endsWith('.smart-glocal.com/cds/v1/tokenize/card')) {
+    && tokenizeUrl.endsWith('.smart-glocal.com/cds/v1/tokenize/card')) {
     url = tokenizeUrl;
   }
 
@@ -368,7 +432,7 @@ async function sendSmartGlocalCredentials<T extends GlobalState>(
 
   if (result.status !== 'ok') {
     // TODO после получения документации сделать аналог getStripeError(result.error);
-    const error = { description: 'payment error' };
+    const error = { descriptionKey: { key: 'ErrorUnexpected' } satisfies RegularLangFnParameters };
     global = getGlobal();
     global = updateTabState(global, {
       payment: {
@@ -420,7 +484,7 @@ addActionHandler('closePremiumModal', (global, actions, payload): ActionReturnTy
 
 addActionHandler('openPremiumModal', async (global, actions, payload): Promise<void> => {
   const {
-    initialSection, fromUserId, isSuccess, isGift, monthsAmount, toUserId,
+    initialSection, fromUserId, isSuccess, isGift, monthsAmount, toUserId, gift,
     tabId = getCurrentTabId(),
   } = payload || {};
 
@@ -441,6 +505,7 @@ addActionHandler('openPremiumModal', async (global, actions, payload): Promise<v
       isGift,
       monthsAmount,
       isSuccess,
+      gift,
     },
   }, tabId);
   setGlobal(global);
@@ -467,13 +532,13 @@ addActionHandler('openGiveawayModal', async (global, actions, payload): Promise<
     return;
   }
 
-  const isOpen = Boolean(chatId);
+  global = getGlobal();
 
   global = updateTabState(global, {
     giveawayModal: {
       chatId,
       gifts: result,
-      isOpen,
+      isOpen: true,
       prepaidGiveaway,
       starOptions,
     },
@@ -481,117 +546,26 @@ addActionHandler('openGiveawayModal', async (global, actions, payload): Promise<
   setGlobal(global);
 });
 
-addActionHandler('closeGiveawayModal', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-
-  return updateTabState(global, {
-    giveawayModal: undefined,
-  }, tabId);
-});
-
-addActionHandler('openPremiumGiftingModal', (global, actions, payload): ActionReturnType => {
+addActionHandler('openGiftModal', async (global, actions, payload): Promise<void> => {
   const {
-    tabId = getCurrentTabId(),
-  } = payload || {};
+    forUserId, selectedResaleGift, tabId = getCurrentTabId(),
+  } = payload;
 
-  global = getGlobal();
-
-  global = updateTabState(global, {
-    giftingModal: {
-      isOpen: true,
-    },
-  }, tabId);
-  setGlobal(global);
-});
-
-addActionHandler('closePremiumGiftingModal', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-
-  return updateTabState(global, {
-    giftingModal: undefined,
-  }, tabId);
-});
-
-addActionHandler('openStarsGiftingModal', (global, actions, payload): ActionReturnType => {
-  const {
-    tabId = getCurrentTabId(),
-  } = payload || {};
-
-  global = getGlobal();
-
-  global = updateTabState(global, {
-    starsGiftingModal: {
-      isOpen: true,
-    },
-  }, tabId);
-  setGlobal(global);
-});
-
-addActionHandler('closeStarsGiftingModal', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-
-  return updateTabState(global, {
-    starsGiftingModal: undefined,
-  }, tabId);
-});
-
-addActionHandler('openStarsTransactionFromGift', (global, actions, payload): ActionReturnType => {
-  const {
-    chatId,
-    messageId,
-    tabId = getCurrentTabId(),
-  } = payload || {};
-
-  const message = selectChatMessage(global, chatId, messageId);
-  if (!message) return undefined;
-
-  const transaction = getStarsTransactionFromGift(message);
-  if (!transaction) return undefined;
-
-  return openStarsTransactionModal(global, transaction, tabId);
-});
-
-addActionHandler('openPrizeStarsTransactionFromGiveaway', (global, actions, payload): ActionReturnType => {
-  const {
-    chatId,
-    messageId,
-    tabId = getCurrentTabId(),
-  } = payload || {};
-
-  const message = selectChatMessage(global, chatId, messageId);
-  if (!message) return undefined;
-
-  const transaction = getPrizeStarsTransactionFromGiveaway(message);
-  if (!transaction) return undefined;
-
-  return openStarsTransactionModal(global, transaction, tabId);
-});
-
-addActionHandler('openPremiumGiftModal', async (global, actions, payload): Promise<void> => {
-  const {
-    forUserIds, tabId = getCurrentTabId(),
-  } = payload || {};
-  const result = await callApi('fetchPremiumPromo');
-  if (!result) return;
-
-  global = getGlobal();
+  if (selectIsCurrentUserFrozen(global)) {
+    actions.openFrozenAccountModal({ tabId });
+    return;
+  }
 
   const gifts = await callApi('getPremiumGiftCodeOptions', {});
+  if (!gifts) return;
 
+  global = getGlobal();
   global = updateTabState(global, {
     giftModal: {
-      isOpen: true,
-      forUserIds,
+      forPeerId: forUserId,
       gifts,
+      selectedResaleGift,
     },
-  }, tabId);
-  setGlobal(global);
-});
-
-addActionHandler('closePremiumGiftModal', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-  global = updateTabState(global, {
-    giftModal: { isOpen: false },
   }, tabId);
   setGlobal(global);
 });
@@ -602,22 +576,20 @@ addActionHandler('openStarsGiftModal', async (global, actions, payload): Promise
     tabId = getCurrentTabId(),
   } = payload || {};
 
+  if (selectIsCurrentUserFrozen(global)) {
+    actions.openFrozenAccountModal({ tabId });
+    return;
+  }
+
   const starsGiftOptions = await callApi('getStarsGiftOptions', {});
 
+  global = getGlobal();
   global = updateTabState(global, {
     starsGiftModal: {
       isOpen: true,
       forUserId,
       starsGiftOptions,
     },
-  }, tabId);
-  setGlobal(global);
-});
-
-addActionHandler('closeStarsGiftModal', (global, actions, payload): ActionReturnType => {
-  const { tabId = getCurrentTabId() } = payload || {};
-  global = updateTabState(global, {
-    starsGiftModal: { isOpen: false },
   }, tabId);
   setGlobal(global);
 });
@@ -629,9 +601,9 @@ addActionHandler('validatePaymentPassword', async (global, actions, payload): Pr
   global = getGlobal();
 
   if (!result) {
-    global = updatePayment(global, { error: { message: 'Unknown Error', field: 'password' } }, tabId);
+    global = updatePayment(global, { error: { messageKey: { key: 'ErrorUnexpected' }, field: 'password' } }, tabId);
   } else if ('error' in result) {
-    global = updatePayment(global, { error: { message: result.error, field: 'password' } }, tabId);
+    global = updatePayment(global, { error: { messageKey: result.messageKey, field: 'password' } }, tabId);
   } else {
     global = updatePayment(global, { temporaryPassword: result, step: PaymentStep.Checkout }, tabId);
   }
@@ -859,7 +831,7 @@ addActionHandler('applyBoost', async (global, actions, payload): Promise<void> =
   const oldMyBoosts = tabState.boostModal?.myBoosts;
 
   if (oldMyBoosts) {
-    const unixNow = Math.floor(Date.now() / 1000);
+    const unixNow = getServerTime();
     const newMyBoosts = oldMyBoosts.map((boost) => {
       if (slots.includes(boost.slot)) {
         return {
@@ -1030,62 +1002,236 @@ addActionHandler('launchPrepaidStarsGiveaway', async (global, actions, payload):
   actions.openBoostStatistics({ chatId, tabId });
 });
 
-addActionHandler('loadStarStatus', async (global): Promise<void> => {
-  const currentStatus = global.stars;
-  const needsTopupOptions = !currentStatus?.topupOptions;
+addActionHandler('upgradeGift', async (global, actions, payload): Promise<void> => {
+  const {
+    gift, shouldKeepOriginalDetails, upgradeStars, tabId = getCurrentTabId(),
+  } = payload;
 
-  const [status, topupOptions] = await Promise.all([
-    callApi('fetchStarsStatus'),
-    needsTopupOptions ? callApi('fetchStarsTopupOptions') : undefined,
-  ]);
+  const requestSavedGift = getRequestInputSavedStarGift(global, gift);
+  if (!requestSavedGift) {
+    return;
+  }
 
-  if (!status || (needsTopupOptions && !topupOptions)) {
+  global = updateTabState(global, {
+    isWaitingForStarGiftUpgrade: true,
+  }, tabId);
+
+  setGlobal(global);
+  global = getGlobal();
+
+  actions.closeGiftUpgradeModal({ tabId });
+  actions.closeGiftInfoModal({ tabId });
+
+  if (!upgradeStars) {
+    const result = await callApi('upgradeStarGift', {
+      inputSavedGift: requestSavedGift,
+      shouldKeepOriginalDetails: shouldKeepOriginalDetails || undefined,
+    });
+
+    global = getGlobal();
+    if (result && global.currentUserId) {
+      actions.reloadPeerSavedGifts({ peerId: global.currentUserId });
+    }
+
+    return;
+  }
+
+  const invoice: ApiInputInvoice = {
+    type: 'stargiftUpgrade',
+    inputSavedGift: gift,
+    shouldKeepOriginalDetails: shouldKeepOriginalDetails || undefined,
+  };
+
+  payInputStarInvoice(global, invoice, upgradeStars, tabId);
+});
+
+addActionHandler('transferGift', (global, actions, payload): ActionReturnType => {
+  const {
+    gift, recipientId, transferStars, tabId = getCurrentTabId(),
+  } = payload;
+
+  const peer = selectChat(global, recipientId);
+
+  const requestSavedGift = getRequestInputSavedStarGift(global, gift);
+  if (!peer || !requestSavedGift) {
+    return;
+  }
+
+  global = updateTabState(global, {
+    isWaitingForStarGiftTransfer: true,
+  }, tabId);
+
+  setGlobal(global);
+  global = getGlobal();
+
+  actions.closeGiftTransferModal({ tabId });
+  actions.closeGiftInfoModal({ tabId });
+
+  if (!transferStars) {
+    callApi('transferStarGift', {
+      inputSavedGift: requestSavedGift,
+      toPeer: peer,
+    });
+
+    return;
+  }
+
+  const invoice: ApiInputInvoice = {
+    type: 'stargiftTransfer',
+    inputSavedGift: gift,
+    recipientId,
+  };
+
+  payInputStarInvoice(global, invoice, transferStars, tabId);
+});
+
+async function payInputStarInvoice<T extends GlobalState>(
+  global: T, inputInvoice: ApiInputInvoice, price: number,
+  ...[tabId = getCurrentTabId()]: TabArgs<T>
+) {
+  const actions = getActions();
+  const isTon = inputInvoice.type === 'stargiftResale' && inputInvoice.currency === TON_CURRENCY_CODE;
+  const balance = isTon ? global.ton?.balance : global.stars?.balance;
+  const currency = isTon ? TON_CURRENCY_CODE : STARS_CURRENCY_CODE;
+
+  if (balance === undefined) return;
+
+  if (balance.amount < price) {
+    actions.openStarsBalanceModal({ currency, tabId });
+    return;
+  }
+
+  const requestInputInvoice = getRequestInputInvoice(global, inputInvoice);
+  if (!requestInputInvoice) {
+    return;
+  }
+
+  global = updateTabState(global, {
+    isPaymentFormLoading: true,
+  }, tabId);
+  setGlobal(global);
+
+  const theme = extractCurrentThemeParams();
+  const form = await callApi('getPaymentForm', requestInputInvoice, theme);
+
+  if (!form) {
     return;
   }
 
   global = getGlobal();
 
-  global = {
-    ...global,
-    stars: {
-      ...currentStatus,
-      balance: status.balance,
-      topupOptions: topupOptions || currentStatus!.topupOptions,
-      history: {
-        all: undefined,
-        inbound: undefined,
-        outbound: undefined,
-      },
-    },
-  };
-  if (status.history) {
-    global = appendStarsTransactions(global, 'all', status.history, status.nextOffset);
-  }
+  global = updateTabState(global, {
+    isPaymentFormLoading: false,
+  }, tabId);
   setGlobal(global);
+
+  if ('error' in form) {
+    handlePaymentFormError(form.error, tabId);
+    return;
+  }
+
+  const formPrice = form.invoice.totalAmount;
+  if (formPrice !== price) {
+    actions.openPriceConfirmModal({
+      originalAmount: price,
+      newAmount: formPrice,
+      currency,
+      directInfo: {
+        inputInvoice,
+        formId: form.formId,
+      },
+      tabId,
+    });
+    return;
+  }
+
+  actions.sendStarPaymentForm({
+    directInfo: {
+      inputInvoice,
+      formId: form.formId,
+    },
+    tabId,
+  });
+}
+
+addActionHandler('openUniqueGiftBySlug', async (global, actions, payload): Promise<void> => {
+  const {
+    slug, tabId = getCurrentTabId(),
+  } = payload;
+
+  const gift = await callApi('fetchUniqueStarGift', { slug });
+
+  if (!gift) {
+    actions.showNotification({
+      message: {
+        key: 'GiftWasNotFound',
+      },
+      tabId,
+    });
+    return;
+  }
+
+  actions.openGiftInfoModal({ gift, tabId });
 });
 
-addActionHandler('loadStarsTransactions', async (global, actions, payload): Promise<void> => {
-  const { type } = payload;
+addActionHandler('processStarGiftWithdrawal', async (global, actions, payload): Promise<void> => {
+  const {
+    gift, password, tabId = getCurrentTabId(),
+  } = payload;
 
-  const history = global.stars?.history[type];
-  const offset = history?.nextOffset;
-  if (history && !offset) return; // Already loaded all
+  let giftWithdrawModal = selectTabState(global, tabId).giftWithdrawModal;
+  if (!giftWithdrawModal) return;
 
-  const result = await callApi('fetchStarsTransactions', {
-    isInbound: type === 'inbound' || undefined,
-    isOutbound: type === 'outbound' || undefined,
-    offset: offset || '',
-  });
+  global = updateTabState(global, {
+    giftWithdrawModal: {
+      ...giftWithdrawModal,
+      isLoading: true,
+      errorKey: undefined,
+    },
+  }, tabId);
+  setGlobal(global);
+
+  const inputGift = getRequestInputSavedStarGift(global, gift);
+  if (!inputGift) {
+    return;
+  }
+
+  const result = await callApi('fetchStarGiftWithdrawalUrl', { inputGift, password });
 
   if (!result) {
     return;
   }
 
   global = getGlobal();
+  giftWithdrawModal = selectTabState(global, tabId).giftWithdrawModal;
+  if (!giftWithdrawModal) return;
 
-  global = updateStarsBalance(global, result.balance);
-  if (result.history) {
-    global = appendStarsTransactions(global, type, result.history, result.nextOffset);
+  if ('error' in result) {
+    global = updateTabState(global, {
+      giftWithdrawModal: {
+        ...giftWithdrawModal,
+        isLoading: false,
+        errorKey: result.messageKey,
+      },
+    }, tabId);
+    setGlobal(global);
+    return;
   }
-  setGlobal(global);
+
+  actions.openUrl({ url: result.url, tabId });
+  actions.closeGiftWithdrawModal({ tabId });
 });
+
+function handlePaymentFormError(error: string, tabId: number) {
+  if (error === 'SLUG_INVALID') {
+    getActions().showNotification({
+      message: {
+        key: 'PaymentInvoiceNotFound',
+      },
+      tabId,
+    });
+    return;
+  }
+
+  getActions().showDialog({ data: { message: error, hasErrorKey: true }, tabId });
+}

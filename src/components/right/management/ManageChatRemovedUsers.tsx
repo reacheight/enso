@@ -1,5 +1,5 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useCallback } from '../../../lib/teact/teact';
+import { memo, useCallback } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiChat, ApiChatMember, ApiUser } from '../../../api/types';
@@ -12,6 +12,7 @@ import useFlag from '../../../hooks/useFlag';
 import useHistoryBack from '../../../hooks/useHistoryBack';
 import useOldLang from '../../../hooks/useOldLang';
 
+import Icon from '../../common/icons/Icon';
 import PrivateChatInfo from '../../common/PrivateChatInfo';
 import FloatingActionButton from '../../ui/FloatingActionButton';
 import ListItem, { type MenuItemContextAction } from '../../ui/ListItem';
@@ -82,9 +83,9 @@ const ManageChatRemovedUsers: FC<OwnProps & StateProps> = ({
 
   return (
     <div className="Management">
-      <div className="custom-scroll">
+      <div className="panel-content custom-scroll">
         <div className="section" dir={lang.isRtl ? 'rtl' : undefined}>
-          <p className="text-muted">{lang(isChannel ? 'NoBlockedChannel2' : 'NoBlockedGroup2')}</p>
+          <p className="section-help">{lang(isChannel ? 'NoBlockedChannel2' : 'NoBlockedGroup2')}</p>
 
           {removedMembers.map((member) => (
             <ListItem
@@ -106,7 +107,7 @@ const ManageChatRemovedUsers: FC<OwnProps & StateProps> = ({
               onClick={openRemoveUserModal}
               ariaLabel={lang('Channel.EditAdmin.Permission.BanUsers')}
             >
-              <i className="icon icon-add-user-filled" />
+              <Icon name="add-user-filled" />
             </FloatingActionButton>
           )}
           {chat && canDeleteMembers && (
@@ -123,7 +124,7 @@ const ManageChatRemovedUsers: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { chatId }): StateProps => {
+  (global, { chatId }): Complete<StateProps> => {
     const chat = selectChat(global, chatId);
     const { byId: usersById } = global.users;
     const canDeleteMembers = chat && (getHasAdminRight(chat, 'banUsers') || chat.isCreator);

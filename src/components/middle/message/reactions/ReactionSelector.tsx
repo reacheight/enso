@@ -1,9 +1,14 @@
 import type { FC } from '../../../../lib/teact/teact';
-import React, { memo, useMemo, useRef } from '../../../../lib/teact/teact';
+import { memo, useMemo, useRef } from '../../../../lib/teact/teact';
 import { getActions } from '../../../../global';
 
 import type {
-  ApiAvailableReaction, ApiChatReactions, ApiReaction, ApiReactionCount,
+  ApiAvailableReaction,
+  ApiChatReactions,
+  ApiReaction,
+  ApiReactionCount,
+  ApiReactionCustomEmoji,
+  ApiReactionPaid,
 } from '../../../../api/types';
 import type { IAnchorPosition } from '../../../../types';
 
@@ -15,12 +20,15 @@ import buildClassName, { createClassNameBuilder } from '../../../../util/buildCl
 import useLastCallback from '../../../../hooks/useLastCallback';
 import useOldLang from '../../../../hooks/useOldLang';
 
+import Icon from '../../../common/icons/Icon';
 import Button from '../../../ui/Button';
 import Link from '../../../ui/Link';
 import ReactionSelectorCustomReaction from './ReactionSelectorCustomReaction';
 import ReactionSelectorReaction from './ReactionSelectorReaction';
 
 import './ReactionSelector.scss';
+
+type RenderableReactions = (ApiAvailableReaction | ApiReactionCustomEmoji | ApiReactionPaid)[];
 
 type OwnProps = {
   enabledReactions?: ApiChatReactions;
@@ -39,8 +47,11 @@ type OwnProps = {
   isInSavedMessages?: boolean;
   isInStoryViewer?: boolean;
   isForEffects?: boolean;
+  isWithPaidReaction?: boolean;
   onClose?: NoneToVoidFunction;
   onToggleReaction: (reaction: ApiReaction) => void;
+  onSendPaidReaction?: NoneToVoidFunction;
+  onShowPaidReactionModal?: NoneToVoidFunction;
   onShowMore: (position: IAnchorPosition) => void;
 };
 
@@ -64,13 +75,15 @@ const ReactionSelector: FC<OwnProps> = ({
   isInStoryViewer,
   isForEffects,
   effectReactions,
+  isWithPaidReaction,
   onClose,
   onToggleReaction,
+  onSendPaidReaction,
+  onShowPaidReactionModal,
   onShowMore,
 }) => {
   const { openPremiumModal } = getActions();
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>();
   const lang = useOldLang();
 
   const areReactionsLocked = isInSavedMessages && !isCurrentUserPremium && !isInStoryViewer;
@@ -87,8 +100,8 @@ const ReactionSelector: FC<OwnProps> = ({
       return allAvailableReactions?.map((reaction) => reaction.reaction);
     })();
 
-    const filteredReactions = reactions?.map((reaction) => {
-      const isCustomReaction = 'documentId' in reaction;
+    const filteredReactions: RenderableReactions = reactions?.map((reaction) => {
+      const isCustomReaction = reaction.type === 'custom';
       const availableReaction = allAvailableReactions?.find((r) => isSameReaction(r.reaction, reaction));
 
       if (isForEffects) return availableReaction;
@@ -96,18 +109,21 @@ const ReactionSelector: FC<OwnProps> = ({
       if ((!isCustomReaction && !availableReaction) || availableReaction?.isInactive) return undefined;
 
       if (!isPrivate && !shouldUseCurrentReactions
-         && (!enabledReactions || !canSendReaction(reaction, enabledReactions))) {
+        && (!enabledReactions || !canSendReaction(reaction, enabledReactions))) {
         return undefined;
       }
 
       return isCustomReaction ? reaction : availableReaction;
     }).filter(Boolean) || [];
 
-    return sortReactions(filteredReactions, topReactions);
+    const sortedReactions = sortReactions(filteredReactions, topReactions);
+    if (isWithPaidReaction) {
+      sortedReactions.unshift({ type: 'paid' });
+    }
+    return sortedReactions;
   }, [
     allAvailableReactions, currentReactions, defaultTagReactions, enabledReactions, isInSavedMessages, isPrivate,
-    topReactions, isForEffects, effectReactions, shouldUseCurrentReactions,
-
+    topReactions, isForEffects, effectReactions, shouldUseCurrentReactions, isWithPaidReaction,
   ]);
 
   const reactionsToRender = useMemo(() => {
@@ -196,6 +212,8 @@ const ReactionSelector: FC<OwnProps> = ({
                   key={getReactionKey(reaction)}
                   isReady={isReady}
                   onToggleReaction={onToggleReaction}
+                  onSendPaidReaction={onSendPaidReaction}
+                  onShowPaidReactionModal={onShowPaidReactionModal}
                   reaction={reaction}
                   noAppearAnimation={!canPlayAnimatedEmojis}
                   chosen={userReactionIndexes.has(i)}
@@ -210,7 +228,7 @@ const ReactionSelector: FC<OwnProps> = ({
                 className={cn('show-more')}
                 onClick={handleShowMoreClick}
               >
-                <i className="icon icon-down" />
+                <Icon name="down" />
               </Button>
             )}
           </div>

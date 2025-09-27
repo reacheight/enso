@@ -1,5 +1,6 @@
 import type { FC } from '../../lib/teact/teact';
-import React, { memo, useMemo } from '../../lib/teact/teact';
+import type React from '../../lib/teact/teact';
+import { memo, useMemo } from '../../lib/teact/teact';
 import { getActions } from '../../global';
 
 import type {
@@ -10,16 +11,24 @@ import type { CustomPeer } from '../../types';
 
 import { EMOJI_STATUS_LOOP_LIMIT } from '../../config';
 import {
-  getChatTitle, getUserFullName, isAnonymousForwardsChat, isChatWithRepliesBot, isPeerUser,
+  getChatTitle,
+  getUserFullName,
+  isAnonymousForwardsChat,
+  isChatWithRepliesBot,
+  isChatWithVerificationCodesBot,
 } from '../../global/helpers';
+import { isApiPeerUser } from '../../global/helpers/peers';
 import buildClassName from '../../util/buildClassName';
+import buildStyle from '../../util/buildStyle';
 import { copyTextToClipboard } from '../../util/clipboard';
 import stopEvent from '../../util/stopEvent';
 import renderText from './helpers/renderText';
 
+import useLang from '../../hooks/useLang';
 import useLastCallback from '../../hooks/useLastCallback';
 import useOldLang from '../../hooks/useOldLang';
 
+import Transition from '../ui/Transition';
 import CustomEmoji from './CustomEmoji';
 import FakeIcon from './FakeIcon';
 import StarIcon from './icons/StarIcon';
@@ -36,10 +45,12 @@ type OwnProps = {
   emojiStatusSize?: number;
   isSavedMessages?: boolean;
   isSavedDialog?: boolean;
+  isMonoforum?: boolean;
+  monoforumBadgeClassName?: string;
   noLoopLimit?: boolean;
   canCopyTitle?: boolean;
   iconElement?: React.ReactNode;
-  allowMultiLine?: boolean;
+  statusSparklesColor?: string;
   onEmojiStatusClick?: NoneToVoidFunction;
   observeIntersection?: ObserveFn;
 };
@@ -56,17 +67,25 @@ const FullNameTitle: FC<OwnProps> = ({
   noLoopLimit,
   canCopyTitle,
   iconElement,
-  allowMultiLine,
+  statusSparklesColor,
+  isMonoforum,
+  monoforumBadgeClassName,
   onEmojiStatusClick,
   observeIntersection,
 }) => {
-  const lang = useOldLang();
   const { showNotification } = getActions();
+
+  const oldLang = useOldLang();
+  const lang = useLang();
+
   const realPeer = 'id' in peer ? peer : undefined;
   const customPeer = 'isCustomPeer' in peer ? peer : undefined;
-  const isUser = realPeer && isPeerUser(realPeer);
-  const title = realPeer && (isUser ? getUserFullName(realPeer) : getChatTitle(lang, realPeer));
-  const isPremium = isUser && realPeer.isPremium;
+  const isUser = realPeer && isApiPeerUser(realPeer);
+  const title = realPeer && (isUser ? getUserFullName(realPeer) : getChatTitle(oldLang, realPeer));
+  const isPremium = (isUser && realPeer.isPremium) || customPeer?.isPremium;
+  const canShowEmojiStatus = withEmojiStatus && !isSavedMessages;
+  const emojiStatus = realPeer?.emojiStatus
+    || (customPeer?.emojiStatusId ? { type: 'regular', documentId: customPeer.emojiStatusId } : undefined);
 
   const handleTitleClick = useLastCallback((e) => {
     if (!title || !canCopyTitle) {
@@ -80,63 +99,84 @@ const FullNameTitle: FC<OwnProps> = ({
 
   const specialTitle = useMemo(() => {
     if (customPeer) {
-      return lang(customPeer.titleKey, customPeer.titleValue, 'i');
+      return renderText(customPeer.title || oldLang(customPeer.titleKey!));
     }
 
     if (isSavedMessages) {
-      return lang(isSavedDialog ? 'MyNotes' : 'SavedMessages');
+      return oldLang(isSavedDialog ? 'MyNotes' : 'SavedMessages');
     }
 
     if (isAnonymousForwardsChat(realPeer!.id)) {
-      return lang('AnonymousForward');
+      return oldLang('AnonymousForward');
     }
 
     if (isChatWithRepliesBot(realPeer!.id)) {
-      return lang('RepliesTitle');
+      return oldLang('RepliesTitle');
+    }
+
+    if (isChatWithVerificationCodesBot(realPeer!.id)) {
+      return oldLang('VerifyCodesNotifications');
     }
 
     return undefined;
-  }, [customPeer, isSavedDialog, isSavedMessages, lang, realPeer]);
-
-  if (specialTitle) {
-    return (
-      <div className={buildClassName('title', styles.root, className)}>
-        <h3 className={buildClassName('fullName', styles.fullName, !allowMultiLine && styles.ellipsis)}>
-          {specialTitle}
-        </h3>
-      </div>
-    );
-  }
+  }, [customPeer, isSavedDialog, isSavedMessages, oldLang, realPeer]);
+  const botVerificationIconId = realPeer?.botVerificationIconId;
 
   return (
     <div className={buildClassName('title', styles.root, className)}>
+      {botVerificationIconId && (
+        <CustomEmoji
+          documentId={botVerificationIconId}
+          size={emojiStatusSize}
+          loopLimit={!noLoopLimit ? EMOJI_STATUS_LOOP_LIMIT : undefined}
+          observeIntersectionForLoading={observeIntersection}
+        />
+      )}
       <h3
         dir="auto"
         role="button"
         className={buildClassName(
           'fullName',
           styles.fullName,
-          !allowMultiLine && styles.ellipsis,
           canCopyTitle && styles.canCopy,
         )}
         onClick={handleTitleClick}
       >
-        {renderText(title || '')}
+        {specialTitle || renderText(title || '')}
       </h3>
       {!iconElement && peer && (
         <>
-          {!noVerified && realPeer?.isVerified && <VerifiedIcon />}
-          {!noFake && realPeer?.fakeType && <FakeIcon fakeType={realPeer.fakeType} />}
-          {withEmojiStatus && realPeer?.emojiStatus && (
-            <CustomEmoji
-              documentId={realPeer.emojiStatus.documentId}
-              size={emojiStatusSize}
-              loopLimit={!noLoopLimit ? EMOJI_STATUS_LOOP_LIMIT : undefined}
-              observeIntersectionForLoading={observeIntersection}
-              onClick={onEmojiStatusClick}
-            />
+          {!noVerified && peer?.isVerified && <VerifiedIcon />}
+          {!noFake && peer?.fakeType && <FakeIcon fakeType={peer.fakeType} />}
+          {canShowEmojiStatus && emojiStatus && (
+            <Transition
+              className={styles.statusTransition}
+              slideClassName={styles.statusTransitionSlide}
+              activeKey={Number(emojiStatus.documentId)}
+              name="slideFade"
+              direction={-1}
+              shouldCleanup
+            >
+              <CustomEmoji
+                forceAlways
+                className="no-selection"
+                withSparkles={emojiStatus.type === 'collectible'}
+                sparklesClassName="statusSparkles"
+                sparklesStyle={buildStyle(statusSparklesColor && `color: ${statusSparklesColor}`)}
+                documentId={emojiStatus.documentId}
+                size={emojiStatusSize}
+                loopLimit={!noLoopLimit ? EMOJI_STATUS_LOOP_LIMIT : undefined}
+                observeIntersectionForLoading={observeIntersection}
+                onClick={onEmojiStatusClick}
+              />
+            </Transition>
           )}
-          {withEmojiStatus && !realPeer?.emojiStatus && isPremium && <StarIcon />}
+          {canShowEmojiStatus && !emojiStatus && isPremium && <StarIcon />}
+          {isMonoforum && (
+            <div className={buildClassName(styles.monoforumBadge, monoforumBadgeClassName)}>
+              {lang('MonoforumBadge')}
+            </div>
+          )}
         </>
       )}
       {iconElement}

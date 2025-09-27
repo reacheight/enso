@@ -116,7 +116,7 @@ export type FoldersState = {
 export type FoldersActions = (
   'setTitle' | 'saveFilters' | 'editFolder' | 'reset' | 'setChatFilter' | 'setIsLoading' | 'setError' |
   'editIncludeFilters' | 'editExcludeFilters' | 'setIncludeFilters' | 'setExcludeFilters' | 'setIsTouched' |
-  'setFolderId' | 'setIsChatlist'
+  'setFolderId' | 'setIsChatlist' | 'setColor'
   );
 export type FolderEditDispatch = Dispatch<FoldersState, FoldersActions>;
 
@@ -124,7 +124,7 @@ const INITIAL_STATE: FoldersState = {
   mode: 'create',
   chatFilter: '',
   folder: {
-    title: '',
+    title: { text: '' },
     includedChatIds: [],
     excludedChatIds: [],
   },
@@ -133,14 +133,14 @@ const INITIAL_STATE: FoldersState = {
 const foldersReducer: StateReducer<FoldersState, FoldersActions> = (
   state,
   action,
-) => {
+): FoldersState => {
   switch (action.type) {
     case 'setTitle':
       return {
         ...state,
         folder: {
           ...state.folder,
-          title: action.payload,
+          title: { text: action.payload },
         },
         isTouched: true,
       };
@@ -184,7 +184,7 @@ const foldersReducer: StateReducer<FoldersState, FoldersActions> = (
           ...state,
           folder: {
             ...omit(state.folder, INCLUDE_FILTER_FIELDS),
-            title: state.folder.title ? state.folder.title : getSuggestedFolderName(state.includeFilters),
+            title: state.folder.title ? state.folder.title : { text: getSuggestedFolderName(state.includeFilters) },
             ...state.includeFilters,
           },
           includeFilters: undefined,
@@ -206,7 +206,7 @@ const foldersReducer: StateReducer<FoldersState, FoldersActions> = (
         return state;
       }
     case 'editFolder': {
-      const { id: folderId, description, ...folder } = action.payload;
+      const { id: folderId, ...folder } = action.payload;
 
       return {
         mode: 'edit',
@@ -247,6 +247,15 @@ const foldersReducer: StateReducer<FoldersState, FoldersActions> = (
           ...state.folder,
           isChatList: action.payload,
         },
+      };
+    case 'setColor':
+      return {
+        ...state,
+        folder: {
+          ...state.folder,
+          color: action.payload,
+        },
+        isTouched: true,
       };
     case 'reset':
       return INITIAL_STATE;

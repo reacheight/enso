@@ -1,5 +1,6 @@
-import type { FC } from '../../lib/teact/teact';
-import React, { memo, useEffect, useMemo } from '../../lib/teact/teact';
+import type { ElementRef, FC } from '../../lib/teact/teact';
+import type React from '../../lib/teact/teact';
+import { memo, useEffect, useMemo } from '../../lib/teact/teact';
 import { getGlobal } from '../../global';
 
 import { selectCanAnimateInterface } from '../../global/selectors';
@@ -16,6 +17,7 @@ type OwnProps = {
   text: string;
   className?: string;
   isDisabled?: boolean;
+  ref?: ElementRef<HTMLSpanElement>;
 };
 
 const ANIMATION_TIME = 200;
@@ -31,6 +33,7 @@ const AnimatedCounter: FC<OwnProps> = ({
   text,
   className,
   isDisabled,
+  ref,
 }) => {
   const { isRtl } = useLang();
 
@@ -58,7 +61,7 @@ const AnimatedCounter: FC<OwnProps> = ({
   }, [shouldAnimate, text]);
 
   return (
-    <span className={buildClassName(className, !isDisabled && styles.root)} dir={isRtl ? 'rtl' : undefined}>
+    <span ref={ref} className={buildClassName(className, !isDisabled && styles.root)} dir={isRtl ? 'rtl' : undefined}>
       {characters}
     </span>
   );

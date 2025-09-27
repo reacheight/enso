@@ -1,5 +1,5 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useMemo } from '../../../lib/teact/teact';
+import { memo, useMemo } from '../../../lib/teact/teact';
 
 import type { ApiAttachment } from '../../../api/types';
 
@@ -12,6 +12,7 @@ import { REM } from '../../common/helpers/mediaDimensions';
 import useLastCallback from '../../../hooks/useLastCallback';
 
 import File from '../../common/File';
+import Icon from '../../common/icons/Icon';
 import MediaSpoiler from '../../common/MediaSpoiler';
 
 import styles from './AttachmentModalItem.module.scss';
@@ -60,7 +61,7 @@ const AttachmentModalItem: FC<OwnProps> = ({
         return (
           <>
             {Boolean(attachment.quick?.duration) && (
-              <div className={styles.duration}>{formatMediaDuration(attachment.quick!.duration)}</div>
+              <div className={styles.duration}>{formatMediaDuration(attachment.quick.duration)}</div>
             )}
             <video
               className={styles.preview}
@@ -84,8 +85,10 @@ const AttachmentModalItem: FC<OwnProps> = ({
               smaller
             />
             {onDelete && (
-              <i
-                className={buildClassName('icon', 'icon-delete', styles.actionItem, styles.deleteFile)}
+              <Icon
+                name="delete"
+                className={buildClassName(styles.actionItem, styles.deleteFile)}
+
                 onClick={() => onDelete(index)}
               />
             )}
@@ -113,19 +116,14 @@ const AttachmentModalItem: FC<OwnProps> = ({
       />
       {shouldRenderOverlay && (
         <div className={styles.overlay}>
-          <i
-            className={buildClassName(
-              'icon',
-              attachment.shouldSendAsSpoiler ? 'icon-spoiler-disable' : 'icon-spoiler',
-              styles.actionItem,
-            )}
+          <Icon
+            name={attachment.shouldSendAsSpoiler ? 'spoiler-disable' : 'spoiler'}
+            className={styles.actionItem}
             onClick={handleSpoilerClick}
           />
           {onDelete && (
-            <i
-              className={buildClassName('icon', 'icon-delete', styles.actionItem)}
-              onClick={() => onDelete(index)}
-            />
+
+            <Icon name="delete" className={styles.actionItem} onClick={() => onDelete(index)} />
           )}
         </div>
       )}

@@ -1,11 +1,12 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo } from '../../../lib/teact/teact';
+import { memo } from '../../../lib/teact/teact';
 
 import buildClassName from '../../../util/buildClassName';
 
 import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
 
+import Icon from '../../common/icons/Icon';
 import Button from '../../ui/Button';
 
 type OwnProps = {
@@ -19,10 +20,10 @@ type OwnProps = {
 };
 
 export enum SymbolMenuTabs {
-  'Emoji',
-  'CustomEmoji',
-  'Stickers',
-  'GIFs',
+  Emoji,
+  CustomEmoji,
+  Stickers,
+  GIFs,
 }
 
 export const SYMBOL_MENU_TAB_TITLES: Record<SymbolMenuTabs, string> = {
@@ -49,7 +50,7 @@ const SymbolMenuFooter: FC<OwnProps> = ({
     return (
       <Button
         className={`symbol-tab-button ${activeTab === tab ? 'activated' : ''}`}
-        // eslint-disable-next-line react/jsx-no-bind
+
         onClick={() => onSwitchTab(tab)}
         ariaLabel={lang(SYMBOL_MENU_TAB_TITLES[tab])}
         round
@@ -80,7 +81,7 @@ const SymbolMenuFooter: FC<OwnProps> = ({
           color="translucent"
           onClick={handleSearchOpen}
         >
-          <i className="icon icon-search" />
+          <Icon name="search" />
         </Button>
       )}
 
@@ -98,7 +99,7 @@ const SymbolMenuFooter: FC<OwnProps> = ({
           faded
           color="translucent"
         >
-          <i className="icon icon-delete-left" />
+          <Icon name="delete-left" />
         </Button>
       )}
     </div>

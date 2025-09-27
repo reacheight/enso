@@ -1,3 +1,4 @@
+import type { ElementRef } from '../../../lib/teact/teact';
 import { useEffect } from '../../../lib/teact/teact';
 
 import { requestMeasure, requestMutation } from '../../../lib/fasterdom/fasterdom';
@@ -5,7 +6,7 @@ import { requestMeasure, requestMutation } from '../../../lib/fasterdom/fasterdo
 import useLastCallback from '../../../hooks/useLastCallback';
 
 export default function useTransitionFixes(
-  containerRef: { current: HTMLDivElement | null },
+  containerRef: ElementRef<HTMLDivElement>,
   transitionElSelector = '.Transition.shared-media-transition',
 ) {
   // Set `min-height` for shared media container to prevent jumping when switching tabs
@@ -15,7 +16,7 @@ export default function useTransitionFixes(
       const transitionEl = container.querySelector<HTMLDivElement>(transitionElSelector);
       const tabsEl = container.querySelector<HTMLDivElement>('.TabList');
       if (transitionEl && tabsEl) {
-        const newHeight = container.offsetHeight - tabsEl.offsetHeight;
+        const newHeight = container.clientHeight - tabsEl.offsetHeight;
 
         requestMutation(() => {
           transitionEl.style.minHeight = `${newHeight}px`;

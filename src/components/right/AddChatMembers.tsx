@@ -1,5 +1,5 @@
 import type { FC } from '../../lib/teact/teact';
-import React, {
+import {
   memo, useCallback, useMemo, useState,
 } from '../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../global';
@@ -10,8 +10,9 @@ import type {
 import { NewChatMembersProgress } from '../../types';
 
 import {
-  filterUsersByName, isChatChannel, isUserBot,
+  isChatChannel, isUserBot,
 } from '../../global/helpers';
+import { filterPeersByQuery } from '../../global/helpers/peers';
 import { selectChat, selectChatFullInfo, selectTabState } from '../../global/selectors';
 import { unique } from '../../util/iteratees';
 import sortChatIds from '../common/helpers/sortChatIds';
@@ -20,6 +21,7 @@ import useHistoryBack from '../../hooks/useHistoryBack';
 import useOldLang from '../../hooks/useOldLang';
 import usePreviousDeprecated from '../../hooks/usePreviousDeprecated';
 
+import Icon from '../common/icons/Icon';
 import PeerPicker from '../common/pickers/PeerPicker';
 import FloatingActionButton from '../ui/FloatingActionButton';
 import Spinner from '../ui/Spinner';
@@ -82,14 +84,18 @@ const AddChatMembers: FC<OwnProps & StateProps> = ({
   const displayedIds = useMemo(() => {
     // No need for expensive global updates on users, so we avoid them
     const usersById = getGlobal().users.byId;
-    const filteredContactIds = localContactIds ? filterUsersByName(localContactIds, usersById, searchQuery) : [];
-
-    return sortChatIds(
-      unique([
-        ...filteredContactIds,
+    const filteredIds = filterPeersByQuery({
+      ids: unique([
+        ...(localContactIds || []),
         ...(localUserIds || []),
         ...(globalUserIds || []),
-      ]).filter((userId) => {
+      ]),
+      query: searchQuery,
+      type: 'user',
+    });
+
+    return sortChatIds(
+      filteredIds.filter((userId) => {
         const user = usersById[userId];
 
         // The user can be added to the chat if the following conditions are met:
@@ -142,7 +148,7 @@ const AddChatMembers: FC<OwnProps & StateProps> = ({
           {isLoading ? (
             <Spinner color="white" />
           ) : (
-            <i className="icon icon-arrow-right" />
+            <Icon name="arrow-right" />
           )}
         </FloatingActionButton>
       </div>
@@ -151,7 +157,7 @@ const AddChatMembers: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { chatId }): StateProps => {
+  (global, { chatId }): Complete<StateProps> => {
     const chat = selectChat(global, chatId);
     const { userIds: localContactIds } = global.contactList || {};
     const { newChatMembersProgress } = selectTabState(global);

@@ -1,19 +1,21 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useMemo } from '../../../lib/teact/teact';
+import { memo, useMemo } from '../../../lib/teact/teact';
 import { getActions, getGlobal } from '../../../global';
 
 import type { ApiCommentsInfo } from '../../../api/types';
 
-import { selectPeer } from '../../../global/selectors';
+import { selectIsCurrentUserFrozen, selectPeer } from '../../../global/selectors';
 import buildClassName from '../../../util/buildClassName';
 import { formatIntegerCompact } from '../../../util/textFormat';
 
+import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
 import useAsyncRendering from '../../right/hooks/useAsyncRendering';
 
 import AnimatedCounter from '../../common/AnimatedCounter';
 import Avatar from '../../common/Avatar';
+import Icon from '../../common/icons/Icon';
 import Spinner from '../../ui/Spinner';
 
 import './CommentButton.scss';
@@ -23,6 +25,7 @@ type OwnProps = {
   disabled?: boolean;
   isLoading?: boolean;
   isCustomShape?: boolean;
+  asActionButton?: boolean;
 };
 
 const SHOW_LOADER_DELAY = 450;
@@ -32,17 +35,24 @@ const CommentButton: FC<OwnProps> = ({
   threadInfo,
   disabled,
   isLoading,
+  asActionButton,
 }) => {
-  const { openThread } = getActions();
+  const { openThread, openFrozenAccountModal } = getActions();
 
   const shouldRenderLoading = useAsyncRendering([isLoading], SHOW_LOADER_DELAY);
 
-  const lang = useOldLang();
+  const oldLang = useOldLang();
+  const lang = useLang();
   const {
     originMessageId, chatId, messagesCount, lastMessageId, lastReadInboxMessageId, recentReplierIds, originChannelId,
   } = threadInfo;
 
   const handleClick = useLastCallback(() => {
+    const global = getGlobal();
+    if (selectIsCurrentUserFrozen(global)) {
+      openFrozenAccountModal();
+      return;
+    }
     openThread({
       isComments: true, chatId, originMessageId, originChannelId,
     });
@@ -68,8 +78,8 @@ const CommentButton: FC<OwnProps> = ({
   function renderRecentRepliers() {
     return (
       Boolean(recentRepliers?.length) && (
-        <div className="recent-repliers" dir={lang.isRtl ? 'rtl' : 'ltr'}>
-          {recentRepliers!.map((peer) => (
+        <div className="recent-repliers" dir={oldLang.isRtl ? 'rtl' : 'ltr'}>
+          {recentRepliers.map((peer) => (
             <Avatar
               key={peer.id}
               size="small"
@@ -83,39 +93,40 @@ const CommentButton: FC<OwnProps> = ({
 
   const hasUnread = Boolean(lastReadInboxMessageId && lastMessageId && lastReadInboxMessageId < lastMessageId);
 
-  const commentsText = messagesCount ? (lang('CommentsCount', '%COMMENTS_COUNT%', undefined, messagesCount) as string)
+  const commentsText = messagesCount ? (oldLang('CommentsCount', '%COMMENTS_COUNT%', undefined, messagesCount))
     .split('%')
     .map((s) => {
-      return (s === 'COMMENTS_COUNT' ? <AnimatedCounter text={formatIntegerCompact(messagesCount)} /> : s);
+      return (s === 'COMMENTS_COUNT' ? <AnimatedCounter text={formatIntegerCompact(lang, messagesCount)} /> : s);
     })
     : undefined;
 
   return (
     <div
-      data-cnt={formatIntegerCompact(messagesCount)}
+      data-cnt={formatIntegerCompact(lang, messagesCount)}
       className={buildClassName(
         'CommentButton',
         hasUnread && 'has-unread',
         disabled && 'disabled',
         isCustomShape && 'CommentButton-custom-shape',
         isLoading && 'loading',
+        asActionButton && 'as-action-button',
       )}
-      dir={lang.isRtl ? 'rtl' : 'ltr'}
+      dir={oldLang.isRtl ? 'rtl' : 'ltr'}
       onClick={handleClick}
       role="button"
       tabIndex={0}
     >
-      <i
+      <Icon
+        name="comments-sticker"
         className={buildClassName(
-          'CommentButton_icon-comments icon icon-comments-sticker',
+          'CommentButton_icon-comments',
           isLoading && shouldRenderLoading && 'CommentButton_hidden',
         )}
-        aria-hidden
       />
-      {!recentRepliers?.length && <i className="icon icon-comments" aria-hidden />}
+      {!recentRepliers?.length && <Icon name="comments" />}
       {renderRecentRepliers()}
       <div className="label" dir="auto">
-        {messagesCount ? commentsText : lang('LeaveAComment')}
+        {messagesCount ? commentsText : oldLang('LeaveAComment')}
       </div>
       <div className="CommentButton_right">
         {isLoading && (
@@ -126,13 +137,13 @@ const CommentButton: FC<OwnProps> = ({
             )}
             color={isCustomShape ? 'white' : 'blue'}
           />
-        ) }
-        <i
+        )}
+        <Icon
+          name="next"
           className={buildClassName(
-            'CommentButton_icon-open icon icon-next',
+            'CommentButton_icon-open',
             isLoading && shouldRenderLoading && 'CommentButton_hidden',
           )}
-          aria-hidden
         />
       </div>
     </div>

@@ -1,19 +1,22 @@
 import type { FC } from '../../lib/teact/teact';
-import React, { memo, useEffect } from '../../lib/teact/teact';
+import { memo, useEffect, useState } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
-import type { MessageListType } from '../../global/types';
+import type { ApiChat } from '../../api/types';
+import type { MessageListType } from '../../types';
 import type { IconName } from '../../types/icons';
 
 import {
   selectCanDeleteSelectedMessages,
   selectCanDownloadSelectedMessages,
   selectCanForwardMessages,
-  selectCanReportSelectedMessages,
-  selectCurrentMessageList, selectHasProtectedMessage,
+  selectCanReportSelectedMessages, selectCurrentChat,
+  selectCurrentMessageList, selectHasIpRevealingMedia,
+  selectHasProtectedMessage,
   selectSelectedMessagesCount,
   selectTabState,
 } from '../../global/selectors';
+import { selectSharedSettings } from '../../global/selectors/sharedState';
 import buildClassName from '../../util/buildClassName';
 import captureKeyboardListeners from '../../util/captureKeyboardListeners';
 
@@ -23,9 +26,10 @@ import useOldLang from '../../hooks/useOldLang';
 import usePreviousDeprecated from '../../hooks/usePreviousDeprecated';
 import useCopySelectedMessages from './hooks/useCopySelectedMessages';
 
-import ReportModal from '../common/ReportModal';
+import Icon from '../common/icons/Icon';
 import Button from '../ui/Button';
-import DeleteSelectedMessageModal from './DeleteSelectedMessageModal';
+import Checkbox from '../ui/Checkbox';
+import ConfirmDialog from '../ui/ConfirmDialog';
 
 import './MessageSelectToolbar.scss';
 
@@ -36,6 +40,7 @@ export type OwnProps = {
 };
 
 type StateProps = {
+  chat?: ApiChat;
   isSchedule: boolean;
   selectedMessagesCount?: number;
   canDeleteMessages?: boolean;
@@ -45,9 +50,12 @@ type StateProps = {
   hasProtectedMessage?: boolean;
   isAnyModalOpen?: boolean;
   selectedMessageIds?: number[];
+  shouldWarnAboutFiles?: boolean;
+  hasIpRevealingMedia?: boolean;
 };
 
 const MessageSelectToolbar: FC<OwnProps & StateProps> = ({
+  chat,
   canPost,
   isActive,
   messageListType,
@@ -60,6 +68,8 @@ const MessageSelectToolbar: FC<OwnProps & StateProps> = ({
   hasProtectedMessage,
   isAnyModalOpen,
   selectedMessageIds,
+  shouldWarnAboutFiles,
+  hasIpRevealingMedia,
 }) => {
   const {
     exitMessageSelectMode,
@@ -67,28 +77,40 @@ const MessageSelectToolbar: FC<OwnProps & StateProps> = ({
     downloadSelectedMessages,
     copySelectedMessages,
     showNotification,
+    reportMessages,
+    openDeleteMessageModal,
+    setSharedSettingOption,
   } = getActions();
   const lang = useOldLang();
 
-  const [isDeleteModalOpen, openDeleteModal, closeDeleteModal] = useFlag();
-  const [isReportModalOpen, openReportModal, closeReportModal] = useFlag();
-
   useCopySelectedMessages(isActive);
+
+  const [isFileIpDialogOpen, openFileIpDialog, closeFileIpDialog] = useFlag();
+  const [shouldNotWarnAboutFiles, setShouldNotWarnAboutFiles] = useState(false);
 
   const handleExitMessageSelectMode = useLastCallback(() => {
     exitMessageSelectMode();
   });
 
+  const handleDelete = useLastCallback(() => {
+    if (!selectedMessageIds || !chat) return;
+    openDeleteMessageModal({
+      chatId: chat.id,
+      messageIds: selectedMessageIds,
+      isSchedule,
+    });
+  });
+
   useEffect(() => {
-    return isActive && !isDeleteModalOpen && !isReportModalOpen && !isAnyModalOpen
+    return isActive && !isAnyModalOpen
       ? captureKeyboardListeners({
-        onBackspace: canDeleteMessages ? openDeleteModal : undefined,
-        onDelete: canDeleteMessages ? openDeleteModal : undefined,
+        onBackspace: canDeleteMessages ? handleDelete : undefined,
+        onDelete: canDeleteMessages ? handleDelete : undefined,
         onEsc: handleExitMessageSelectMode,
       })
       : undefined;
   }, [
-    isActive, isDeleteModalOpen, isReportModalOpen, openDeleteModal, handleExitMessageSelectMode, isAnyModalOpen,
+    isActive, handleDelete, handleExitMessageSelectMode, isAnyModalOpen,
     canDeleteMessages,
   ]);
 
@@ -105,10 +127,34 @@ const MessageSelectToolbar: FC<OwnProps & StateProps> = ({
     exitMessageSelectMode();
   });
 
+  const handleMessageDownload = useLastCallback(() => {
+    if (shouldWarnAboutFiles && hasIpRevealingMedia) {
+      openFileIpDialog();
+      return;
+    }
+
+    handleDownload();
+  });
+
+  const handleFileIpConfirm = useLastCallback(() => {
+    setSharedSettingOption({ shouldWarnAboutFiles: !shouldNotWarnAboutFiles });
+    closeFileIpDialog();
+    handleDownload();
+  });
+
   const prevSelectedMessagesCount = usePreviousDeprecated(selectedMessagesCount || undefined, true);
   const renderingSelectedMessagesCount = isActive ? selectedMessagesCount : prevSelectedMessagesCount;
 
   const formattedMessagesCount = lang('VoiceOver.Chat.MessagesSelected', renderingSelectedMessagesCount, 'i');
+
+  const openMessageReport = useLastCallback(() => {
+    if (!selectedMessageIds || !chat) return;
+    reportMessages({
+      chatId: chat.id,
+      messageIds: selectedMessageIds,
+    });
+    exitMessageSelectMode();
+  });
 
   const className = buildClassName(
     'MessageSelectToolbar',
@@ -132,67 +178,73 @@ const MessageSelectToolbar: FC<OwnProps & StateProps> = ({
         title={label}
         aria-label={label}
       >
-        <i className={buildClassName('icon', `icon-${icon}`)} />
+        <Icon name={icon} />
       </div>
     );
   };
 
   return (
-    <div className={className}>
-      <div className="MessageSelectToolbar-inner">
-        <Button
-          color="translucent"
-          round
-          onClick={handleExitMessageSelectMode}
-          ariaLabel="Exit select mode"
-        >
-          <i className="icon icon-close" />
-        </Button>
-        <span className="MessageSelectToolbar-count" title={formattedMessagesCount}>
-          {formattedMessagesCount}
-        </span>
+    <>
+      <div className={className}>
+        <div className="MessageSelectToolbar-inner">
+          <Button
+            color="translucent"
+            round
+            onClick={handleExitMessageSelectMode}
+            ariaLabel="Exit select mode"
+          >
+            <Icon name="close" />
+          </Button>
+          <span className="MessageSelectToolbar-count" title={formattedMessagesCount}>
+            {formattedMessagesCount}
+          </span>
 
-        {Boolean(selectedMessagesCount) && (
-          <div className="MessageSelectToolbar-actions">
-            {messageListType !== 'scheduled' && canForwardMessages && (
-              renderButton(
-                'forward', lang('Chat.ForwardActionHeader'), openForwardMenuForSelectedMessages,
-              )
-            )}
-            {canReportMessages && (
-              renderButton('flag', lang('Conversation.ReportMessages'), openReportModal)
-            )}
-            {canDownloadMessages && !hasProtectedMessage && (
-              renderButton('download', lang('lng_media_download'), handleDownload)
-            )}
-            {!hasProtectedMessage && (
-              renderButton('copy', lang('lng_context_copy_selected_items'), handleCopy)
-            )}
-            {canDeleteMessages && (
-              renderButton('delete', lang('EditAdminGroupDeleteMessages'), openDeleteModal, true)
-            )}
-          </div>
-        )}
+          {Boolean(selectedMessagesCount) && (
+            <div className="MessageSelectToolbar-actions">
+              {messageListType !== 'scheduled' && canForwardMessages && (
+                renderButton(
+                  'forward', lang('Chat.ForwardActionHeader'), openForwardMenuForSelectedMessages,
+                )
+              )}
+              {canReportMessages && (
+                renderButton('flag', lang('Conversation.ReportMessages'), openMessageReport)
+              )}
+              {canDownloadMessages && !hasProtectedMessage && (
+                renderButton('download', lang('lng_media_download'), handleMessageDownload)
+              )}
+              {!hasProtectedMessage && (
+                renderButton('copy', lang('lng_context_copy_selected_items'), handleCopy)
+              )}
+              {canDeleteMessages && (
+                renderButton('delete', lang('EditAdminGroupDeleteMessages'), handleDelete, true)
+              )}
+            </div>
+          )}
+        </div>
       </div>
-      {canDeleteMessages && (
-        <DeleteSelectedMessageModal
-          isOpen={isDeleteModalOpen}
-          isSchedule={isSchedule}
-          onClose={closeDeleteModal}
+      <ConfirmDialog
+        isOpen={isFileIpDialogOpen}
+        onClose={closeFileIpDialog}
+        confirmHandler={handleFileIpConfirm}
+      >
+        {lang('lng_launch_svg_warning')}
+        <Checkbox
+          className="dialog-checkbox"
+          checked={shouldNotWarnAboutFiles}
+          label={lang('lng_launch_exe_dont_ask')}
+          onCheck={setShouldNotWarnAboutFiles}
         />
-      )}
-      <ReportModal
-        isOpen={isReportModalOpen}
-        onClose={closeReportModal}
-        messageIds={selectedMessageIds}
-      />
-    </div>
+      </ConfirmDialog>
+    </>
   );
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     const tabState = selectTabState(global);
+    const { shouldWarnAboutFiles } = selectSharedSettings(global);
+    const chat = selectCurrentChat(global);
+
     const { type: messageListType, chatId } = selectCurrentMessageList(global) || {};
     const isSchedule = messageListType === 'scheduled';
     const { canDelete } = selectCanDeleteSelectedMessages(global);
@@ -201,11 +253,15 @@ export default memo(withGlobal<OwnProps>(
     const { messageIds: selectedMessageIds } = tabState.selectedMessages || {};
     const hasProtectedMessage = chatId ? selectHasProtectedMessage(global, chatId, selectedMessageIds) : false;
     const canForward = !isSchedule && chatId ? selectCanForwardMessages(global, chatId, selectedMessageIds) : false;
+    const hasIpRevealingMedia = selectedMessageIds && chatId
+      ? selectHasIpRevealingMedia(global, chatId, selectedMessageIds) : false;
     const isShareMessageModalOpen = tabState.isShareMessageModalShown;
     const isAnyModalOpen = Boolean(isShareMessageModalOpen || tabState.requestedDraft
-      || tabState.requestedAttachBotInChat || tabState.requestedAttachBotInstall);
+      || tabState.requestedAttachBotInChat || tabState.requestedAttachBotInstall || tabState.reportModal
+      || tabState.deleteMessageModal);
 
     return {
+      chat,
       isSchedule,
       selectedMessagesCount: selectSelectedMessagesCount(global),
       canDeleteMessages: canDelete,
@@ -215,6 +271,8 @@ export default memo(withGlobal<OwnProps>(
       selectedMessageIds,
       hasProtectedMessage,
       isAnyModalOpen,
+      shouldWarnAboutFiles,
+      hasIpRevealingMedia,
     };
   },
 )(MessageSelectToolbar));

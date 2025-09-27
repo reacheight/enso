@@ -14,13 +14,14 @@ import buildAttachment from '../helpers/buildAttachment';
 import { preparePastedHtml } from '../helpers/cleanHtml';
 import getFilesFromDataTransferItems from '../helpers/getFilesFromDataTransferItems';
 
-import useOldLang from '../../../../hooks/useOldLang';
-
-const MAX_MESSAGE_LENGTH = 4096;
+import useLang from '../../../../hooks/useLang';
 
 const TYPE_HTML = 'text/html';
 const DOCUMENT_TYPE_WORD = 'urn:schemas-microsoft-com:office:word';
 const NAMESPACE_PREFIX_WORD = 'xmlns:w';
+
+const VALID_TARGET_IDS = new Set([EDITABLE_INPUT_ID, EDITABLE_INPUT_MODAL_ID, EDITABLE_STORY_INPUT_ID]);
+const CLOSEST_CONTENT_EDITABLE_SELECTOR = 'div[contenteditable]';
 
 const useClipboardPaste = (
   isActive: boolean,
@@ -32,7 +33,7 @@ const useClipboardPaste = (
   onCustomEmojiStripped?: VoidFunction,
 ) => {
   const { showNotification } = getActions();
-  const lang = useOldLang();
+  const lang = useLang();
 
   useEffect(() => {
     if (!isActive) {
@@ -44,12 +45,19 @@ const useClipboardPaste = (
         return;
       }
 
-      const input = document.activeElement;
-      if (input && ![EDITABLE_INPUT_ID, EDITABLE_INPUT_MODAL_ID, EDITABLE_STORY_INPUT_ID].includes(input.id)) {
+      const input = (e.target as HTMLElement)?.closest(CLOSEST_CONTENT_EDITABLE_SELECTOR);
+      if (!input || !VALID_TARGET_IDS.has(input.id)) {
         return;
       }
 
-      const pastedText = e.clipboardData.getData('text').substring(0, MAX_MESSAGE_LENGTH);
+      e.preventDefault();
+
+      // Some extensions can trigger paste into their panels without focus
+      if (document.activeElement !== input) {
+        return;
+      }
+
+      const pastedText = e.clipboardData.getData('text');
       const html = e.clipboardData.getData('text/html');
 
       let pastedFormattedText = html ? parseHtmlAsFormattedText(
@@ -64,7 +72,6 @@ const useClipboardPaste = (
       const { items } = e.clipboardData;
       let files: File[] | undefined = [];
 
-      e.preventDefault();
       if (items.length > 0) {
         files = await getFilesFromDataTransferItems(items);
         if (editedMessage) {
@@ -97,15 +104,24 @@ const useClipboardPaste = (
       const isUploadingDocumentSticker = isUploadingFileSticker(newAttachments[0]);
       const isInAlbum = editedMessage && editedMessage?.groupedId;
 
+      if (editedMessage && newAttachments?.length > 1) {
+        showNotification({
+          message: lang('MediaReplaceInvalidError', undefined, { pluralValue: newAttachments.length }),
+        });
+        return;
+      }
+
       if (editedMessage && isUploadingDocumentSticker) {
-        showNotification({ message: lang(isInAlbum ? 'lng_edit_media_album_error' : 'lng_edit_media_invalid_file') });
+        showNotification({ message: lang('MediaReplaceInvalidError', undefined, { pluralValue: 1 }) });
         return;
       }
 
       if (isInAlbum) {
         shouldSetAttachments = canReplace;
         if (!shouldSetAttachments) {
-          showNotification({ message: lang('lng_edit_media_album_error') });
+          showNotification({
+            message: lang('MediaReplaceInvalidError', undefined, { pluralValue: newAttachments.length }),
+          });
           return;
         }
       }

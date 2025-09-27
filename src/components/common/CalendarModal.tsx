@@ -1,9 +1,10 @@
 import type { FC } from '../../lib/teact/teact';
-import React, {
+import type React from '../../lib/teact/teact';
+import {
   memo, useCallback, useEffect, useMemo, useState,
 } from '../../lib/teact/teact';
 
-import type { LangFn } from '../../hooks/useOldLang';
+import type { OldLangFn } from '../../hooks/useOldLang';
 
 import { MAX_INT_32 } from '../../config';
 import buildClassName from '../../util/buildClassName';
@@ -15,6 +16,7 @@ import usePreviousDeprecated from '../../hooks/usePreviousDeprecated';
 
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
+import Icon from './icons/Icon';
 
 import './CalendarModal.scss';
 
@@ -31,8 +33,10 @@ export type OwnProps = {
   withTimePicker?: boolean;
   submitButtonLabel?: string;
   secondButtonLabel?: string;
+  description?: string;
   onClose: () => void;
   onSubmit: (date: Date) => void;
+  onDateChange?: (date: Date) => void;
   onSecondButtonClick?: NoneToVoidFunction;
 };
 
@@ -56,8 +60,10 @@ const CalendarModal: FC<OwnProps> = ({
   withTimePicker,
   submitButtonLabel,
   secondButtonLabel,
+  description,
   onClose,
   onSubmit,
+  onDateChange,
   onSecondButtonClick,
 }) => {
   const lang = useOldLang();
@@ -167,6 +173,7 @@ const CalendarModal: FC<OwnProps> = ({
       dateCopy.setMonth(currentMonth);
       dateCopy.setFullYear(currentYear);
 
+      onDateChange?.(dateCopy);
       return dateCopy;
     });
   }
@@ -194,11 +201,12 @@ const CalendarModal: FC<OwnProps> = ({
     const date = new Date(selectedDate.getTime());
     date.setHours(hours);
     setSelectedDate(date);
+    onDateChange?.(date);
 
     const hoursStr = formatInputTime(hours);
     setSelectedHours(hoursStr);
     e.target.value = hoursStr;
-  }, [selectedDate]);
+  }, [selectedDate, onDateChange]);
 
   const handleChangeMinutes = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^\d]+/g, '');
@@ -213,11 +221,12 @@ const CalendarModal: FC<OwnProps> = ({
     const date = new Date(selectedDate.getTime());
     date.setMinutes(minutes);
     setSelectedDate(date);
+    onDateChange?.(date);
 
     const minutesStr = formatInputTime(minutes);
     setSelectedMinutes(minutesStr);
     e.target.value = minutesStr;
-  }, [selectedDate]);
+  }, [selectedDate, onDateChange]);
 
   function renderTimePicker() {
     return (
@@ -258,7 +267,7 @@ const CalendarModal: FC<OwnProps> = ({
             color="translucent"
             onClick={onClose}
           >
-            <i className="icon icon-close" />
+            <Icon name="close" />
           </Button>
 
           <h4>
@@ -274,7 +283,7 @@ const CalendarModal: FC<OwnProps> = ({
             disabled={shouldDisablePrevMonth}
             onClick={!shouldDisablePrevMonth ? handlePrevMonth : undefined}
           >
-            <i className="icon icon-previous" />
+            <Icon name="previous" />
           </Button>
 
           <Button
@@ -284,7 +293,7 @@ const CalendarModal: FC<OwnProps> = ({
             disabled={shouldDisableNextMonth}
             onClick={!shouldDisableNextMonth ? handleNextMonth : undefined}
           >
-            <i className="icon icon-next" />
+            <Icon name="next" />
           </Button>
         </div>
       </div>
@@ -311,7 +320,7 @@ const CalendarModal: FC<OwnProps> = ({
                   currentYear, currentMonth, gridDate, minDate, maxDate,
                 )
                   ? 'disabled'
-                  : `${gridDate ? 'clickable' : ''}`,
+                  : gridDate ? 'clickable' : '',
                 selectedDay === formatDay(currentYear, currentMonth, gridDate) && 'selected',
               )}
             >
@@ -329,6 +338,11 @@ const CalendarModal: FC<OwnProps> = ({
       {withTimePicker && renderTimePicker()}
 
       <div className="footer">
+        {description && (
+          <div className="description">
+            {description}
+          </div>
+        )}
         <div className="footer">
           <Button
             onClick={handleSubmit}
@@ -401,7 +415,7 @@ function formatDay(year: number, month: number, day: number) {
   return `${year}-${month + 1}-${day}`;
 }
 
-function formatSubmitLabel(lang: LangFn, date: Date) {
+function formatSubmitLabel(lang: OldLangFn, date: Date) {
   const day = formatDateToString(date, lang.code);
   const today = formatDateToString(new Date(), lang.code);
 

@@ -1,7 +1,7 @@
 import '../../../global/actions/calls';
 
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo, useEffect, useMemo, useRef, useState,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
@@ -30,6 +30,7 @@ import useOldLang from '../../../hooks/useOldLang';
 import { useFullscreenStatus } from '../../../hooks/window/useFullscreen';
 import useGroupCallVideoLayout from './hooks/useGroupCallVideoLayout';
 
+import Icon from '../../common/icons/Icon';
 import Button from '../../ui/Button';
 import Checkbox from '../../ui/Checkbox';
 import FloatingActionButton from '../../ui/FloatingActionButton';
@@ -79,18 +80,13 @@ const GroupCall: FC<OwnProps & StateProps> = ({
   } = getActions();
 
   const lang = useOldLang();
-  // eslint-disable-next-line no-null/no-null
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>();
 
-  // eslint-disable-next-line no-null/no-null
-  const primaryVideoContainerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const secondaryVideoContainerRef = useRef<HTMLDivElement>(null);
+  const primaryVideoContainerRef = useRef<HTMLDivElement>();
+  const secondaryVideoContainerRef = useRef<HTMLDivElement>();
 
-  // eslint-disable-next-line no-null/no-null
-  const panelScrollTriggerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const panelRef = useRef<HTMLDivElement>(null);
+  const panelScrollTriggerRef = useRef<HTMLDivElement>();
+  const panelRef = useRef<HTMLDivElement>();
 
   const [isLeaving, setIsLeaving] = useState(false);
   const isOpen = !isCallPanelVisible && !isLeaving;
@@ -278,10 +274,7 @@ const GroupCall: FC<OwnProps & StateProps> = ({
                 className={buildClassName(styles.headerButton, styles.firstButton)}
                 ariaLabel={lang(isFullscreen ? 'AccExitFullscreen' : 'AccSwitchToFullscreen')}
               >
-                <i
-                  className={buildClassName('icon', isFullscreen ? 'icon-smallscreen' : 'icon-fullscreen')}
-                  aria-hidden
-                />
+                <Icon name={isFullscreen ? 'smallscreen' : 'fullscreen'} />
               </Button>
             )}
 
@@ -298,7 +291,7 @@ const GroupCall: FC<OwnProps & StateProps> = ({
                 onClick={handleToggleSidebar}
                 ariaLabel={lang('AccDescrExpandPanel')}
               >
-                <i className="icon icon-sidebar" aria-hidden />
+                <Icon name="sidebar" />
               </Button>
             )}
           </div>
@@ -328,7 +321,7 @@ const GroupCall: FC<OwnProps & StateProps> = ({
                 onClick={handleToggleFullscreen}
                 ariaLabel={lang('AccSwitchToFullscreen')}
               >
-                <i className="icon icon-fullscreen" aria-hidden />
+                <Icon name="fullscreen" />
               </Button>
             )}
 
@@ -341,10 +334,7 @@ const GroupCall: FC<OwnProps & StateProps> = ({
                 className={buildClassName(styles.headerButton, styles.firstButton)}
                 ariaLabel={lang('Close')}
               >
-                <i
-                  className={buildClassName('icon', 'icon-close')}
-                  aria-hidden
-                />
+                <Icon name="close" />
               </Button>
             )}
 
@@ -361,7 +351,7 @@ const GroupCall: FC<OwnProps & StateProps> = ({
                 onClick={handleToggleSidebar}
                 ariaLabel={lang('AccDescrCollapsePanel')}
               >
-                <i className="icon icon-sidebar" aria-hidden />
+                <Icon name="sidebar" />
               </Button>
             )}
 
@@ -389,7 +379,7 @@ const GroupCall: FC<OwnProps & StateProps> = ({
                 onClick={handleInviteMember}
                 ariaLabel={lang('VoipGroupInviteMember')}
               >
-                <i className="icon icon-add-user" aria-hidden />
+                <Icon name="add-user" />
               </Button>
             )}
           </div>
@@ -438,7 +428,7 @@ const GroupCall: FC<OwnProps & StateProps> = ({
           className={styles.addParticipantButton}
           ariaLabel={lang('VoipGroupInviteMember')}
         >
-          <i className="icon icon-add-user-filled" aria-hidden />
+          <Icon name="add-user-filled" />
         </FloatingActionButton>
       </div>
 
@@ -482,7 +472,7 @@ const GroupCall: FC<OwnProps & StateProps> = ({
           ariaLabel={lang(hasVideo ? 'VoipStopVideo' : 'VoipStartVideo')}
           disabled={isConnecting}
         >
-          <i className={buildClassName('icon', !hasVideo ? 'icon-video-stop' : 'icon-video')} aria-hidden />
+          <Icon name={!hasVideo ? 'video-stop' : 'video'} />
         </Button>
 
         <Button
@@ -498,10 +488,7 @@ const GroupCall: FC<OwnProps & StateProps> = ({
           ariaLabel={lang(hasPresentation ? 'lng_group_call_screen_share_stop' : 'lng_group_call_tooltip_screen')}
           disabled={isConnecting || !IS_SCREENSHARE_SUPPORTED}
         >
-          <i
-            className={buildClassName('icon', !hasPresentation ? 'icon-share-screen-stop' : 'icon-share-screen')}
-            aria-hidden
-          />
+          <Icon name={!hasPresentation ? 'share-screen-stop' : 'share-screen'} />
         </Button>
 
         <MicrophoneButton className={styles.actionButton} />
@@ -518,7 +505,7 @@ const GroupCall: FC<OwnProps & StateProps> = ({
           ariaLabel={lang('lng_group_call_settings')}
           disabled
         >
-          <i className="icon icon-settings-filled" aria-hidden />
+          <Icon name="settings-filled" />
         </Button>
 
         <Button
@@ -532,7 +519,7 @@ const GroupCall: FC<OwnProps & StateProps> = ({
           onClick={handleLeaveGroupCall}
           ariaLabel={lang('lng_group_call_leave')}
         >
-          <i className="icon icon-close" aria-hidden />
+          <Icon name="close" />
         </Button>
       </div>
 
@@ -545,6 +532,7 @@ const GroupCall: FC<OwnProps & StateProps> = ({
         <p>{lang(isEndGroupCallModal ? 'VoipGroupEndAlertText' : 'VoipGroupLeaveAlertText')}</p>
         {!isEndGroupCallModal && (
           <Checkbox
+            className="dialog-checkbox"
             label={lang('VoipGroupEndChat')}
             checked={shouldEndGroupCall}
             onCheck={setShouldEndGroupCall}
@@ -564,10 +552,10 @@ const GroupCall: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { groupCallId }): StateProps => {
+  (global, { groupCallId }): Complete<StateProps> => {
     const {
       connectionState, title, participants, participantsCount, chatId,
-    } = selectGroupCall(global, groupCallId)! || {};
+    } = selectGroupCall(global, groupCallId) || {};
 
     const chat = chatId ? selectChat(global, chatId) : undefined;
 

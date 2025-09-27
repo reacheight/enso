@@ -1,11 +1,10 @@
 import type { FC } from '../../lib/teact/teact';
-import React, {
+import {
   memo,
   useMemo,
   useRef,
 } from '../../lib/teact/teact';
-import { getGlobal } from '../../lib/teact/teactn';
-import { getActions, withGlobal } from '../../global';
+import { getActions, getGlobal, withGlobal } from '../../global';
 
 import type { ApiSticker } from '../../api/types';
 
@@ -43,8 +42,7 @@ const CustomEmojiSetsModal: FC<OwnProps & StateProps> = ({
     return customEmojiSetIds?.map((id) => getGlobal().stickers.setsById[id]);
   }, [customEmojiSetIds]);
 
-  // eslint-disable-next-line no-null/no-null
-  const customEmojiModalRef = useRef<HTMLDivElement>(null);
+  const customEmojiModalRef = useRef<HTMLDivElement>();
   const { observe: observeIntersectionForCovers } = useIntersectionObserver({
     rootRef: customEmojiModalRef, isDisabled: !customEmojiSets,
   });
@@ -85,7 +83,7 @@ const CustomEmojiSetsModal: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     return {
       canPlayAnimatedEmojis: selectCanPlayAnimatedEmojis(global),
     };

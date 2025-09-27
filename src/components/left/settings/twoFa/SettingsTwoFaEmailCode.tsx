@@ -1,13 +1,14 @@
 import type { FC } from '../../../../lib/teact/teact';
-import React, {
+import type React from '../../../../lib/teact/teact';
+import {
   memo, useCallback, useEffect, useRef, useState,
 } from '../../../../lib/teact/teact';
 import { withGlobal } from '../../../../global';
 
 import type { ApiSticker } from '../../../../api/types';
 
-import { selectAnimatedEmoji } from '../../../../global/selectors';
-import { IS_TOUCH_ENV } from '../../../../util/windowEnvironment';
+import { selectAnimatedEmoji, selectTabState } from '../../../../global/selectors';
+import { IS_TOUCH_ENV } from '../../../../util/browser/windowEnvironment';
 
 import useAppLayout from '../../../../hooks/useAppLayout';
 import useHistoryBack from '../../../../hooks/useHistoryBack';
@@ -27,8 +28,9 @@ type OwnProps = {
 };
 
 type StateProps = {
-  animatedEmoji: ApiSticker;
-  codeLength: number;
+  animatedEmoji?: ApiSticker;
+  codeLength?: number;
+  recoveryEmail?: string;
 };
 
 const ICON_SIZE = 160;
@@ -42,9 +44,9 @@ const SettingsTwoFaEmailCode: FC<OwnProps & StateProps> = ({
   onSubmit,
   isActive,
   onReset,
+  recoveryEmail,
 }) => {
-  // eslint-disable-next-line no-null/no-null
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>();
   const { isMobile } = useAppLayout();
   const focusDelayTimeoutMs = isMobile ? 550 : 400;
 
@@ -84,9 +86,14 @@ const SettingsTwoFaEmailCode: FC<OwnProps & StateProps> = ({
     <div className="settings-content two-fa custom-scroll">
       <div className="settings-content-header no-border">
         <AnimatedIconFromSticker sticker={animatedEmoji} size={ICON_SIZE} className="settings-content-icon" />
+        {recoveryEmail && (
+          <p className="settings-item-description mb-3" dir="auto">
+            {lang('TwoStepAuth.ConfirmEmailDescription', recoveryEmail)}
+          </p>
+        )}
       </div>
 
-      <div className="settings-item pt-0">
+      <div className="settings-item settings-group">
         <InputText
           value={value}
           ref={inputRef}
@@ -101,9 +108,13 @@ const SettingsTwoFaEmailCode: FC<OwnProps & StateProps> = ({
   );
 };
 
-export default memo(withGlobal<OwnProps>((global) => {
+export default memo(withGlobal<OwnProps>((global): Complete<StateProps> => {
+  const tabState = selectTabState(global);
+  const recoveryEmail = tabState.recoveryEmail;
+
   return {
     animatedEmoji: selectAnimatedEmoji(global, '💌'),
     codeLength: global.twoFaSettings.waitingEmailCodeLength,
+    recoveryEmail,
   };
 })(SettingsTwoFaEmailCode));

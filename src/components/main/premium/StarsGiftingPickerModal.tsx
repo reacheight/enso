@@ -1,5 +1,5 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo, useMemo,
   useState,
 } from '../../../lib/teact/teact';
@@ -7,8 +7,9 @@ import { getActions, getGlobal, withGlobal } from '../../../global';
 
 import { SERVICE_NOTIFICATIONS_USER_ID } from '../../../config';
 import {
-  filterUsersByName, isDeletedUser, isUserBot,
+  isDeletedUser, isUserBot,
 } from '../../../global/helpers';
+import { filterPeersByQuery } from '../../../global/helpers/peers';
 import { unique } from '../../../util/iteratees';
 import sortChatIds from '../../common/helpers/sortChatIds';
 
@@ -38,7 +39,7 @@ const StarsGiftingPickerModal: FC<OwnProps & StateProps> = ({
   archivedListIds,
   userIds,
 }) => {
-  const { closeStarsGiftingModal, openStarsGiftModal } = getActions();
+  const { closeStarsGiftingPickerModal, openStarsGiftModal } = getActions();
 
   const oldLang = useOldLang();
 
@@ -46,15 +47,17 @@ const StarsGiftingPickerModal: FC<OwnProps & StateProps> = ({
 
   const displayedUserIds = useMemo(() => {
     const usersById = getGlobal().users.byId;
-    const combinedIds = [
+    const combinedIds = unique([
       ...(userIds || []),
       ...(activeListIds || []),
       ...(archivedListIds || []),
-    ];
+    ]);
 
-    const filteredContactIds = filterUsersByName(combinedIds, usersById, searchQuery);
+    const filteredUserIds = filterPeersByQuery({
+      ids: combinedIds, query: searchQuery, type: 'user',
+    });
 
-    return sortChatIds(unique(filteredContactIds).filter((id) => {
+    return sortChatIds(filteredUserIds.filter((id) => {
       const user = usersById[id];
 
       if (!user) {
@@ -70,6 +73,7 @@ const StarsGiftingPickerModal: FC<OwnProps & StateProps> = ({
   const handleSelectedUserIdsChange = useLastCallback((newSelectedId?: string) => {
     if (newSelectedId?.length) {
       openStarsGiftModal({ forUserId: newSelectedId });
+      closeStarsGiftingPickerModal();
     }
   });
 
@@ -77,13 +81,13 @@ const StarsGiftingPickerModal: FC<OwnProps & StateProps> = ({
     <PickerModal
       className={styles.root}
       isOpen={isOpen}
-      onClose={closeStarsGiftingModal}
+      onClose={closeStarsGiftingPickerModal}
       title={oldLang('GiftStarsTitle')}
       hasCloseButton
       shouldAdaptToSearch
       withFixedHeight
       confirmButtonText={oldLang('Continue')}
-      onEnter={closeStarsGiftingModal}
+      onEnter={closeStarsGiftingPickerModal}
     >
       <PeerPicker
         className={styles.picker}
@@ -100,7 +104,7 @@ const StarsGiftingPickerModal: FC<OwnProps & StateProps> = ({
   );
 };
 
-export default memo(withGlobal<OwnProps>((global): StateProps => {
+export default memo(withGlobal<OwnProps>((global): Complete<StateProps> => {
   const {
     chats: {
       listIds,

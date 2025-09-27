@@ -1,12 +1,13 @@
 import type {
   ApiChat, ApiChatFullInfo, ApiChatMember,
 } from '../../api/types';
-import type { ChatListType, GlobalState } from '../types';
+import type { ChatListType } from '../../types';
+import type { GlobalState } from '../types';
 
 import { ARCHIVED_FOLDER_ID } from '../../config';
 import { areDeepEqual } from '../../util/areDeepEqual';
 import {
-  areSortedArraysEqual, buildCollectionByKey, omit, pick, unique,
+  areSortedArraysEqual, buildCollectionByKey, omit, omitUndefined, pick, unique,
 } from '../../util/iteratees';
 import { selectChatFullInfo } from '../selectors';
 
@@ -86,7 +87,7 @@ export function updateChatsLastMessageId<T extends GlobalState>(
   };
 }
 
-export function updateChatListIds<T extends GlobalState>(
+export function addChatListIds<T extends GlobalState>(
   global: T, type: ChatListType, idsUpdate: string[],
 ): T {
   const { [type]: listIds } = global.chats.listIds;
@@ -125,7 +126,7 @@ export function addUnreadMentions<T extends GlobalState>(
 
   if (shouldUpdateCount) {
     const updatedUnreadMentionsCount = (chat.unreadMentionsCount || 0)
-    + Math.max(0, updatedUnreadMentions.length - prevChatUnreadMentions.length);
+      + Math.max(0, updatedUnreadMentions.length - prevChatUnreadMentions.length);
 
     global = updateChat(global, chatId, {
       unreadMentionsCount: updatedUnreadMentionsCount,
@@ -253,7 +254,7 @@ export function addChats<T extends GlobalState>(global: T, newById: Record<strin
     const membersCountChanged = !existingChat?.membersCount && newChat.membersCount;
 
     if (existingChat && !existingChat.isMin && !membersCountChanged
-        && (newChat.isMin || existingChat.accessHash === newChat.accessHash)) {
+      && (newChat.isMin || existingChat.accessHash === newChat.accessHash)) {
       return acc;
     }
 
@@ -310,7 +311,7 @@ function getUpdatedChat<T extends GlobalState>(
     return undefined;
   }
 
-  return updatedChat;
+  return omitUndefined(updatedChat);
 }
 
 export function updateChatListType<T extends GlobalState>(
@@ -373,10 +374,6 @@ export function updateChatListSecondaryInfo<T extends GlobalState>(
         ...global.chats.totalCount,
         [totalCountKey]: info.totalChatCount,
       },
-      isFullyLoaded: {
-        ...global.chats.isFullyLoaded,
-        [type]: false,
-      },
     },
   };
 }
@@ -385,6 +382,7 @@ export function leaveChat<T extends GlobalState>(global: T, leftChatId: string):
   global = removeChatFromChatLists(global, leftChatId);
 
   global = updateChat(global, leftChatId, { isNotJoined: true });
+  global = updateChatFullInfo(global, leftChatId, { joinInfo: undefined });
 
   return global;
 }
@@ -422,12 +420,11 @@ export function addChatMembers<T extends GlobalState>(global: T, chat: ApiChat, 
   });
 }
 
-export function addSimilarChannels<T extends GlobalState>(
+export function replaceSimilarChannels<T extends GlobalState>(
   global: T,
   chatId: string,
   similarChannelIds: string[],
   count?: number,
-  shouldShowInChat = true,
 ) {
   return {
     ...global,
@@ -438,7 +435,6 @@ export function addSimilarChannels<T extends GlobalState>(
         [chatId]: {
           similarChannelIds,
           count: count || similarChannelIds.length,
-          shouldShowInChat,
         },
       },
     },
@@ -459,7 +455,28 @@ export function toggleSimilarChannels<T extends GlobalState>(
         ...global.chats.similarChannelsById,
         [chatId]: {
           ...similarChannels,
-          shouldShowInChat: !similarChannels.shouldShowInChat,
+          isExpanded: !similarChannels?.isExpanded,
+        },
+      },
+    },
+  };
+}
+
+export function addSimilarBots<T extends GlobalState>(
+  global: T,
+  chatId: string,
+  similarBotsIds: string[],
+  count?: number,
+) {
+  return {
+    ...global,
+    chats: {
+      ...global.chats,
+      similarBotsById: {
+        ...global.chats.similarBotsById,
+        [chatId]: {
+          similarBotsIds,
+          count,
         },
       },
     },

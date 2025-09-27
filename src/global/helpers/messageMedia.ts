@@ -13,9 +13,12 @@ import type {
   ApiVideo,
   ApiVoice,
   ApiWebDocument,
+  ApiWebPage,
   MediaContainer,
+  SizeTarget,
+  StatefulMediaContent,
 } from '../../api/types';
-import type { ActiveDownloads } from '../types';
+import type { ActiveDownloads } from '../../types';
 import { ApiMediaFormat } from '../../api/types';
 
 import {
@@ -24,20 +27,12 @@ import {
   IS_PROGRESSIVE_SUPPORTED,
   IS_SAFARI,
   MAX_BUFFER_SIZE,
-} from '../../util/windowEnvironment';
+} from '../../util/browser/windowEnvironment';
 import { getDocumentHasPreview } from '../../components/common/helpers/documentInfo';
 import { getAttachmentMediaType, matchLinkInMessageText } from './messages';
 
 export type MediaWithThumbs = ApiPhoto | ApiVideo | ApiDocument | ApiSticker | ApiMediaExtendedPreview;
 export type DownloadableMedia = ApiPhoto | ApiVideo | ApiDocument | ApiSticker | ApiAudio | ApiVoice | ApiWebDocument;
-
-type Target =
-  'micro'
-  | 'pictogram'
-  | 'inline'
-  | 'preview'
-  | 'full'
-  | 'download';
 
 export function getMessageContent(message: MediaContainer) {
   return message.content;
@@ -50,22 +45,20 @@ export function hasMessageMedia(message: MediaContainer) {
     || getMessageDocument(message)
     || getMessageSticker(message)
     || getMessageContact(message)
-    || getMessagePoll(message)
+    || getMessagePollId(message)
+    || getMessageTodo(message)
     || getMessageAction(message)
     || getMessageAudio(message)
     || getMessageVoice(message)
   ));
 }
 
-export function hasReplaceableMedia(message: MediaContainer) {
-  const video = getMessageVideo(message);
-  return Boolean((
-    getMessagePhoto(message)
-    || (video && !video?.isRound)
-    || getMessageDocument(message)
-    || getMessageSticker(message)
-    || getMessageAudio(message)
-  ));
+export function canEditMedia(message: MediaContainer) {
+  const {
+    video, ...otherMedia
+  } = message.content;
+
+  return !video?.isRound && !Object.keys(otherMedia).length;
 }
 
 export function getMessagePhoto(message: MediaContainer) {
@@ -106,10 +99,6 @@ export function getMessageDocument(message: MediaContainer) {
   return message.content.document;
 }
 
-export function getMessageWebPageDocument(message: MediaContainer) {
-  return getMessageWebPage(message)?.document;
-}
-
 export function isDocumentPhoto(document: ApiDocument) {
   return document.innerMediaType === 'photo';
 }
@@ -127,8 +116,12 @@ export function getMessageContact(message: MediaContainer) {
   return message.content.contact;
 }
 
-export function getMessagePoll(message: MediaContainer) {
-  return message.content.poll;
+export function getMessagePollId(message: MediaContainer) {
+  return message.content.pollId;
+}
+
+export function getMessageTodo(message: MediaContainer) {
+  return message.content.todo;
 }
 
 export function getMessageInvoice(message: MediaContainer) {
@@ -147,60 +140,30 @@ export function getMessagePaidMedia(message: MediaContainer) {
   return message.content.paidMedia;
 }
 
-export function getMessageWebPagePhoto(message: MediaContainer) {
-  return getMessageWebPage(message)?.photo;
-}
-
 export function getMessageDocumentPhoto(message: MediaContainer) {
   const document = getMessageDocument(message);
   return document && isDocumentPhoto(document) ? document : undefined;
 }
 
-export function getMessageWebPageVideo(message: MediaContainer) {
-  return getMessageWebPage(message)?.video;
+export function getWebPagePhoto(webPage?: ApiWebPage) {
+  return webPage?.webpageType === 'full' ? webPage.photo : undefined;
 }
 
-export function getMessageWebPageAudio(message: MediaContainer) {
-  return getMessageWebPage(message)?.audio;
+export function getWebPageVideo(webPage?: ApiWebPage) {
+  return webPage?.webpageType === 'full' ? webPage.video : undefined;
+}
+
+export function getWebPageAudio(webPage?: ApiWebPage) {
+  return webPage?.webpageType === 'full' ? webPage.audio : undefined;
+}
+
+export function getWebPageDocument(webPage?: ApiWebPage) {
+  return webPage?.webpageType === 'full' ? webPage.document : undefined;
 }
 
 export function getMessageDocumentVideo(message: MediaContainer) {
   const document = getMessageDocument(message);
   return document && isDocumentVideo(document) ? document : undefined;
-}
-
-export function getMessageDownloadableMedia(message: MediaContainer): DownloadableMedia | undefined {
-  return (
-    getMessagePhoto(message)
-    || getMessageVideo(message)
-    || getMessageDocument(message)
-    || getMessageSticker(message)
-    || getMessageAudio(message)
-    || getMessageVoice(message)
-    || getMessageWebPagePhoto(message)
-    || getMessageWebPageVideo(message)
-    || getMessageWebPageAudio(message)
-  );
-}
-
-function getMessageMediaThumbnail(message: MediaContainer) {
-  const media = getMessagePhoto(message)
-    || getMessageVideo(message)
-    || getMessageDocument(message)
-    || getMessageSticker(message)
-    || getMessageWebPagePhoto(message)
-    || getMessageWebPageVideo(message)
-    || getMessageInvoice(message)?.extendedMedia;
-
-  if (!media) {
-    return undefined;
-  }
-
-  return media.thumbnail;
-}
-
-export function getMessageMediaThumbDataUri(message: MediaContainer) {
-  return getMessageMediaThumbnail(message)?.dataUri;
 }
 
 export function getMediaThumbUri(media: MediaWithThumbs) {
@@ -226,52 +189,11 @@ export function buildStaticMapHash(
     long, lat, accessHash, accuracyRadius,
   } = geo;
 
-  // eslint-disable-next-line max-len
+  // eslint-disable-next-line @stylistic/max-len
   return `staticMap:${accessHash}?lat=${lat}&long=${long}&w=${width}&h=${height}&zoom=${zoom}&scale=${scale}&accuracyRadius=${accuracyRadius}`;
 }
 
-export function getMessageMediaHash(
-  message: MediaContainer,
-  target: Target,
-) {
-  const {
-    video, sticker, audio, voice, document,
-  } = message.content;
-
-  const messagePhoto = getMessagePhoto(message) || getMessageWebPagePhoto(message);
-  const actionPhoto = getMessageActionPhoto(message);
-  const messageVideo = video || getMessageWebPageVideo(message);
-  const messageDocument = document || getMessageWebPageDocument(message);
-  const messageAudio = audio || getMessageWebPageAudio(message);
-
-  if (messageVideo) {
-    return getVideoMediaHash(messageVideo, target);
-  }
-
-  if (messagePhoto || actionPhoto) {
-    return getPhotoMediaHash(messagePhoto || actionPhoto!, target, Boolean(actionPhoto));
-  }
-
-  if (messageDocument) {
-    return getDocumentMediaHash(messageDocument, target);
-  }
-
-  if (sticker) {
-    return getStickerMediaHash(sticker, target);
-  }
-
-  if (messageAudio) {
-    return getAudioMediaHash(messageAudio, target);
-  }
-
-  if (voice) {
-    return getVoiceMediaHash(voice, target);
-  }
-
-  return undefined;
-}
-
-export function getPhotoMediaHash(photo: ApiPhoto | ApiDocument, target: Target, isAction?: boolean) {
+export function getPhotoMediaHash(photo: ApiPhoto | ApiDocument, target: SizeTarget, isAction?: boolean) {
   const base = `photo${photo.id}`;
   const isVideo = photo.mediaType === 'photo' && photo.isVideo;
 
@@ -300,7 +222,7 @@ export function getVideoProfilePhotoMediaHash(photo: ApiPhoto) {
   return `photo${photo.id}?size=u`;
 }
 
-export function getVideoMediaHash(video: ApiVideo | ApiDocument, target: Target) {
+export function getVideoMediaHash(video: ApiVideo | ApiDocument, target: SizeTarget) {
   const base = `document${video.id}`;
 
   switch (target) {
@@ -323,7 +245,7 @@ export function getVideoPreviewMediaHash(video: ApiVideo) {
   return video.hasVideoPreview ? `document${video.id}?size=v` : undefined;
 }
 
-export function getDocumentMediaHash(document: ApiDocument, target: Target) {
+export function getDocumentMediaHash(document: ApiDocument, target: SizeTarget) {
   const base = `document${document.id}`;
 
   switch (target) {
@@ -343,7 +265,7 @@ export function getDocumentMediaHash(document: ApiDocument, target: Target) {
   }
 }
 
-export function getAudioMediaHash(audio: ApiAudio, target: Target) {
+export function getAudioMediaHash(audio: ApiAudio, target: SizeTarget) {
   const base = `document${audio.id}`;
 
   switch (target) {
@@ -359,7 +281,7 @@ export function getAudioMediaHash(audio: ApiAudio, target: Target) {
   }
 }
 
-export function getVoiceMediaHash(voice: ApiVoice, target: Target) {
+export function getVoiceMediaHash(voice: ApiVoice, target: SizeTarget) {
   const base = `document${voice.id}`;
 
   switch (target) {
@@ -379,12 +301,15 @@ export function getWebDocumentHash(webDocument?: ApiWebDocument) {
   return `webDocument:${webDocument.url}`;
 }
 
-export function getStickerMediaHash(sticker: ApiSticker, target: Target) {
+export function getStickerMediaHash(sticker: ApiSticker, target: SizeTarget) {
   const base = `document${sticker.id}`;
 
   switch (target) {
     case 'micro':
     case 'pictogram':
+      if (!sticker.previewPhotoSizes?.some((size) => size.type === 's')) {
+        return getStickerMediaHash(sticker, 'preview');
+      }
       return `${base}?size=s`;
     case 'preview':
       return `${base}?size=m`;
@@ -396,7 +321,7 @@ export function getStickerMediaHash(sticker: ApiSticker, target: Target) {
   }
 }
 
-export function getMediaHash(media: DownloadableMedia, target: Target) {
+export function getMediaHash(media: DownloadableMedia, target: SizeTarget) {
   switch (media.mediaType) {
     case 'photo':
       return getPhotoMediaHash(media, target);
@@ -439,7 +364,10 @@ export function getGamePreviewVideoHash(game: ApiGame) {
 
 export function appendProgressiveQueryParameters(media: ApiAudio | ApiVideo | ApiDocument, base: string) {
   if (IS_PROGRESSIVE_SUPPORTED && IS_SAFARI) {
-    return `${base}?fileSize=${media.size}&mimeType=${media.mimeType}`;
+    const url = new URL(base, window.location.href);
+    url.searchParams.append('fileSize', media.size.toString());
+    url.searchParams.append('mimeType', media.mimeType);
+    return url.toString();
   }
 
   return base;
@@ -450,7 +378,7 @@ export function getAudioHasCover(media: ApiAudio) {
 }
 
 export function getMediaFormat(
-  media: DownloadableMedia, target: Target,
+  media: DownloadableMedia, target: SizeTarget,
 ): ApiMediaFormat {
   const isDocument = media.mediaType === 'document';
   const hasInnerVideo = isDocument && media.innerMediaType === 'video';
@@ -546,7 +474,7 @@ export function getMediaTransferState(
 export function getMessageContentIds(
   messages: Record<number, ApiMessage>, messageIds: number[], contentType: ApiMessageSearchType | 'inlineMedia',
 ) {
-  let validator: Function;
+  let validator: (message: ApiMessage) => unknown;
 
   switch (contentType) {
     case 'media':
@@ -601,31 +529,6 @@ export function getMessageContentIds(
   }, [] as Array<number>);
 }
 
-export function getMediaDuration(message: ApiMessage) {
-  const { audio, voice, video } = getMessageContent(message);
-  const media = audio || voice || video || getMessageWebPageVideo(message) || getMessageWebPageAudio(message);
-  if (!media) {
-    return undefined;
-  }
-
-  return media.duration;
-}
-
-export function canReplaceMessageMedia(message: ApiMessage, attachment: ApiAttachment) {
-  const isPhotoOrVideo = Boolean(getMessagePhoto(message)
-    || getMessageWebPagePhoto(message) || Boolean(getMessageVideo(message)
-      || getMessageWebPageVideo(message)));
-  const isFile = Boolean(getMessageAudio(message)
-    || getMessageVoice(message) || getMessageDocument(message));
-
-  const fileType = getAttachmentMediaType(attachment);
-
-  return (
-    (isPhotoOrVideo && (fileType === 'photo' || fileType === 'video'))
-    || (isFile && (fileType === 'audio' || fileType === 'file'))
-  );
-}
-
 export function isMediaLoadableInViewer(newMessage: ApiMessage) {
   if (!newMessage.content) return false;
   if (newMessage.content.photo) return true;
@@ -662,4 +565,62 @@ export function getIsDownloading(activeDownloads: ActiveDownloads, media: Downlo
   const hash = getMediaHash(media, 'download');
   if (!hash) return false;
   return Boolean(activeDownloads[hash]);
+}
+
+export function getMessageMediaHash(
+  message: MediaContainer,
+  statefulMedia: StatefulMediaContent,
+  target: SizeTarget,
+) {
+  const {
+    video, sticker, audio, voice, document,
+  } = message.content;
+  const { webPage } = statefulMedia;
+
+  const messagePhoto = getMessagePhoto(message) || getWebPagePhoto(webPage);
+  const actionPhoto = getMessageActionPhoto(message);
+  const messageVideo = video || getWebPageVideo(webPage);
+  const messageDocument = document || getWebPageDocument(webPage);
+  const messageAudio = audio || getWebPageAudio(webPage);
+
+  if (messageVideo) {
+    return getVideoMediaHash(messageVideo, target);
+  }
+
+  if (messagePhoto || actionPhoto) {
+    return getPhotoMediaHash(messagePhoto || actionPhoto!, target, Boolean(actionPhoto));
+  }
+
+  if (messageDocument) {
+    return getDocumentMediaHash(messageDocument, target);
+  }
+
+  if (sticker) {
+    return getStickerMediaHash(sticker, target);
+  }
+
+  if (messageAudio) {
+    return getAudioMediaHash(messageAudio, target);
+  }
+
+  if (voice) {
+    return getVoiceMediaHash(voice, target);
+  }
+
+  return undefined;
+}
+
+export function canReplaceMessageMedia(
+  message: MediaContainer, attachment: ApiAttachment,
+) {
+  const isPhotoOrVideo = Boolean(getMessagePhoto(message) || getMessageVideo(message));
+  const isFile = Boolean(getMessageAudio(message)
+    || getMessageVoice(message) || getMessageDocument(message));
+
+  const fileType = getAttachmentMediaType(attachment);
+
+  return (
+    (isPhotoOrVideo && (fileType === 'photo' || fileType === 'video'))
+    || (isFile && (fileType === 'audio' || fileType === 'file'))
+  );
 }

@@ -1,5 +1,5 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo, useEffect, useLayoutEffect,
   useMemo,
   useRef, useState,
@@ -13,9 +13,11 @@ import type {
   CustomPeer, MiddleSearchParams, MiddleSearchType, ThreadId,
 } from '../../../types';
 
-import { ANONYMOUS_USER_ID, REPLIES_USER_ID } from '../../../config';
+import { ANONYMOUS_USER_ID } from '../../../config';
 import { requestMeasure, requestMutation, requestNextMutation } from '../../../lib/fasterdom/fasterdom';
-import { getIsSavedDialog, getReactionKey, isSameReaction } from '../../../global/helpers';
+import {
+  getIsSavedDialog, getReactionKey, isSameReaction, isSystemBot,
+} from '../../../global/helpers';
 import {
   selectChat,
   selectChatMessage,
@@ -24,9 +26,11 @@ import {
   selectForwardedSender,
   selectIsChatWithSelf,
   selectIsCurrentUserPremium,
+  selectMonoforumChannel,
   selectSender,
   selectTabState,
 } from '../../../global/selectors';
+import { IS_IOS } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
 import captureEscKeyListener from '../../../util/captureEscKeyListener';
 import { getDayStartAt } from '../../../util/dates/dateFormat';
@@ -34,7 +38,6 @@ import focusEditableElement from '../../../util/focusEditableElement';
 import { getSearchResultKey, parseSearchResultKey, type SearchResultKey } from '../../../util/keys/searchResultKey';
 import { MEMO_EMPTY_ARRAY } from '../../../util/memo';
 import { debounce, fastRaf } from '../../../util/schedulers';
-import { IS_IOS } from '../../../util/windowEnvironment';
 
 import { useClickOutside } from '../../../hooks/events/useOutsideClick';
 import useAppLayout from '../../../hooks/useAppLayout';
@@ -49,7 +52,7 @@ import useOldLang from '../../../hooks/useOldLang';
 
 import Avatar from '../../common/Avatar';
 import Icon from '../../common/icons/Icon';
-import PickerSelectedItem from '../../common/pickers/PickerSelectedItem';
+import PeerChip from '../../common/PeerChip';
 import Button from '../../ui/Button';
 import InfiniteScroll from '../../ui/InfiniteScroll';
 import SearchInput from '../../ui/SearchInput';
@@ -63,8 +66,8 @@ export type OwnProps = {
 };
 
 type StateProps = {
-  isActive?: boolean;
   chat?: ApiChat;
+  monoforumChat?: ApiChat;
   threadId?: ThreadId;
   requestedQuery?: string;
   savedTags?: Record<ApiReactionKey, ApiSavedReactionTag>;
@@ -92,9 +95,10 @@ const RESULT_ITEM_CLASS_NAME = 'MiddleSearchResult';
 
 const runDebouncedForSearch = debounce((cb) => cb(), 200, false);
 
-const MiddleSearch: FC<StateProps> = ({
+const MiddleSearch: FC<OwnProps & StateProps> = ({
   isActive,
   chat,
+  monoforumChat,
   threadId,
   requestedQuery,
   savedTags,
@@ -121,12 +125,10 @@ const MiddleSearch: FC<StateProps> = ({
     loadSavedReactionTags,
   } = getActions();
 
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const inputRef = useRef<HTMLInputElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const containerRef = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>();
+  const inputRef = useRef<HTMLInputElement>();
+  const containerRef = useRef<HTMLDivElement>();
+  const shouldCancelSearchRef = useRef(false);
 
   const { isMobile } = useAppLayout();
   const oldLang = useOldLang();
@@ -213,18 +215,10 @@ const MiddleSearch: FC<StateProps> = ({
     };
   }, []);
 
-  // Focus message
+  // Reset focus on query result
   useEffect(() => {
-    if (foundIds?.length) {
-      if (searchType === 'chat') {
-        const [chatId, messageId] = parseSearchResultKey(foundIds[0]);
-        focusMessage({ chatId, messageId, threadId });
-      }
-      setFocusedIndex(0);
-    } else {
-      setFocusedIndex(-1);
-    }
-  }, [searchType, focusMessage, foundIds, threadId]);
+    setFocusedIndex(-1);
+  }, [lastSearchQuery]);
 
   // Disable native up/down buttons on iOS
   useLayoutEffect(() => {
@@ -311,10 +305,15 @@ const MiddleSearch: FC<StateProps> = ({
       return;
     }
 
-    runDebouncedForSearch(() => performMiddleSearch({ chatId, threadId, query }));
+    runDebouncedForSearch(() => {
+      if (shouldCancelSearchRef.current) return;
+      performMiddleSearch({ chatId, threadId, query });
+    });
   });
 
   const handleQueryChange = useLastCallback((newQuery: string) => {
+    shouldCancelSearchRef.current = false;
+
     if (newQuery.startsWith('#') && !isHashtagQuery) {
       updateMiddleSearch({ chatId: chat!.id, threadId, update: { isHashtag: true } });
       setQuery(newQuery.slice(1));
@@ -327,6 +326,7 @@ const MiddleSearch: FC<StateProps> = ({
     if (!newQuery) {
       setIsLoading(false);
       resetMiddleSearch();
+      shouldCancelSearchRef.current = true;
     }
   });
 
@@ -404,7 +404,7 @@ const MiddleSearch: FC<StateProps> = ({
         return undefined;
       }
 
-      const originalSender = (isSavedMessages || chatId === REPLIES_USER_ID || chatId === ANONYMOUS_USER_ID)
+      const originalSender = (isSavedMessages || isSystemBot(chatId) || chatId === ANONYMOUS_USER_ID)
         ? selectForwardedSender(global, message) : undefined;
       const messageSender = selectSender(global, message);
       const messageChat = selectChat(global, message.chatId);
@@ -518,9 +518,8 @@ const MiddleSearch: FC<StateProps> = ({
     switch (type) {
       case 'chat':
         return (
-          <PickerSelectedItem
+          <PeerChip
             className={buildClassName(styles.searchType, isSelected && styles.selectedType)}
-            fluid
             peerId={chat?.id}
             title={oldLang('SearchThisChat')}
             clickArg="chat"
@@ -529,9 +528,8 @@ const MiddleSearch: FC<StateProps> = ({
         );
       case 'myChats':
         return (
-          <PickerSelectedItem
+          <PeerChip
             className={buildClassName(styles.searchType, isSelected && styles.selectedType)}
-            fluid
             peerId={currentUserId}
             forceShowSelf
             title={oldLang('SearchMyMessages')}
@@ -541,9 +539,8 @@ const MiddleSearch: FC<StateProps> = ({
         );
       case 'channels':
         return (
-          <PickerSelectedItem
+          <PeerChip
             className={buildClassName(styles.searchType, isSelected && styles.selectedType)}
-            fluid
             customPeer={CHANNELS_PEER}
             title={oldLang('SearchPublicPosts')}
             clickArg="channels"
@@ -597,6 +594,7 @@ const MiddleSearch: FC<StateProps> = ({
             ref={containerRef}
             className={buildClassName(styles.results, 'custom-scroll')}
             items={viewportResults}
+            itemSelector={`.${RESULT_ITEM_CLASS_NAME}`}
             preloadBackwards={0}
             onLoadMore={getMore}
             onKeyDown={handleKeyDown}
@@ -649,7 +647,7 @@ const MiddleSearch: FC<StateProps> = ({
         {!isMobile && (
           <Avatar
             className={styles.avatar}
-            peer={chat}
+            peer={monoforumChat || chat}
             size="medium"
             isSavedMessages={isSavedMessages}
           />
@@ -698,7 +696,7 @@ const MiddleSearch: FC<StateProps> = ({
               round
               size="smaller"
               color="translucent"
-              // eslint-disable-next-line react/jsx-no-bind
+
               onClick={() => openHistoryCalendar({ selectedAt: getDayStartAt(Date.now()) })}
               ariaLabel={oldLang('JumpToDate')}
             >
@@ -714,7 +712,7 @@ const MiddleSearch: FC<StateProps> = ({
             round
             size="smaller"
             color="translucent"
-            // eslint-disable-next-line react/jsx-no-bind
+
             onClick={() => openHistoryCalendar({ selectedAt: getDayStartAt(Date.now()) })}
             ariaLabel={oldLang('JumpToDate')}
           >
@@ -723,7 +721,7 @@ const MiddleSearch: FC<StateProps> = ({
           <div className={styles.counter}>
             {hasQueryData && (
               foundIds?.length ? (
-                oldLang('Of', [focusedIndex + 1, totalCount])
+                oldLang('Of', [Math.max(focusedIndex + 1, 1), totalCount])
               ) : foundIds && !foundIds.length && (
                 oldLang('NoResult')
               )
@@ -774,16 +772,16 @@ const MiddleSearch: FC<StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     const currentMessageList = selectCurrentMessageList(global);
     if (!currentMessageList) {
-      return {};
+      return {} as Complete<StateProps>;
     }
     const { chatId, threadId } = currentMessageList;
 
     const chat = selectChat(global, chatId);
     if (!chat) {
-      return {};
+      return {} as Complete<StateProps>;
     }
 
     const {
@@ -797,8 +795,11 @@ export default memo(withGlobal<OwnProps>(
 
     const savedTags = isSavedMessages && !isSavedDialog ? global.savedReactionTags?.byKey : undefined;
 
+    const monoforumChat = selectMonoforumChannel(global, chatId);
+
     return {
       chat,
+      monoforumChat,
       requestedQuery,
       totalCount,
       threadId,

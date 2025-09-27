@@ -1,0 +1,34 @@
+.wrapper {
+  display: flex;
+  gap: 0.25rem;
+  padding-top: 0.25rem;
+}
+
+.tag {
+  --emoji-size: 0.75rem;
+  --custom-emoji-size: 0.75rem;
+
+  position: relative;
+
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 1.5rem;
+  padding: 0.0625rem 0.25rem;
+  border-radius: 0.25rem;
+
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 0.75rem;
+  color: var(--accent-color);
+  text-align: center;
+  text-transform: uppercase;
+
+  background-color: var(--accent-background-color);
+
+  &ColorMore {
+    color: var(--color-text-secondary);
+  }
+}

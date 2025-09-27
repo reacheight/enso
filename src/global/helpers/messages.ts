@@ -1,17 +1,22 @@
+import type { TeactNode } from '../../lib/teact/teact';
+
 import type {
   ApiAttachment,
   ApiMessage,
   ApiMessageEntityTextUrl,
-  ApiPeer, ApiSponsoredMessage,
+  ApiPeer,
   ApiStory,
+  ApiTypeStory,
 } from '../../api/types';
-import type { MediaContent } from '../../api/types/messages';
-import type { LangFn } from '../../hooks/useOldLang';
+import type {
+  ApiPoll, ApiWebPage, MediaContainer, StatefulMediaContent,
+} from '../../api/types/messages';
 import type { ThreadId } from '../../types';
+import type { LangFn } from '../../util/localization';
+import type { GlobalState } from '../types';
 import { ApiMessageEntityTypes, MAIN_THREAD_ID } from '../../api/types';
 
 import {
-  CONTENT_NOT_SUPPORTED,
   LOTTIE_STICKER_MIME_TYPE,
   RE_LINK_TEMPLATE,
   SERVICE_NOTIFICATIONS_USER_ID,
@@ -19,19 +24,17 @@ import {
   SUPPORTED_PHOTO_CONTENT_TYPES,
   SUPPORTED_VIDEO_CONTENT_TYPES,
   TME_LINK_PREFIX,
+  VERIFICATION_CODES_USER_ID,
   VIDEO_STICKER_MIME_TYPE,
 } from '../../config';
+import { areDeepEqual } from '../../util/areDeepEqual';
+import { getCleanPeerId, isUserId } from '../../util/entities/ids';
 import { areSortedArraysIntersecting, unique } from '../../util/iteratees';
 import { isLocalMessageId } from '../../util/keys/messageKey';
 import { getServerTime } from '../../util/serverTime';
 import { getGlobal } from '../index';
-import {
-  getChatTitle,
-  getCleanPeerId,
-  isPeerUser,
-  isUserId,
-} from './chats';
-import { getMainUsername, getUserFullName } from './users';
+import { selectPollFromMessage, selectWebPageFromMessage } from '../selectors';
+import { getMainUsername } from './users';
 
 const RE_LINK = new RegExp(RE_LINK_TEMPLATE, 'i');
 
@@ -46,32 +49,62 @@ export function getMessageOriginalId(message: ApiMessage) {
 
 export function getMessageTranscription(message: ApiMessage) {
   const { transcriptionId } = message;
-  // eslint-disable-next-line eslint-multitab-tt/no-immediate-global
   const global = getGlobal();
 
   return transcriptionId && global.transcriptions[transcriptionId]?.text;
 }
 
-export function hasMessageText(message: ApiMessage | ApiStory | ApiSponsoredMessage) {
+export function hasMessageText(message: MediaContainer) {
   const {
-    text, sticker, photo, video, audio, voice, document, poll, webPage, contact, invoice, location,
-    game, action, storyData, giveaway, giveawayResults, isExpiredVoice, paidMedia,
+    action, text, sticker, photo, video, audio, voice, document, pollId, todo,
+    webPage, contact, invoice, location, game, storyData, giveaway, giveawayResults, paidMedia,
   } = message.content;
 
   return Boolean(text) || !(
-    sticker || photo || video || audio || voice || document || contact || poll || webPage || invoice || location
-    || game || action?.phoneCall || storyData || giveaway || giveawayResults || isExpiredVoice || paidMedia
+    sticker || photo || video || audio || voice || document || contact || pollId || todo || webPage
+    || invoice || location || game || storyData || giveaway || giveawayResults
+    || paidMedia || action?.type === 'phoneCall'
   );
 }
 
-export function getMessageText(message: ApiMessage | ApiStory | ApiSponsoredMessage) {
-  return hasMessageText(message) ? message.content.text?.text || CONTENT_NOT_SUPPORTED : undefined;
+export function getMessageStatefulContent(global: GlobalState, message: ApiMessage): StatefulMediaContent {
+  const poll = selectPollFromMessage(global, message);
+  const webPage = selectWebPageFromMessage(global, message);
+
+  const { peerId: storyPeerId, id: storyId } = message.content.storyData || {};
+  const story = storyId && storyPeerId ? global.stories.byPeerId[storyPeerId]?.byId[storyId] : undefined;
+
+  return groupStatefulContent({ poll, story, webPage });
+}
+
+export function groupStatefulContent({
+  poll,
+  story,
+  webPage,
+}: {
+  poll?: ApiPoll;
+  story?: ApiTypeStory;
+  webPage?: ApiWebPage;
+}) {
+  return {
+    poll,
+    story: story && 'content' in story ? story : undefined,
+    webPage,
+  };
+}
+
+export function getMessageText(message: MediaContainer) {
+  return hasMessageText(message) ? message.content.text : undefined;
+}
+
+export function getMessageTextWithFallback(lang: LangFn, message: MediaContainer) {
+  return hasMessageText(message) ? message.content.text || { text: lang('MessageUnsupported') } : undefined;
 }
 
 export function getMessageCustomShape(message: ApiMessage): boolean {
   const {
     text, sticker, photo, video, audio, voice,
-    document, poll, webPage, contact, action,
+    document, pollId, webPage, contact, action,
     game, invoice, location, storyData,
   } = message.content;
 
@@ -79,8 +112,8 @@ export function getMessageCustomShape(message: ApiMessage): boolean {
     return true;
   }
 
-  if (!text || photo || video || audio || voice || document || poll || webPage || contact || action || game || invoice
-    || location || storyData) {
+  if (!text || photo || video || audio || voice || document || pollId || webPage || contact || action || game
+    || invoice || location || storyData) {
     return false;
   }
 
@@ -173,7 +206,7 @@ export function isForwardedMessage(message: ApiMessage) {
 }
 
 export function isActionMessage(message: ApiMessage) {
-  return Boolean(message.content.action) || isExpiredMessage(message);
+  return Boolean(message.content.action);
 }
 
 export function isServiceNotificationMessage(message: ApiMessage) {
@@ -182,10 +215,6 @@ export function isServiceNotificationMessage(message: ApiMessage) {
 
 export function isAnonymousOwnMessage(message: ApiMessage) {
   return Boolean(message.senderId) && !isUserId(message.senderId) && isOwnMessage(message);
-}
-
-export function getSenderTitle(lang: LangFn, sender: ApiPeer) {
-  return isPeerUser(sender) ? getUserFullName(sender) : getChatTitle(lang, sender);
 }
 
 export function getSendingState(message: ApiMessage) {
@@ -279,54 +308,53 @@ export function extractMessageText(message: ApiMessage | ApiStory, inChatList = 
   const { text } = contentText;
   let { entities } = contentText;
 
-  if (text && inChatList && 'chatId' in message && message.chatId === SERVICE_NOTIFICATIONS_USER_ID
-    // eslint-disable-next-line eslint-multitab-tt/no-immediate-global
-    && !getGlobal().settings.byKey.shouldShowLoginCodeInChatList) {
-    const authCode = text.match(/^\D*([\d-]{5,7})\D/)?.[1];
-    if (authCode) {
-      entities = [
-        ...entities || [],
-        {
-          type: ApiMessageEntityTypes.Spoiler,
-          offset: text.indexOf(authCode),
-          length: authCode.length,
-        },
-      ];
-      entities.sort((a, b) => (a.offset > b.offset ? 1 : -1));
+  if (text && 'chatId' in message) {
+    if (message.chatId === SERVICE_NOTIFICATIONS_USER_ID) {
+      const authCode = text.match(/^\D*([\d-]{5,7})\D/)?.[1];
+      if (authCode) {
+        entities = [
+          ...entities || [],
+          {
+            type: inChatList ? ApiMessageEntityTypes.Spoiler : ApiMessageEntityTypes.Code,
+            offset: text.indexOf(authCode),
+            length: authCode.length,
+          },
+        ];
+        entities.sort((a, b) => (a.offset > b.offset ? 1 : -1));
+      }
+    }
+
+    if (inChatList && message.chatId === VERIFICATION_CODES_USER_ID && entities) {
+      // Wrap code entities in spoiler
+      const hasCodeEntities = entities.some((entity) => entity.type === ApiMessageEntityTypes.Code);
+      if (hasCodeEntities) {
+        const oldEntities = entities;
+        entities = [];
+
+        for (let i = 0; i < oldEntities.length; i++) {
+          const entity = oldEntities[i];
+          if (entity.type === ApiMessageEntityTypes.Code) {
+            entities.push({
+              type: ApiMessageEntityTypes.Spoiler,
+              offset: entity.offset,
+              length: entity.length,
+            });
+          }
+          entities.push(entity);
+        }
+      }
     }
   }
 
   return { text, entities };
 }
 
-export function getExpiredMessageDescription(langFn: LangFn, message: ApiMessage): string | undefined {
-  return getExpiredMessageContentDescription(langFn, message.content);
-}
-export function getExpiredMessageContentDescription(langFn: LangFn, mediaContent: MediaContent): string | undefined {
-  const { isExpiredVoice, isExpiredRoundVideo } = mediaContent;
-  if (isExpiredVoice) {
-    return langFn('Message.VoiceMessageExpired');
-  } else if (isExpiredRoundVideo) {
-    return langFn('Message.VideoMessageExpired');
-  }
-  return undefined;
-}
-
 export function isExpiredMessage(message: ApiMessage) {
-  return isExpiredMessageContent(message.content);
-}
-
-export function isExpiredMessageContent(content: MediaContent) {
-  const { isExpiredVoice, isExpiredRoundVideo } = content ?? {};
-  return Boolean(isExpiredVoice || isExpiredRoundVideo);
+  return message.content.action?.type === 'expired';
 }
 
 export function hasMessageTtl(message: ApiMessage) {
   return message.content?.ttlSeconds !== undefined;
-}
-
-export function isJoinedChannelMessage(message: ApiMessage) {
-  return message.content.action && message.content.action.type === 'joinedChannel';
 }
 
 export function getAttachmentMediaType(attachment: ApiAttachment) {
@@ -361,4 +389,116 @@ export function getMessageLink(peer: ApiPeer, topicId?: ThreadId, messageId?: nu
   const topicPart = topicId && topicId !== MAIN_THREAD_ID ? `/${topicId}` : '';
   const messagePart = messageId ? `/${messageId}` : '';
   return `${TME_LINK_PREFIX}${chatPart}${topicPart}${messagePart}`;
+}
+
+export function splitMessagesForForwarding(messages: ApiMessage[], limit: number): ApiMessage[][] {
+  const result: ApiMessage[][] = [];
+  let currentArr: ApiMessage[] = [];
+
+  // Group messages by `groupedId`
+  messages.reduce<ApiMessage[][]>((acc, message) => {
+    const lastGroup = acc[acc.length - 1];
+    if (message.groupedId && lastGroup?.[0]?.groupedId === message.groupedId) {
+      lastGroup.push(message);
+      return acc;
+    }
+
+    acc.push([message]);
+    return acc;
+  }, []).forEach((batch) => {
+    // Fit them into `limit` size
+    if (currentArr.length + batch.length > limit) {
+      result.push(currentArr);
+      currentArr = [];
+    }
+
+    currentArr.push(...batch);
+  });
+
+  if (currentArr.length) {
+    result.push(currentArr);
+  }
+
+  return result;
+}
+
+export interface SuggestedChangesInfo {
+  isNewText: boolean;
+  isNewPrice: boolean;
+  isNewTime: boolean;
+  isNewMedia: boolean;
+}
+
+export function getSuggestedChangesInfo(
+  message: ApiMessage,
+  originalMessage?: ApiMessage,
+): SuggestedChangesInfo | undefined {
+  if (!message.suggestedPostInfo || message.replyInfo?.type !== 'message'
+    || !message.replyInfo?.replyToMsgId || !originalMessage) {
+    return undefined;
+  }
+
+  if (!originalMessage.suggestedPostInfo) {
+    return undefined;
+  }
+
+  const original = originalMessage.suggestedPostInfo;
+  const suggested = message.suggestedPostInfo;
+
+  const originalContent = originalMessage.content;
+  const suggestedContent = message.content;
+  const { text: originalText, ...originalMediaContent } = originalContent;
+  const { text: suggestedText, ...suggestedMediaContent } = suggestedContent;
+
+  const isNewText = !areDeepEqual(originalText, suggestedText);
+  const isNewMedia = !areDeepEqual(originalMediaContent, suggestedMediaContent);
+
+  const originalPrice = original.price?.amount;
+  const suggestedPrice = suggested.price?.amount;
+  const isNewPrice = originalPrice !== suggestedPrice;
+
+  const originalTime = original.scheduleDate;
+  const suggestedTime = suggested.scheduleDate;
+  const isNewTime = originalTime !== suggestedTime;
+
+  if (!isNewText && !isNewPrice && !isNewTime && !isNewMedia) {
+    return undefined;
+  }
+
+  return {
+    isNewText,
+    isNewPrice,
+    isNewTime,
+    isNewMedia,
+  };
+}
+
+export function getSuggestedChangesActionText(
+  lang: LangFn,
+  message: ApiMessage,
+  originalMessage?: ApiMessage,
+  isOutgoing?: boolean,
+  senderLink?: TeactNode,
+): TeactNode | undefined {
+  const changesInfo = getSuggestedChangesInfo(message, originalMessage);
+  if (!changesInfo) {
+    return undefined;
+  }
+
+  const changesParts: string[] = [];
+  if (changesInfo.isNewPrice) changesParts.push(lang('ActionSuggestedChangesPrice'));
+  if (changesInfo.isNewTime) changesParts.push(lang('ActionSuggestedChangesTime'));
+  if (changesInfo.isNewText) changesParts.push(lang('ActionSuggestedChangesText'));
+  if (changesInfo.isNewMedia) changesParts.push(lang('ActionSuggestedChangesMedia'));
+
+  const changesText = lang.conjunction(changesParts);
+
+  const langKey = isOutgoing ? 'ActionSuggestedChangesOutgoing' : 'ActionSuggestedChangesIncoming';
+  return lang(langKey, {
+    changes: changesText,
+    user: senderLink,
+  }, {
+    withNodes: true,
+    withMarkdown: true,
+  });
 }

@@ -1,12 +1,13 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useCallback, useMemo } from '../../../lib/teact/teact';
+import { memo, useCallback, useMemo } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiChat, ApiCountryCode, ApiUser } from '../../../api/types';
 
 import { CHAT_HEIGHT_PX } from '../../../config';
-import { getMainUsername, isUserId } from '../../../global/helpers';
+import { getMainUsername } from '../../../global/helpers';
 import buildClassName from '../../../util/buildClassName';
+import { isUserId } from '../../../util/entities/ids';
 import { formatPhoneNumberWithCode } from '../../../util/phoneNumber';
 
 import useFlag from '../../../hooks/useFlag';
@@ -15,6 +16,7 @@ import useOldLang from '../../../hooks/useOldLang';
 
 import Avatar from '../../common/Avatar';
 import FullNameTitle from '../../common/FullNameTitle';
+import Icon from '../../common/icons/Icon';
 import FloatingActionButton from '../../ui/FloatingActionButton';
 import ListItem from '../../ui/ListItem';
 import Loading from '../../ui/Loading';
@@ -104,7 +106,12 @@ const SettingsPrivacyBlockedUsers: FC<OwnProps & StateProps> = ({
           {user?.phoneNumber && (
             <div className="contact-phone" dir="auto">{formatPhoneNumberWithCode(phoneCodeList, user.phoneNumber)}</div>
           )}
-          {userMainUsername && (<div className="contact-username" dir="auto">@{userMainUsername}</div>)}
+          {userMainUsername && (
+            <div className="contact-username" dir="auto">
+              @
+              {userMainUsername}
+            </div>
+          )}
         </div>
       </ListItem>
     );
@@ -122,7 +129,7 @@ const SettingsPrivacyBlockedUsers: FC<OwnProps & StateProps> = ({
         <div className="chat-list custom-scroll">
           {blockedIds?.length ? (
             <div className="scroll-container settings-item">
-              {blockedIds!.map((contactId, i) => renderContact(contactId, i, 0))}
+              {blockedIds.map((contactId, i) => renderContact(contactId, i, 0))}
             </div>
           ) : blockedIds && !blockedIds.length ? (
             <div className="no-results" dir="auto">{lang('NoBlocked')}</div>
@@ -138,7 +145,7 @@ const SettingsPrivacyBlockedUsers: FC<OwnProps & StateProps> = ({
         onClick={openBlockUserModal}
         ariaLabel={lang('BlockContact')}
       >
-        <i className="icon icon-add" />
+        <Icon name="add" />
       </FloatingActionButton>
       <BlockUserModal
         isOpen={isBlockUserModalOpen}
@@ -149,7 +156,7 @@ const SettingsPrivacyBlockedUsers: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     const {
       chats: {
         byId: chatsByIds,

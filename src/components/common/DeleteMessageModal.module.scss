@@ -1,12 +1,18 @@
-.mainContainer {
+.main {
   max-height: 90vh;
+}
+
+.root {
+  :global(.modal-dialog) {
+    max-width: 22.5rem;
+  }
 }
 
 .container {
   display: flex;
-  align-items: center;
   gap: 1rem;
-  margin: 0 1rem;
+  align-items: center;
+  margin-left: -0.5rem;
 }
 
 .title {
@@ -19,42 +25,44 @@
 
 .actionTitle {
   margin-top: 1.5rem;
-  margin-left: 1rem;
-  color: var(--color-links);
   font-size: 1rem;
-  font-weight: bold;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-links);
 }
 
 .restrictionTitle {
-  margin-bottom: 1.5rem;
-  margin-top: 0;
-}
-
-.listItemButton {
-  margin-top: 0.1875rem;
-  margin-left: 1rem;
+  margin: 1rem 0 0.5rem 1rem;
 }
 
 .button {
-  color: var(--color-links) !important;
   padding: 0 !important;
+  color: var(--color-links) !important;
   &:hover {
     background: none !important;
   }
 }
 
+.options {
+  margin: 0 -1rem;
+}
+
 .dropdownList {
-  padding-left: 3.1875rem;
+  padding: 0 1rem 0 4rem;
 }
 
 .dialogButtons {
   padding-bottom: 1rem;
 }
 
+.proceedButtons {
+  margin-top: 0.5rem;
+}
+
 .restrictionContainer,
 .dropdownList {
   overflow: hidden;
   max-height: 0;
+  margin: 0 -1rem;
   /* stylelint-disable-next-line plugin/no-low-performance-animation-properties */
   transition: max-height 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
@@ -62,6 +70,7 @@
 .restrictionContainerOpen,
 .dropdownListOpen {
   max-height: 100vh;
+  margin: 0 -1rem;
   /* stylelint-disable-next-line plugin/no-low-performance-animation-properties */
   transition: max-height 0.3s ease-in-out;
 }

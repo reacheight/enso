@@ -1,5 +1,6 @@
 import type { FC } from '../../lib/teact/teact';
-import React, {
+import type React from '../../lib/teact/teact';
+import {
   memo, useCallback, useEffect, useMemo, useState,
 } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
@@ -18,6 +19,7 @@ import useHistoryBack from '../../hooks/useHistoryBack';
 import useOldLang from '../../hooks/useOldLang';
 
 import CustomEmojiPicker from '../common/CustomEmojiPicker';
+import Icon from '../common/icons/Icon';
 import TopicIcon from '../common/TopicIcon';
 import FloatingActionButton from '../ui/FloatingActionButton';
 import InputText from '../ui/InputText';
@@ -160,7 +162,7 @@ const CreateTopic: FC<OwnProps & StateProps> = ({
         {isLoading ? (
           <Spinner color="white" />
         ) : (
-          <i className="icon icon-check" />
+          <Icon name="check" />
         )}
       </FloatingActionButton>
     </div>
@@ -168,7 +170,7 @@ const CreateTopic: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     const { createTopicPanel } = selectTabState(global);
     return {
       chat: createTopicPanel?.chatId ? selectChat(global, createTopicPanel.chatId) : undefined,

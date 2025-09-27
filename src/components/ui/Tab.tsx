@@ -1,18 +1,20 @@
-import type { FC } from '../../lib/teact/teact';
-import React, { useEffect, useLayoutEffect, useRef } from '../../lib/teact/teact';
+import type { FC, TeactNode } from '../../lib/teact/teact';
+import type React from '../../lib/teact/teact';
+import { useEffect, useLayoutEffect, useRef } from '../../lib/teact/teact';
 
 import type { MenuItemContextAction } from './ListItem';
 
 import { requestForcedReflow, requestMutation } from '../../lib/fasterdom/fasterdom';
+import { MouseButton } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
 import forceReflow from '../../util/forceReflow';
-import { MouseButton } from '../../util/windowEnvironment';
 import renderText from '../common/helpers/renderText';
 
 import useContextMenuHandlers from '../../hooks/useContextMenuHandlers';
 import { useFastClick } from '../../hooks/useFastClick';
 import useLastCallback from '../../hooks/useLastCallback';
 
+import Icon from '../common/icons/Icon';
 import Menu from './Menu';
 import MenuItem from './MenuItem';
 import MenuSeparator from './MenuSeparator';
@@ -21,7 +23,7 @@ import './Tab.scss';
 
 type OwnProps = {
   className?: string;
-  title: string;
+  title: TeactNode;
   isActive?: boolean;
   isBlocked?: boolean;
   badgeCount?: number;
@@ -51,13 +53,12 @@ const Tab: FC<OwnProps> = ({
   contextActions,
   contextRootElementSelector,
 }) => {
-  // eslint-disable-next-line no-null/no-null
-  const tabRef = useRef<HTMLDivElement>(null);
+  const tabRef = useRef<HTMLDivElement>();
 
   useLayoutEffect(() => {
     // Set initial active state
     if (isActive && previousActiveTab === undefined && tabRef.current) {
-      tabRef.current!.classList.add(classNames.active);
+      tabRef.current.classList.add(classNames.active);
     }
   }, [isActive, previousActiveTab]);
 
@@ -139,11 +140,11 @@ const Tab: FC<OwnProps> = ({
       ref={tabRef}
     >
       <span className="Tab_inner">
-        {renderText(title)}
+        {typeof title === 'string' ? renderText(title) : title}
         {Boolean(badgeCount) && (
           <span className={buildClassName('badge', isBadgeActive && classNames.badgeActive)}>{badgeCount}</span>
         )}
-        {isBlocked && <i className="icon icon-lock-badge blocked" />}
+        {isBlocked && <Icon name="lock-badge" className="blocked" />}
         <i className="platform" />
       </span>
 

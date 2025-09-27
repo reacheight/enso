@@ -1,11 +1,11 @@
 import type { ChangeEvent } from 'react';
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo, useEffect, useMemo, useRef, useState,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
-import type { ApiBotInfo, ApiUser } from '../../../api/types';
+import type { ApiUser } from '../../../api/types';
 import { ApiMediaFormat } from '../../../api/types';
 import { ManagementProgress } from '../../../types';
 
@@ -46,10 +46,8 @@ type OwnProps = {
 type StateProps = {
   userId?: string;
   user?: ApiUser;
-  chatBot?: ApiBotInfo;
   currentBio?: string;
   progress?: ManagementProgress;
-  isMuted?: boolean;
   maxBioLength: number;
 };
 
@@ -59,10 +57,10 @@ const ManageBot: FC<OwnProps & StateProps> = ({
   userId,
   user,
   progress,
-  onClose,
   currentBio,
   isActive,
   maxBioLength,
+  onClose,
 }) => {
   const {
     setBotInfo,
@@ -167,11 +165,10 @@ const ManageBot: FC<OwnProps & StateProps> = ({
   });
 
   const handleChangeSettings = useLastCallback(() => {
-    startBotFatherConversation({ param: `${username}` });
+    startBotFatherConversation({ param: username! });
   });
 
-  // eslint-disable-next-line no-null/no-null
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>();
   const isSuggestRef = useRef(false);
 
   const handleSelectAvatar = useLastCallback((file: File) => {
@@ -250,7 +247,7 @@ const ManageBot: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { userId }): StateProps => {
+  (global, { userId }): Complete<StateProps> => {
     const user = selectBot(global, userId);
     const userFullInfo = selectUserFullInfo(global, userId);
     const { progress } = selectTabState(global).management;

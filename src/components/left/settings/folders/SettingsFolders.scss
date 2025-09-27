@@ -1,14 +1,15 @@
 .settings-folders-recommended-item {
-  width: 100%;
   display: flex;
+  gap: 1rem;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+
+  width: 100%;
 }
 
 .settings-folders-blocked-icon {
-  color: var(--color-text-secondary);
   margin-left: 0.25rem;
+  color: var(--color-text-secondary);
 }
 
 .settings-folders-list-item {
@@ -22,24 +23,26 @@
     width: 100%;
 
     .Avatar {
-      margin-left: -0.25rem;
       margin-right: 1.5rem;
+      margin-left: -0.25rem;
     }
 
     .title {
       display: flex;
-      justify-content: flex-start;
       align-items: center;
+      justify-content: flex-start;
 
       h3 {
-        font-size: 1rem;
-        font-weight: 500;
-        line-height: 1.3125;
-        margin: 0;
         overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
+
+        margin: 0;
+
+        font-size: 1rem;
+        font-weight: var(--font-weight-medium);
+        line-height: 1.3125;
         text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     }
 
@@ -68,22 +71,22 @@
     color: var(--color-primary);
 
     .icon {
-      opacity: 1;
       color: inherit;
+      opacity: 1;
     }
   }
 
   &[dir="rtl"] {
     .Avatar {
-      margin-left: 1.5rem;
       margin-right: -0.25rem;
+      margin-left: 1.5rem;
     }
   }
 }
 
 .settings-item .ShowMoreButton {
-  margin: 0 -1rem;
   width: calc(100% + 2rem);
+  margin: 0 -1rem;
   padding-left: 1rem !important;
 }
 
@@ -91,12 +94,16 @@
   position: relative;
 }
 
-.settings-sortable-container .draggable-knob {
-  margin-top: -0.25rem;
-}
-
 .settings-sortable-item .multiline-item {
   padding-inline-end: 3rem;
+}
+
+.settings-sortable-item .Button {
+  margin-right: -1rem;
+  &:hover,
+  &:active {
+    background-color: transparent !important;
+  }
 }
 
 .picker-category-title {
@@ -104,8 +111,98 @@
 }
 
 .Picker {
-  height: 100%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  height: 100%;
+}
+
+.color-picker {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+
+  min-height: 3rem;
+  padding: 0 1rem 1rem;
+}
+
+.color-picker-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline-end: 1rem;
+}
+
+.color-picker-item {
+  cursor: pointer;
+
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 0.125rem solid transparent;
+  border-radius: 50%;
+
+  color: var(--accent-color);
+
+  background-color: currentColor;
+  box-shadow: none;
+
+  /* stylelint-disable-next-line plugin/no-low-performance-animation-properties */
+  transition: border 100ms ease-in-out, box-shadow 100ms ease-in-out;
+}
+
+.color-picker-item-disabled {
+  --accent-color: var(--color-topic-grey);
+}
+
+.color-picker-selected-color {
+  color: var(--accent-color);
+}
+
+.color-picker-item-none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-topic-grey);
+
+  .color-picker-item-none-icon {
+    color: var(--color-background);
+  }
+}
+
+.color-picker-item:not(.color-picker-item-hover-disabled) {
+  &.color-picker-item-active,
+  &:focus,
+  &:hover,
+  &:active {
+    border: 0.125rem solid var(--color-background);
+    box-shadow: 0 0 0 0.125rem currentColor;
+  }
+}
+
+.settings-item-relative {
+  position: relative;
+}
+
+.settings-folders-lock-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+
+  padding: 1.3125rem;
+
+  font-size: 0.875rem;
+  color: var(--color-gray);
+}
+
+.settings-folders-color-circle {
+  position: absolute;
+  top: 50%;
+  right: 2rem;
+  transform: translateY(-50%);
+
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+
+  background-color: var(--accent-color);
 }

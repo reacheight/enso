@@ -1,11 +1,9 @@
-import type { FC } from '../../lib/teact/teact';
-import React, { memo, useEffect, useState } from '../../lib/teact/teact';
+import type { FC } from '@teact';
+import { memo, useEffect, useRef, useState } from '@teact';
 import { getActions, withGlobal } from '../../global';
 
-import type { ProfileTabType, ThreadId } from '../../types';
-import {
-  ManagementScreens, NewChatMembersProgress, ProfileState, RightColumnContent,
-} from '../../types';
+import type { AnimationLevel, ProfileTabType, ThreadId } from '../../types';
+import { ManagementScreens, NewChatMembersProgress, ProfileState, RightColumnContent } from '../../types';
 
 import { ANIMATION_END_DELAY, MIN_SCREEN_WIDTH_FOR_STATIC_RIGHT_COLUMN } from '../../config';
 import { getIsSavedDialog } from '../../global/helpers';
@@ -16,12 +14,15 @@ import {
   selectRightColumnContentKey,
   selectTabState,
 } from '../../global/selectors';
+import { selectSharedSettings } from '../../global/selectors/sharedState.ts';
 import captureEscKeyListener from '../../util/captureEscKeyListener';
+import { resolveTransitionName } from '../../util/resolveTransitionName.ts';
 
 import useCurrentOrPrev from '../../hooks/useCurrentOrPrev';
 import useHistoryBack from '../../hooks/useHistoryBack';
 import useLastCallback from '../../hooks/useLastCallback';
 import useLayoutEffectWithPrevDeps from '../../hooks/useLayoutEffectWithPrevDeps';
+import useScrollNotch from '../../hooks/useScrollNotch.ts';
 import useWindowSize from '../../hooks/window/useWindowSize';
 
 import Transition from '../ui/Transition';
@@ -50,8 +51,8 @@ type StateProps = {
   contentKey?: RightColumnContent;
   chatId?: string;
   threadId?: ThreadId;
-  isInsideTopic?: boolean;
   isChatSelected: boolean;
+  animationLevel: AnimationLevel;
   shouldSkipHistoryAnimations?: boolean;
   nextManagementScreen?: ManagementScreens;
   nextProfileTab?: ProfileTabType;
@@ -77,6 +78,7 @@ const RightColumn: FC<OwnProps & StateProps> = ({
   threadId,
   isMobile,
   isChatSelected,
+  animationLevel,
   shouldSkipHistoryAnimations,
   nextManagementScreen,
   nextProfileTab,
@@ -106,6 +108,8 @@ const RightColumn: FC<OwnProps & StateProps> = ({
     closeMonetizationStatistics,
   } = getActions();
 
+  const containerRef = useRef<HTMLDivElement>();
+
   const { width: windowWidth } = useWindowSize();
   const [profileState, setProfileState] = useState<ProfileState>(
     isSavedMessages && !isSavedDialog ? ProfileState.SavedDialogs : ProfileState.Profile,
@@ -134,6 +138,11 @@ const RightColumn: FC<OwnProps & StateProps> = ({
   const [shouldSkipTransition, setShouldSkipTransition] = useState(!isOpen);
 
   const renderingContentKey = useCurrentOrPrev(contentKey, true, !isChatSelected) ?? -1;
+
+  useScrollNotch({
+    containerRef,
+    selector: ':scope .custom-scroll, :scope .panel-content',
+  }, [contentKey, managementScreen, chatId, threadId]);
 
   const close = useLastCallback((shouldScrollUp = true) => {
     switch (contentKey) {
@@ -171,6 +180,9 @@ const RightColumn: FC<OwnProps & StateProps> = ({
             setManagementScreen(ManagementScreens.GroupPermissions);
             setSelectedChatMemberId(undefined);
             setIsPromotedByCurrentUser(undefined);
+            break;
+          case ManagementScreens.NewDiscussionGroup:
+            setManagementScreen(ManagementScreens.Discussion);
             break;
           case ManagementScreens.ChatAdminRights:
           case ManagementScreens.ChatNewAdminRights:
@@ -313,6 +325,7 @@ const RightColumn: FC<OwnProps & StateProps> = ({
             threadId={threadId}
             profileState={profileState}
             isMobile={isMobile}
+            isActive={isOpen && isActive}
             onProfileStateChange={setProfileState}
           />
         );
@@ -388,7 +401,8 @@ const RightColumn: FC<OwnProps & StateProps> = ({
           onScreenSelect={setManagementScreen}
         />
         <Transition
-          name={(shouldSkipTransition || shouldSkipHistoryAnimations) ? 'none' : 'zoomFade'}
+          ref={containerRef}
+          name={resolveTransitionName('layers', animationLevel, shouldSkipTransition || shouldSkipHistoryAnimations)}
           renderCount={MAIN_SCREENS_COUNT + MANAGEMENT_SCREENS_COUNT}
           activeKey={isManagement ? MAIN_SCREENS_COUNT + managementScreen : renderingContentKey}
           shouldCleanup
@@ -406,9 +420,11 @@ const RightColumn: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { isMobile }): StateProps => {
+  (global, { isMobile }): Complete<StateProps> => {
     const { chatId, threadId } = selectCurrentMessageList(global) || {};
+
     const areActiveChatsLoaded = selectAreActiveChatsLoaded(global);
+    const { animationLevel } = selectSharedSettings(global);
     const {
       management, shouldSkipHistoryAnimations, nextProfileTab, shouldCloseRightColumn,
     } = selectTabState(global);
@@ -422,6 +438,7 @@ export default memo(withGlobal<OwnProps>(
       chatId,
       threadId,
       isChatSelected: Boolean(chatId && areActiveChatsLoaded),
+      animationLevel,
       shouldSkipHistoryAnimations,
       nextManagementScreen,
       nextProfileTab,

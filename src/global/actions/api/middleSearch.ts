@@ -2,7 +2,7 @@ import type {
   ChatMediaSearchParams, ChatMediaSearchSegment, LoadingState, SharedMediaType, ThreadId,
 } from '../../../types';
 import type { ActionReturnType, GlobalState, TabArgs } from '../../types';
-import { type ApiChat, MAIN_THREAD_ID } from '../../../api/types';
+import { type ApiPeer, MAIN_THREAD_ID } from '../../../api/types';
 import { LoadMoreDirection } from '../../../types';
 
 import {
@@ -34,6 +34,7 @@ import {
   selectCurrentMessageList,
   selectCurrentMiddleSearch,
   selectCurrentSharedMediaSearch,
+  selectPeer,
 } from '../../selectors';
 
 const MEDIA_PRELOAD_OFFSET = 9;
@@ -49,9 +50,9 @@ addActionHandler('performMiddleSearch', async (global, actions, payload): Promis
   const isSavedDialog = getIsSavedDialog(chatId, threadId, currentUserId);
   const realChatId = isSavedDialog ? String(threadId) : chatId;
 
-  const chat = realChatId ? selectChat(global, realChatId) : undefined;
+  const peer = realChatId ? selectPeer(global, realChatId) : undefined;
   let currentSearch = selectCurrentMiddleSearch(global, tabId);
-  if (!chat) {
+  if (!peer) {
     return;
   }
 
@@ -65,10 +66,12 @@ addActionHandler('performMiddleSearch', async (global, actions, payload): Promis
   const {
     results, savedTag, type, isHashtag,
   } = currentSearch;
-  const offsetId = results?.nextOffsetId;
-  const offsetRate = results?.nextOffsetRate;
-  const offsetPeerId = results?.nextOffsetPeerId;
-  const offsetPeer = offsetPeerId ? selectChat(global, offsetPeerId) : undefined;
+  const shouldReuseParams = results?.query === query;
+
+  const offsetId = shouldReuseParams ? results?.nextOffsetId : undefined;
+  const offsetRate = shouldReuseParams ? results?.nextOffsetRate : undefined;
+  const offsetPeerId = shouldReuseParams ? results?.nextOffsetPeerId : undefined;
+  const offsetPeer = shouldReuseParams && offsetPeerId ? selectChat(global, offsetPeerId) : undefined;
 
   const shouldHaveQuery = isHashtag || !savedTag;
   if (shouldHaveQuery && !query) {
@@ -87,7 +90,7 @@ addActionHandler('performMiddleSearch', async (global, actions, payload): Promis
   let result;
   if (type === 'chat') {
     result = await callApi('searchMessagesInChat', {
-      chat,
+      peer,
       type: 'text',
       query: isHashtag ? `#${query}` : query,
       threadId,
@@ -110,7 +113,7 @@ addActionHandler('performMiddleSearch', async (global, actions, payload): Promis
   }
 
   if (type === 'channels') {
-    result = await callApi('searchHashtagPosts', {
+    result = await callApi('searchPublicPosts', {
       hashtag: query!,
       limit: MESSAGE_SEARCH_SLICE,
       offsetId,
@@ -133,12 +136,12 @@ addActionHandler('performMiddleSearch', async (global, actions, payload): Promis
 
   currentSearch = selectCurrentMiddleSearch(global, tabId);
   const hasTagChanged = currentSearch?.savedTag && !isSameReaction(savedTag, currentSearch.savedTag);
-  const hasSearchChanged = currentSearch?.fetchingQuery && currentSearch.fetchingQuery !== query;
+  const hasSearchChanged = currentSearch?.fetchingQuery !== query;
   if (!currentSearch || hasSearchChanged || hasTagChanged) {
     return;
   }
 
-  const resultChatId = isSavedDialog ? currentUserId : chat.id;
+  const resultChatId = isSavedDialog ? currentUserId : peer.id;
 
   global = addUserStatuses(global, userStatusesById);
   global = addMessages(global, messages);
@@ -187,10 +190,10 @@ addActionHandler('searchSharedMediaMessages', (global, actions, payload): Action
   const isSavedDialog = getIsSavedDialog(chatId, threadId, global.currentUserId);
   const realChatId = isSavedDialog ? String(threadId) : chatId;
 
-  const chat = selectChat(global, realChatId);
+  const peer = selectPeer(global, realChatId);
   const currentSearch = selectCurrentSharedMediaSearch(global, tabId);
 
-  if (!chat || !currentSearch) {
+  if (!peer || !currentSearch) {
     return;
   }
 
@@ -202,7 +205,7 @@ addActionHandler('searchSharedMediaMessages', (global, actions, payload): Action
     return;
   }
 
-  void searchSharedMedia(global, chat, threadId, type, offsetId, undefined, isSavedDialog, tabId);
+  void searchSharedMedia(global, peer, threadId, type, offsetId, undefined, isSavedDialog, tabId);
 });
 addActionHandler('searchChatMediaMessages', (global, actions, payload): ActionReturnType => {
   const {
@@ -228,6 +231,7 @@ addActionHandler('searchChatMediaMessages', (global, actions, payload): ActionRe
     if (!currentSearch) {
       return;
     }
+    global = getGlobal();
   }
 
   void searchChatMedia(global,
@@ -272,7 +276,7 @@ addActionHandler('searchMessagesByDate', async (global, actions, payload): Promi
 
 async function searchSharedMedia<T extends GlobalState>(
   global: T,
-  chat: ApiChat,
+  peer: ApiPeer,
   threadId: ThreadId,
   type: SharedMediaType,
   offsetId?: number,
@@ -280,10 +284,10 @@ async function searchSharedMedia<T extends GlobalState>(
   isSavedDialog?: boolean,
   ...[tabId = getCurrentTabId()]: TabArgs<T>
 ) {
-  const resultChatId = isSavedDialog ? global.currentUserId! : chat.id;
+  const resultChatId = isSavedDialog ? global.currentUserId! : peer.id;
 
   const result = await callApi('searchMessagesInChat', {
-    chat,
+    peer,
     type,
     limit: SHARED_MEDIA_SLICE * 2,
     threadId,
@@ -317,7 +321,7 @@ async function searchSharedMedia<T extends GlobalState>(
   setGlobal(global);
 
   if (!isBudgetPreload) {
-    void searchSharedMedia(global, chat, threadId, type, nextOffsetId, true, isSavedDialog, tabId);
+    void searchSharedMedia(global, peer, threadId, type, nextOffsetId, true, isSavedDialog, tabId);
   }
 }
 
@@ -356,7 +360,7 @@ function calcChatMediaSearchOffsetId(
   direction: LoadMoreDirection,
   currentMessageId: number,
   segment?: ChatMediaSearchSegment,
-) : number {
+): number {
   if (!segment) return currentMessageId;
   if (direction === LoadMoreDirection.Backwards) return segment.foundIds[0];
   if (direction === LoadMoreDirection.Forwards) return segment.foundIds[segment.foundIds.length - 1];
@@ -392,10 +396,10 @@ function calcLoadMoreDirection(currentMessageId: number, currentSegment?: ChatMe
 }
 
 function calcLoadingState(
-  direction : LoadMoreDirection,
-  limit : number, newFoundIdsCount : number,
+  direction: LoadMoreDirection,
+  limit: number, newFoundIdsCount: number,
   currentSegment?: ChatMediaSearchSegment,
-) : LoadingState {
+): LoadingState {
   let areAllItemsLoadedForwards = Boolean(currentSegment?.loadingState.areAllItemsLoadedForwards);
   let areAllItemsLoadedBackwards = Boolean(currentSegment?.loadingState.areAllItemsLoadedBackwards);
 
@@ -414,7 +418,7 @@ function calcLoadingState(
 
 async function searchChatMedia<T extends GlobalState>(
   global: T,
-  chat: ApiChat,
+  peer: ApiPeer,
   threadId: ThreadId,
   currentMediaMessageId: number,
   chatMediaSearchParams: ChatMediaSearchParams,
@@ -440,13 +444,13 @@ async function searchChatMedia<T extends GlobalState>(
   const offsetId = calcChatMediaSearchOffsetId(direction, currentMediaMessageId, currentSegment);
   const addOffset = calcChatMediaSearchAddOffset(direction, limit);
 
-  const resultChatId = isSavedDialog ? global.currentUserId! : chat.id;
+  const resultChatId = isSavedDialog ? global.currentUserId! : peer.id;
 
   global = setChatMediaSearchLoading(global, resultChatId, threadId, true, tabId);
   setGlobal(global);
 
   const result = await callApi('searchMessagesInChat', {
-    chat,
+    peer,
     type: 'media',
     limit,
     threadId,

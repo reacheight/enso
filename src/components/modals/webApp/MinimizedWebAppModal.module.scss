@@ -1,15 +1,17 @@
 .root {
-  height: 2.5rem;
-  font-size: 0.875rem;
-  font-weight: 500;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
 
-  border-radius: var(--border-radius-default);
-  background-color: transparent;
+  height: 2.5rem;
   padding: 0;
   padding-inline: 0.5rem;
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
+  border-radius: var(--border-radius-default);
+
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+
+  background-color: transparent;
 }
 
 .window-state-button,
@@ -37,9 +39,11 @@
 }
 
 .title {
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
-  margin-left: 0.5rem;
+
   margin-right: 0.5rem;
+  margin-left: 0.5rem;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

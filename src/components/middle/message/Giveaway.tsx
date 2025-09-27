@@ -1,4 +1,4 @@
-import React, {
+import {
   memo, useMemo, useRef, useState,
 } from '../../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../../global';
@@ -30,7 +30,7 @@ import useOldLang from '../../../hooks/useOldLang';
 
 import AnimatedIconFromSticker from '../../common/AnimatedIconFromSticker';
 import AnimatedIconWithPreview from '../../common/AnimatedIconWithPreview';
-import PickerSelectedItem from '../../common/pickers/PickerSelectedItem';
+import PeerChip from '../../common/PeerChip';
 import Button from '../../ui/Button';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import Separator from '../../ui/Separator';
@@ -160,10 +160,9 @@ const Giveaway = ({
           </p>
           <div className={styles.peers}>
             {channelIds.map((peerId) => (
-              <PickerSelectedItem
+              <PeerChip
                 peerId={peerId}
                 forceShowSelf
-                fluid
                 withPeerColors={!isOwn}
                 className={styles.peer}
                 clickArg={peerId}
@@ -203,10 +202,9 @@ const Giveaway = ({
           </strong>
           <div className={styles.peers}>
             {winnerIds.map((peerId) => (
-              <PickerSelectedItem
+              <PeerChip
                 peerId={peerId}
                 forceShowSelf
-                fluid
                 withPeerColors={!isOwn}
                 className={styles.peer}
                 clickArg={peerId}
@@ -341,7 +339,6 @@ const Giveaway = ({
       <Button
         className={styles.button}
         color="adaptive"
-        size="smaller"
         onClick={handleShowInfoClick}
       >
         {lang('BoostingHowItWork')}
@@ -360,10 +357,10 @@ const Giveaway = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { message }): StateProps => {
+  (global, { message }): Complete<StateProps> => {
     const { giveaway } = message.content;
     const chat = selectChat(global, message.chatId)!;
-    const sender = selectChat(global, giveaway?.channelIds[0]!)
+    const sender = (giveaway?.channelIds[0] ? selectChat(global, giveaway.channelIds[0]) : undefined)
       || selectForwardedSender(global, message) || chat;
 
     const sticker = giveaway && selectGiftStickerForDuration(global, giveaway.months);

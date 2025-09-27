@@ -1,5 +1,5 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo,
   useCallback, useEffect, useRef,
 } from '../../../lib/teact/teact';
@@ -16,6 +16,7 @@ import useHorizontalScroll from '../../../hooks/useHorizontalScroll';
 import useOldLang from '../../../hooks/useOldLang';
 
 import Avatar from '../../common/Avatar';
+import Icon from '../../common/icons/Icon';
 import Button from '../../ui/Button';
 import LeftSearchResultChat from './LeftSearchResultChat';
 
@@ -47,8 +48,7 @@ const RecentContacts: FC<OwnProps & StateProps> = ({
     addRecentlyFoundChatId, clearRecentlyFoundChats,
   } = getActions();
 
-  // eslint-disable-next-line no-null/no-null
-  const topUsersRef = useRef<HTMLDivElement>(null);
+  const topUsersRef = useRef<HTMLDivElement>();
 
   // Due to the parent Transition, this component never gets unmounted,
   // that's why we use throttled API call on every update.
@@ -113,12 +113,13 @@ const RecentContacts: FC<OwnProps & StateProps> = ({
               onClick={handleClearRecentlyFoundChats}
               isRtl={lang.isRtl}
             >
-              <i className="icon icon-close" />
+              <Icon name="close" />
             </Button>
           </h3>
           {recentlyFoundChatIds.map((id) => (
             <LeftSearchResultChat
               chatId={id}
+              withOpenAppButton
               onClick={handleClick}
             />
           ))}
@@ -129,7 +130,7 @@ const RecentContacts: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     const { userIds: topUserIds } = global.topPeers;
     const usersById = global.users.byId;
     const { recentlyFoundChatIds } = global;

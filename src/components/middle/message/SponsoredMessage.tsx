@@ -1,59 +1,58 @@
-import type { RefObject } from 'react';
-import type { FC } from '../../../lib/teact/teact';
-import React, {
+import type { ElementRef, FC } from '../../../lib/teact/teact';
+import type React from '../../../lib/teact/teact';
+import {
   memo, useEffect, useMemo, useRef,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiSponsoredMessage } from '../../../api/types';
-import type { ISettings } from '../../../types';
+import type { ThemeKey } from '../../../types';
 import { MediaViewerOrigin } from '../../../types';
 
 import {
   getIsDownloading,
   getMessageContent,
-  getMessageDownloadableMedia,
 } from '../../../global/helpers';
 import {
   selectActiveDownloads, selectCanAutoLoadMedia, selectCanAutoPlayMedia,
   selectSponsoredMessage,
   selectTheme,
 } from '../../../global/selectors';
+import { selectMessageDownloadableMedia } from '../../../global/selectors/media';
+import { IS_ANDROID } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
-import { IS_ANDROID } from '../../../util/windowEnvironment';
 import { renderTextWithEntities } from '../../common/helpers/renderTextWithEntities';
 import { preventMessageInputBlur } from '../helpers/preventMessageInputBlur';
 import { calculateMediaDimensions, getMinMediaWidth, MIN_MEDIA_WIDTH_WITH_TEXT } from './helpers/mediaDimensions';
 
 import useAppLayout from '../../../hooks/useAppLayout';
 import useContextMenuHandlers from '../../../hooks/useContextMenuHandlers';
-import useFlag from '../../../hooks/useFlag';
 import { type ObserveFn, useIntersectionObserver } from '../../../hooks/useIntersectionObserver';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
 
-import AboutAdsModal from '../../common/AboutAdsModal.async';
 import Avatar from '../../common/Avatar';
+import BadgeButton from '../../common/BadgeButton';
 import Icon from '../../common/icons/Icon';
 import PeerColorWrapper from '../../common/PeerColorWrapper';
 import Button from '../../ui/Button';
 import MessageAppendix from './MessageAppendix';
 import Photo from './Photo';
-import SponsoredMessageContextMenuContainer from './SponsoredMessageContextMenuContainer.async';
+import SponsoredContextMenuContainer from './SponsoredContextMenuContainer.async';
 import Video from './Video';
 
 import './SponsoredMessage.scss';
 
 type OwnProps = {
   chatId: string;
-  containerRef: RefObject<HTMLDivElement>;
+  containerRef: ElementRef<HTMLDivElement>;
   observeIntersectionForLoading: ObserveFn;
   observeIntersectionForPlaying: ObserveFn;
 };
 
 type StateProps = {
   message?: ApiSponsoredMessage;
-  theme: ISettings['theme'];
+  theme: ThemeKey;
   isDownloading?: boolean;
   canAutoLoadMedia?: boolean;
   canAutoPlayMedia?: boolean;
@@ -73,19 +72,17 @@ const SponsoredMessage: FC<OwnProps & StateProps> = ({
   canAutoPlayMedia,
 }) => {
   const {
-    viewSponsoredMessage,
+    viewSponsored,
     openUrl,
-    hideSponsoredMessages,
-    clickSponsoredMessage,
-    reportSponsoredMessage,
+    hideSponsored,
+    clickSponsored,
     openMediaViewer,
+    openAboutAdsModal,
   } = getActions();
 
   const lang = useOldLang();
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const contentRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>();
+  const ref = useRef<HTMLDivElement>();
   const shouldObserve = Boolean(message);
 
   const { isMobile } = useAppLayout();
@@ -101,27 +98,22 @@ const SponsoredMessage: FC<OwnProps & StateProps> = ({
     handleBeforeContextMenu, handleContextMenu,
     handleContextMenuClose, handleContextMenuHide,
   } = useContextMenuHandlers(ref, undefined, true, IS_ANDROID);
-  const [isAboutAdsModalOpen, openAboutAdsModal, closeAboutAdsModal] = useFlag(false);
 
   useEffect(() => {
     return shouldObserve ? observeIntersection(contentRef.current!, (target) => {
-      if (target.isIntersecting) {
-        viewSponsoredMessage({ chatId });
+      if (target.isIntersecting && message?.randomId) {
+        viewSponsored({ randomId: message.randomId });
       }
     }) : undefined;
-  }, [chatId, shouldObserve, observeIntersection, viewSponsoredMessage]);
+  }, [message?.randomId, shouldObserve, observeIntersection, viewSponsored]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     preventMessageInputBlur(e);
     handleBeforeContextMenu(e);
   };
 
-  const handleReportSponsoredMessage = useLastCallback(() => {
-    reportSponsoredMessage({ chatId, randomId: message!.randomId });
-  });
-
   const handleHideSponsoredMessage = useLastCallback(() => {
-    hideSponsoredMessages();
+    hideSponsored();
   });
 
   const {
@@ -134,16 +126,27 @@ const SponsoredMessage: FC<OwnProps & StateProps> = ({
   const handleClick = useLastCallback(() => {
     if (!message) return;
 
-    clickSponsoredMessage({ isMedia: photo || isGif ? true : undefined, chatId });
-    openUrl({ url: message!.url, shouldSkipModal: true });
+    clickSponsored({ randomId: message.randomId, isMedia: photo || isGif ? true : undefined });
+    openUrl({ url: message.url, shouldSkipModal: true });
   });
 
   const handleOpenMedia = useLastCallback(() => {
-    clickSponsoredMessage({ isMedia: true, chatId });
+    if (!message) return;
+    clickSponsored({ randomId: message.randomId, isMedia: true });
     openMediaViewer({
       origin: MediaViewerOrigin.SponsoredMessage,
       chatId,
       isSponsoredMessage: true,
+    });
+  });
+
+  const handleOpenAboutAdsModal = useLastCallback(() => {
+    if (!message) return;
+    openAboutAdsModal({
+      randomId: message.randomId,
+      canReport: message.canReport,
+      additionalInfo: message.additionalInfo,
+      sponsorInfo: message.sponsorInfo,
     });
   });
 
@@ -262,13 +265,13 @@ const SponsoredMessage: FC<OwnProps & StateProps> = ({
   return (
     <div
       ref={ref}
-      style={style}
       key="sponsored-message"
       className="SponsoredMessage Message open sponsored-media-preview"
     >
       <div
         className="message-content media has-shadow has-solid-background has-appendix"
         dir="auto"
+        style={style}
         onMouseDown={handleMouseDown}
         onContextMenu={handleContextMenu}
       >
@@ -282,8 +285,10 @@ const SponsoredMessage: FC<OwnProps & StateProps> = ({
             />
           )}
           <span className={buildClassName('message-title message-type', hasMedia && 'has-media')}>
-            {message!.isRecommended ? lang('Message.RecommendedLabel') : lang('SponsoredMessage')}
-            <span onClick={openAboutAdsModal} className="ad-about">{lang('SponsoredMessageAdWhatIsThis')}</span>
+            {message.isRecommended ? lang('Message.RecommendedLabel') : lang('SponsoredMessage')}
+            <BadgeButton onClick={handleOpenAboutAdsModal} className="ad-about">
+              {lang('SponsoredMessageAdWhatIsThis')}
+            </BadgeButton>
           </span>
           {renderContent()}
         </PeerColorWrapper>
@@ -297,7 +302,7 @@ const SponsoredMessage: FC<OwnProps & StateProps> = ({
             ariaLabel={lang('Close')}
             onClick={handleHideSponsoredMessage}
           >
-            <Icon name="close" />
+            <Icon name="close" className="sponsored-action-icon" />
           </Button>
           {message.canReport && (
             <Button
@@ -309,37 +314,34 @@ const SponsoredMessage: FC<OwnProps & StateProps> = ({
               onClick={handleContextMenu}
               onContextMenu={handleContextMenu}
             >
-              <Icon name="more" />
+              <Icon name="more" className="sponsored-action-icon" />
             </Button>
           )}
         </div>
       </div>
       {contextMenuAnchor && (
-        <SponsoredMessageContextMenuContainer
+        <SponsoredContextMenuContainer
           isOpen={isContextMenuOpen}
           anchor={contextMenuAnchor}
-          message={message!}
-          onAboutAdsClick={openAboutAdsModal}
-          onReportAd={handleReportSponsoredMessage}
+          triggerRef={ref}
+          randomId={message.randomId}
+          canReport={message.canReport}
+          sponsorInfo={message.sponsorInfo}
+          additionalInfo={message.additionalInfo}
           onClose={handleContextMenuClose}
           onCloseAnimationEnd={handleContextMenuHide}
         />
       )}
-      <AboutAdsModal
-        isOpen={isAboutAdsModalOpen}
-        isMonetizationSharing={message.canReport}
-        onClose={closeAboutAdsModal}
-      />
     </div>
   );
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { chatId }): StateProps => {
+  (global, { chatId }): Complete<StateProps> => {
     const message = selectSponsoredMessage(global, chatId);
 
     const activeDownloads = selectActiveDownloads(global);
-    const downloadableMedia = message ? getMessageDownloadableMedia(message) : undefined;
+    const downloadableMedia = message ? selectMessageDownloadableMedia(global, message) : undefined;
     const isDownloading = downloadableMedia && getIsDownloading(activeDownloads, downloadableMedia);
 
     return {

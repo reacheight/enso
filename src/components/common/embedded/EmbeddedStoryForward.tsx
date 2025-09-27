@@ -1,5 +1,5 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useEffect, useRef } from '../../../lib/teact/teact';
+import { memo, useEffect, useRef } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type {
@@ -9,12 +9,10 @@ import type {
 } from '../../../api/types';
 import type { IconName } from '../../../types/icons';
 
-import {
-  getSenderTitle,
-  isUserId,
-} from '../../../global/helpers';
+import { getPeerTitle } from '../../../global/helpers/peers';
 import { selectPeer, selectPeerStory } from '../../../global/selectors';
 import buildClassName from '../../../util/buildClassName';
+import { isUserId } from '../../../util/entities/ids';
 import { getPeerColorClass } from '../helpers/peerColor';
 import renderText from '../helpers/renderText';
 import { renderTextWithEntities } from '../helpers/renderTextWithEntities';
@@ -24,6 +22,7 @@ import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
 
 import Icon from '../icons/Icon';
+import PeerColorWrapper from '../PeerColorWrapper';
 import EmojiIconBackground from './EmojiIconBackground';
 
 import './EmbeddedMessage.scss';
@@ -45,8 +44,7 @@ const EmbeddedStoryForward: FC<OwnProps & StateProps> = ({
   story,
 }) => {
   const { openStoryViewer, loadPeerStoriesByIds, openChat } = getActions();
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>();
 
   const lang = useOldLang();
 
@@ -59,7 +57,7 @@ const EmbeddedStoryForward: FC<OwnProps & StateProps> = ({
     }
   }, [forwardInfo, story]);
 
-  const senderTitle = sender ? getSenderTitle(lang, sender) : forwardInfo.fromName;
+  const senderTitle = sender ? getPeerTitle(lang, sender) : forwardInfo.fromName;
 
   const openOriginalStory = useLastCallback(() => {
     const { fromPeerId, storyId } = forwardInfo;
@@ -108,7 +106,7 @@ const EmbeddedStoryForward: FC<OwnProps & StateProps> = ({
   }
 
   return (
-    <div
+    <PeerColorWrapper
       ref={ref}
       className={buildClassName(
         'EmbeddedMessage',
@@ -131,12 +129,12 @@ const EmbeddedStoryForward: FC<OwnProps & StateProps> = ({
           {renderSender()}
         </div>
       </div>
-    </div>
+    </PeerColorWrapper>
   );
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { forwardInfo }): StateProps => {
+  (global, { forwardInfo }): Complete<StateProps> => {
     const sender = forwardInfo.fromPeerId ? selectPeer(global, forwardInfo.fromPeerId) : undefined;
     const story = forwardInfo.storyId && forwardInfo.fromPeerId
       ? selectPeerStory(global, forwardInfo.fromPeerId, forwardInfo.storyId) : undefined;

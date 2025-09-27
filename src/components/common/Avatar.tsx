@@ -1,6 +1,7 @@
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import type { FC, TeactNode } from '../../lib/teact/teact';
-import React, { memo, useMemo, useRef } from '../../lib/teact/teact';
+import type React from '../../lib/teact/teact';
+import { memo, useMemo, useRef } from '../../lib/teact/teact';
 import { getActions } from '../../global';
 
 import type {
@@ -21,13 +22,13 @@ import {
   isAnonymousForwardsChat,
   isChatWithRepliesBot,
   isDeletedUser,
-  isPeerChat,
-  isPeerUser,
-  isUserId,
 } from '../../global/helpers';
+import { isApiPeerChat, isApiPeerUser } from '../../global/helpers/peers';
 import buildClassName, { createClassNameBuilder } from '../../util/buildClassName';
 import buildStyle from '../../util/buildStyle';
+import { isUserId } from '../../util/entities/ids';
 import { getFirstLetters } from '../../util/textFormat';
+import { REM } from './helpers/mediaDimensions';
 import { getPeerColorClass } from './helpers/peerColor';
 import renderText from './helpers/renderText';
 
@@ -45,8 +46,19 @@ import './Avatar.scss';
 
 const LOOP_COUNT = 3;
 
+export const AVATAR_SIZES = {
+  micro: REM,
+  mini: 1.5 * REM,
+  tiny: 2 * REM,
+  small: 2.125 * REM,
+  medium: 2.75 * REM,
+  large: 3.375 * REM,
+  giant: 5.625 * REM,
+  jumbo: 7.5 * REM,
+};
+
 export type AvatarSize =
-  'micro' | 'tiny' | 'mini' | 'small' | 'small-mobile' | 'medium' | 'large' | 'giant' | 'huge' | 'jumbo';
+  'micro' | 'mini' | 'tiny' | 'small' | 'medium' | 'large' | 'giant' | 'jumbo' | number;
 
 const cn = createClassNameBuilder('Avatar');
 cn.media = cn('media');
@@ -58,6 +70,7 @@ type OwnProps = {
   peer?: ApiPeer | CustomPeer;
   photo?: ApiPhoto;
   webPhoto?: ApiWebDocument;
+  previewUrl?: string;
   text?: string;
   isSavedMessages?: boolean;
   isSavedDialog?: boolean;
@@ -72,8 +85,11 @@ type OwnProps = {
   storyViewerMode?: 'full' | 'single-peer' | 'disabled';
   loopIndefinitely?: boolean;
   noPersonalPhoto?: boolean;
+  asMessageBubble?: boolean;
   observeIntersection?: ObserveFn;
   onClick?: (e: ReactMouseEvent<HTMLDivElement, MouseEvent>, hasMedia: boolean) => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  onMouseMove?: (e: React.MouseEvent) => void;
 };
 
 const Avatar: FC<OwnProps> = ({
@@ -82,6 +98,7 @@ const Avatar: FC<OwnProps> = ({
   peer,
   photo,
   webPhoto,
+  previewUrl,
   text,
   isSavedMessages,
   isSavedDialog,
@@ -96,17 +113,19 @@ const Avatar: FC<OwnProps> = ({
   storyViewerMode = 'single-peer',
   loopIndefinitely,
   noPersonalPhoto,
+  asMessageBubble,
   onClick,
+  onContextMenu,
+  onMouseMove,
 }) => {
   const { openStoryViewer } = getActions();
 
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>();
   const videoLoopCountRef = useRef(0);
   const isCustomPeer = peer && 'isCustomPeer' in peer;
   const realPeer = peer && !isCustomPeer ? peer : undefined;
-  const user = realPeer && isPeerUser(realPeer) ? realPeer : undefined;
-  const chat = realPeer && isPeerChat(realPeer) ? realPeer : undefined;
+  const user = realPeer && isApiPeerUser(realPeer) ? realPeer : undefined;
+  const chat = realPeer && isApiPeerChat(realPeer) ? realPeer : undefined;
   const isDeleted = user && isDeletedUser(user);
   const isReplies = realPeer && isChatWithRepliesBot(realPeer.id);
   const isAnonymousForwards = realPeer && isAnonymousForwardsChat(realPeer.id);
@@ -114,12 +133,14 @@ const Avatar: FC<OwnProps> = ({
   let imageHash: string | undefined;
   let videoHash: string | undefined;
 
+  const pxSize = typeof size === 'number' ? size : AVATAR_SIZES[size];
+
   const shouldLoadVideo = withVideo && photo?.isVideo;
 
-  const shouldFetchBig = size === 'jumbo';
+  const isBig = pxSize >= AVATAR_SIZES.jumbo;
   if (!isSavedMessages && !isDeleted) {
     if ((user && !noPersonalPhoto) || chat) {
-      imageHash = getChatAvatarHash(peer as ApiPeer, shouldFetchBig ? 'big' : undefined);
+      imageHash = getChatAvatarHash(peer as ApiPeer, isBig ? 'big' : undefined);
     } else if (photo) {
       imageHash = `photo${photo.id}?size=m`;
       if (photo.isVideo && withVideo) {
@@ -156,7 +177,8 @@ const Avatar: FC<OwnProps> = ({
 
   const imgBlobUrl = useMedia(imageHash, false, ApiMediaFormat.BlobUrl);
   const videoBlobUrl = useMedia(videoHash, !shouldLoadVideo, ApiMediaFormat.BlobUrl);
-  const hasBlobUrl = Boolean(imgBlobUrl || videoBlobUrl);
+  const imgUrl = imgBlobUrl || previewUrl;
+  const hasBlobUrl = Boolean(imgUrl || videoBlobUrl);
   // `videoBlobUrl` can be taken from memory cache, so we need to check `shouldLoadVideo` again
   const shouldPlayVideo = Boolean(videoBlobUrl && shouldLoadVideo);
 
@@ -192,7 +214,7 @@ const Avatar: FC<OwnProps> = ({
     content = (
       <>
         <img
-          src={imgBlobUrl}
+          src={imgUrl}
           className={buildClassName(cn.media, 'avatar-media', transitionClassNames, videoBlobUrl && 'poster')}
           alt={author}
           decoding="async"
@@ -220,17 +242,20 @@ const Avatar: FC<OwnProps> = ({
   } else if (chat) {
     const title = getChatTitle(lang, chat);
     content = title && getFirstLetters(title, isUserId(chat.id) ? 2 : 1);
+  } else if (isCustomPeer) {
+    const title = peer.title || lang(peer.titleKey!);
+    content = title && getFirstLetters(title, 1);
   } else if (text) {
     content = getFirstLetters(text, 2);
   }
 
   const isRoundedRect = (isCustomPeer && peer.isAvatarSquare)
-  || (isForum && !((withStory || withStorySolid) && realPeer?.hasStories));
+    || (isForum && !((withStory || withStorySolid) && realPeer?.hasStories));
   const isPremiumGradient = isCustomPeer && peer.withPremiumGradient;
   const customColor = isCustomPeer && peer.customPeerAvatarColor;
 
   const fullClassName = buildClassName(
-    `Avatar size-${size}`,
+    'Avatar',
     className,
     getPeerColorClass(peer),
     !peer && text && 'hidden-user',
@@ -240,16 +265,17 @@ const Avatar: FC<OwnProps> = ({
     isReplies && 'replies-bot-account',
     isPremiumGradient && 'premium-gradient-bg',
     isRoundedRect && 'forum',
+    asMessageBubble && 'message-bubble',
     (photo || webPhoto) && 'force-fit',
     ((withStory && realPeer?.hasStories) || forPremiumPromo) && 'with-story-circle',
     withStorySolid && realPeer?.hasStories && 'with-story-solid',
     withStorySolid && forceFriendStorySolid && 'close-friend',
     withStorySolid && (realPeer?.hasUnreadStories || forceUnreadStorySolid) && 'has-unread-story',
     onClick && 'interactive',
-    (!isSavedMessages && !imgBlobUrl) && 'no-photo',
+    (!isSavedMessages && !imgUrl) && 'no-photo',
   );
 
-  const hasMedia = Boolean(isSavedMessages || imgBlobUrl);
+  const hasMedia = Boolean(isSavedMessages || imgUrl);
 
   const { handleClick, handleMouseDown } = useFastClick((e: ReactMouseEvent<HTMLDivElement, MouseEvent>) => {
     if (withStory && storyViewerMode !== 'disabled' && realPeer?.hasStories) {
@@ -276,15 +302,17 @@ const Avatar: FC<OwnProps> = ({
       data-peer-id={realPeer?.id}
       data-test-sender-id={IS_TEST ? realPeer?.id : undefined}
       aria-label={typeof content === 'string' ? author : undefined}
-      style={buildStyle(customColor && `--color-user: ${customColor}`)}
+      style={buildStyle(`--_size: ${pxSize}px;`, customColor && `--color-user: ${customColor}`)}
       onClick={handleClick}
+      onContextMenu={onContextMenu}
       onMouseDown={handleMouseDown}
+      onMouseMove={onMouseMove}
     >
       <div className="inner">
-        {typeof content === 'string' ? renderText(content, [size === 'jumbo' ? 'hq_emoji' : 'emoji']) : content}
+        {typeof content === 'string' ? renderText(content, [isBig ? 'hq_emoji' : 'emoji']) : content}
       </div>
       {withStory && realPeer?.hasStories && (
-        <AvatarStoryCircle peerId={realPeer.id} size={size} withExtraGap={withStoryGap} />
+        <AvatarStoryCircle peerId={realPeer.id} size={pxSize} withExtraGap={withStoryGap} />
       )}
     </div>
   );

@@ -1,12 +1,12 @@
-import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo, useEffect,
   useMemo,
 } from '../../../lib/teact/teact';
+import { getActions } from '../../../global';
 
 import type { ApiAttachMenuPeerType, ApiMessage } from '../../../api/types';
 import type { GlobalState } from '../../../global/types';
-import type { ISettings, ThreadId } from '../../../types';
+import type { MessageListType, ThemeKey, ThreadId } from '../../../types';
 
 import {
   CONTENT_TYPES_WITH_PREVIEW, DEBUG_LOG_FILENAME, SUPPORTED_AUDIO_CONTENT_TYPES,
@@ -17,15 +17,15 @@ import {
   getMessageAudio, getMessageDocument,
   getMessagePhoto,
   getMessageVideo, getMessageVoice,
-  getMessageWebPagePhoto,
-  getMessageWebPageVideo,
 } from '../../../global/helpers';
+import { IS_TOUCH_ENV } from '../../../util/browser/windowEnvironment';
+import buildClassName from '../../../util/buildClassName';
 import { getDebugLogs } from '../../../util/debugConsole';
 import { validateFiles } from '../../../util/files';
 import { openSystemFilesDialog } from '../../../util/systemFilesDialog';
-import { IS_TOUCH_ENV } from '../../../util/windowEnvironment';
 
 import useFlag from '../../../hooks/useFlag';
+import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useMouseInside from '../../../hooks/useMouseInside';
 import useOldLang from '../../../hooks/useOldLang';
@@ -44,6 +44,7 @@ export type OwnProps = {
   isButtonVisible: boolean;
   canAttachMedia: boolean;
   canAttachPolls: boolean;
+  canAttachToDoLists: boolean;
   canSendPhotos: boolean;
   canSendVideos: boolean;
   canSendDocuments: boolean;
@@ -52,21 +53,25 @@ export type OwnProps = {
   attachBots?: GlobalState['attachMenu']['bots'];
   peerType?: ApiAttachMenuPeerType;
   shouldCollectDebugLogs?: boolean;
-  theme: ISettings['theme'];
-  onFileSelect: (files: File[], shouldSuggestCompression?: boolean) => void;
+  theme: ThemeKey;
+  canEditMedia?: boolean;
+  editingMessage?: ApiMessage;
+  messageListType?: MessageListType;
+  paidMessagesStars?: number;
+  onFileSelect: (files: File[]) => void;
   onPollCreate: NoneToVoidFunction;
+  onTodoListCreate: NoneToVoidFunction;
   onMenuOpen: NoneToVoidFunction;
   onMenuClose: NoneToVoidFunction;
-  hasReplaceableMedia?: boolean;
-  editingMessage?: ApiMessage;
 };
 
-const AttachMenu: FC<OwnProps> = ({
+const AttachMenu = ({
   chatId,
   threadId,
   isButtonVisible,
   canAttachMedia,
   canAttachPolls,
+  canAttachToDoLists,
   canSendPhotos,
   canSendVideos,
   canSendDocuments,
@@ -76,13 +81,19 @@ const AttachMenu: FC<OwnProps> = ({
   isScheduled,
   theme,
   shouldCollectDebugLogs,
+  canEditMedia,
+  editingMessage,
+  messageListType,
+  paidMessagesStars,
   onFileSelect,
   onMenuOpen,
   onMenuClose,
   onPollCreate,
-  hasReplaceableMedia,
-  editingMessage,
-}) => {
+  onTodoListCreate,
+}: OwnProps) => {
+  const {
+    updateAttachmentSettings,
+  } = getActions();
   const [isAttachMenuOpen, openAttachMenu, closeAttachMenu] = useFlag();
   const [handleMouseEnter, handleMouseLeave, markMouseInside] = useMouseInside(isAttachMenuOpen, closeAttachMenu);
 
@@ -93,8 +104,8 @@ const AttachMenu: FC<OwnProps> = ({
   const isMenuOpen = isAttachMenuOpen || isAttachmentBotMenuOpen;
 
   const isPhotoOrVideo = editingMessage && editingMessage?.groupedId
-    && Boolean(getMessagePhoto(editingMessage) || getMessageWebPagePhoto(editingMessage)
-      || Boolean(getMessageVideo(editingMessage) || getMessageWebPageVideo(editingMessage)));
+    && Boolean(getMessagePhoto(editingMessage)
+      || Boolean(getMessageVideo(editingMessage)));
   const isFile = editingMessage && editingMessage?.groupedId && Boolean(getMessageAudio(editingMessage)
     || getMessageVoice(editingMessage) || getMessageDocument(editingMessage));
 
@@ -120,29 +131,31 @@ const AttachMenu: FC<OwnProps> = ({
     }
   });
 
-  const handleFileSelect = useLastCallback((e: Event, shouldSuggestCompression?: boolean) => {
+  const handleFileSelect = useLastCallback((e: Event) => {
     const { files } = e.target as HTMLInputElement;
     const validatedFiles = validateFiles(files);
 
     if (validatedFiles?.length) {
-      onFileSelect(validatedFiles, shouldSuggestCompression);
+      onFileSelect(validatedFiles);
     }
   });
 
   const handleQuickSelect = useLastCallback(() => {
+    updateAttachmentSettings({ shouldCompress: true });
     openSystemFilesDialog(
       Array.from(canSendVideoAndPhoto ? CONTENT_TYPES_WITH_PREVIEW : (
         canSendPhotos ? SUPPORTED_PHOTO_CONTENT_TYPES : SUPPORTED_VIDEO_CONTENT_TYPES
       )).join(','),
-      (e) => handleFileSelect(e, true),
+      (e) => handleFileSelect(e),
     );
   });
 
   const handleDocumentSelect = useLastCallback(() => {
+    updateAttachmentSettings({ shouldCompress: false });
     openSystemFilesDialog(!canSendDocuments && canSendAudios
       ? Array.from(SUPPORTED_AUDIO_CONTENT_TYPES).join(',') : (
         '*'
-      ), (e) => handleFileSelect(e, false));
+      ), (e) => handleFileSelect(e));
   });
 
   const handleSendLogs = useLastCallback(() => {
@@ -154,7 +167,8 @@ const AttachMenu: FC<OwnProps> = ({
     return attachBots
       ? Object.values(attachBots).filter((bot) => {
         if (!peerType || !bot.isForAttachMenu) return false;
-        if (peerType === 'bots' && bot.id === chatId && bot.attachMenuPeerTypes.includes('self')) {
+        if (peerType === 'bots' && bot.id === chatId
+          && bot.attachMenuPeerTypes && bot.attachMenuPeerTypes.includes('self')) {
           return true;
         }
         return bot.attachMenuPeerTypes!.includes(peerType);
@@ -162,7 +176,8 @@ const AttachMenu: FC<OwnProps> = ({
       : undefined;
   }, [attachBots, chatId, peerType]);
 
-  const lang = useOldLang();
+  const oldLang = useOldLang();
+  const lang = useLang();
 
   if (!isButtonVisible) {
     return undefined;
@@ -171,10 +186,10 @@ const AttachMenu: FC<OwnProps> = ({
   return (
     <div className="AttachMenu">
       {
-        editingMessage && hasReplaceableMedia ? (
+        editingMessage && canEditMedia ? (
           <ResponsiveHoverButton
             id="replace-menu-button"
-            className={isAttachMenuOpen ? 'AttachMenu--button activated' : 'AttachMenu--button'}
+            className={buildClassName('AttachMenu--button composer-action-button', isAttachMenuOpen && 'activated')}
             round
             color="translucent"
             onActivate={handleToggleAttachMenu}
@@ -188,7 +203,7 @@ const AttachMenu: FC<OwnProps> = ({
           <ResponsiveHoverButton
             id="attach-menu-button"
             disabled={Boolean(editingMessage)}
-            className={isAttachMenuOpen ? 'AttachMenu--button activated' : 'AttachMenu--button'}
+            className={buildClassName('AttachMenu--button composer-action-button', isAttachMenuOpen && 'activated')}
             round
             color="translucent"
             onActivate={handleToggleAttachMenu}
@@ -219,34 +234,41 @@ const AttachMenu: FC<OwnProps> = ({
        ** transferring to the fragment content in the second clause
        */}
         {!canAttachMedia && (
-          <MenuItem className="media-disabled" disabled>Posting media content is not allowed in this group.</MenuItem>
+          <MenuItem className="media-disabled" disabled>
+            {lang(messageListType === 'scheduled' && paidMessagesStars
+              ? 'DescriptionScheduledPaidMediaNotAllowed'
+              : 'DescriptionRestrictedMedia')}
+          </MenuItem>
         )}
         {canAttachMedia && (
           <>
             {canSendVideoOrPhoto && !isFile && (
               <MenuItem icon="photo" onClick={handleQuickSelect}>
-                {lang(canSendVideoAndPhoto ? 'AttachmentMenu.PhotoOrVideo'
+                {oldLang(canSendVideoAndPhoto ? 'AttachmentMenu.PhotoOrVideo'
                   : (canSendPhotos ? 'InputAttach.Popover.Photo' : 'InputAttach.Popover.Video'))}
               </MenuItem>
             )}
             {((canSendDocuments || canSendAudios) && !isPhotoOrVideo)
               && (
                 <MenuItem icon="document" onClick={handleDocumentSelect}>
-                  {lang(!canSendDocuments && canSendAudios ? 'InputAttach.Popover.Music' : 'AttachDocument')}
+                  {oldLang(!canSendDocuments && canSendAudios ? 'InputAttach.Popover.Music' : 'AttachDocument')}
                 </MenuItem>
               )}
             {canSendDocuments && shouldCollectDebugLogs && (
               <MenuItem icon="bug" onClick={handleSendLogs}>
-                {lang('DebugSendLogs')}
+                {oldLang('DebugSendLogs')}
               </MenuItem>
             )}
           </>
         )}
         {canAttachPolls && !editingMessage && (
-          <MenuItem icon="poll" onClick={onPollCreate}>{lang('Poll')}</MenuItem>
+          <MenuItem icon="poll" onClick={onPollCreate}>{oldLang('Poll')}</MenuItem>
+        )}
+        {canAttachToDoLists && !editingMessage && (
+          <MenuItem icon="select" onClick={onTodoListCreate}>{lang('TitleToDoList')}</MenuItem>
         )}
 
-        {!editingMessage && !hasReplaceableMedia && !isScheduled && bots?.map((bot) => (
+        {!editingMessage && !canEditMedia && !isScheduled && bots?.map((bot) => (
           <AttachBotItem
             bot={bot}
             chatId={chatId}

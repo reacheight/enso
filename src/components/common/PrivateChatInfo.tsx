@@ -1,5 +1,6 @@
 import type { FC } from '../../lib/teact/teact';
-import React, { memo, useEffect, useMemo } from '../../lib/teact/teact';
+import type React from '../../lib/teact/teact';
+import { memo, useEffect, useMemo } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
 import type {
@@ -10,12 +11,13 @@ import type { IconName } from '../../types/icons';
 import { MediaViewerOrigin } from '../../types';
 
 import {
-  getMainUsername, getUserStatus, isUserOnline,
+  getMainUsername, getUserStatus, isSystemBot, isUserOnline,
 } from '../../global/helpers';
 import { selectChatMessages, selectUser, selectUserStatus } from '../../global/selectors';
 import buildClassName from '../../util/buildClassName';
 import renderText from './helpers/renderText';
 
+import useIntervalForceUpdate from '../../hooks/schedulers/useIntervalForceUpdate';
 import useLastCallback from '../../hooks/useLastCallback';
 import useOldLang from '../../hooks/useOldLang';
 
@@ -66,6 +68,8 @@ type StateProps =
     isSynced?: boolean;
   };
 
+const UPDATE_INTERVAL = 1000 * 60; // 1 min
+
 const PrivateChatInfo: FC<OwnProps & StateProps> = ({
   customPeer,
   typingStatus,
@@ -109,12 +113,16 @@ const PrivateChatInfo: FC<OwnProps & StateProps> = ({
 
   const { id: userId } = user || {};
 
+  const hasAvatarMediaViewer = withMediaViewer && !isSavedMessages;
+
   useEffect(() => {
     if (userId) {
       if (withFullInfo && isSynced) loadFullUser({ userId });
       if (withMediaViewer) loadMoreProfilePhotos({ peerId: userId, isPreload: true });
     }
   }, [userId, withFullInfo, withMediaViewer, isSynced]);
+
+  useIntervalForceUpdate(UPDATE_INTERVAL);
 
   const handleAvatarViewerOpen = useLastCallback(
     (e: React.MouseEvent<HTMLDivElement, MouseEvent>, hasMedia: boolean) => {
@@ -168,6 +176,10 @@ const PrivateChatInfo: FC<OwnProps & StateProps> = ({
 
     if (typingStatus) {
       return <TypingStatus typingStatus={typingStatus} />;
+    }
+
+    if (isSystemBot(user.id)) {
+      return undefined;
     }
 
     const translatedStatus = getUserStatus(lang, user, userStatus);
@@ -237,7 +249,7 @@ const PrivateChatInfo: FC<OwnProps & StateProps> = ({
         withStory={withStory}
         storyViewerOrigin={storyViewerOrigin}
         storyViewerMode="single-peer"
-        onClick={withMediaViewer ? handleAvatarViewerOpen : undefined}
+        onClick={hasAvatarMediaViewer ? handleAvatarViewerOpen : undefined}
       />
       <div className="info">
         {renderNameTitle()}
@@ -250,7 +262,7 @@ const PrivateChatInfo: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { userId, forceShowSelf }): StateProps => {
+  (global, { userId, forceShowSelf }): Complete<StateProps> => {
     const { isSynced } = global;
     const user = userId ? selectUser(global, userId) : undefined;
     const userStatus = userId ? selectUserStatus(global, userId) : undefined;

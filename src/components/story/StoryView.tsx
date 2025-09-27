@@ -1,4 +1,4 @@
-import React, { memo, useMemo } from '../../lib/teact/teact';
+import { memo, useMemo } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
 import type {
@@ -6,10 +6,11 @@ import type {
 } from '../../api/types';
 import type { IconName } from '../../types/icons';
 
-import { getUserFullName, isUserId } from '../../global/helpers';
+import { getUserFullName } from '../../global/helpers';
 import { selectPeer } from '../../global/selectors';
 import buildClassName from '../../util/buildClassName';
 import { formatDateAtTime } from '../../util/dates/dateFormat';
+import { isUserId } from '../../util/entities/ids';
 import { REM } from '../common/helpers/mediaDimensions';
 
 import useLastCallback from '../../hooks/useLastCallback';
@@ -17,7 +18,7 @@ import useOldLang from '../../hooks/useOldLang';
 
 import GroupChatInfo from '../common/GroupChatInfo';
 import PrivateChatInfo from '../common/PrivateChatInfo';
-import ReactionStaticEmoji from '../common/ReactionStaticEmoji';
+import ReactionStaticEmoji from '../common/reactions/ReactionStaticEmoji';
 import ListItem, { type MenuItemContextAction } from '../ui/ListItem';
 
 import styles from './StoryViewModal.module.scss';

@@ -1,6 +1,5 @@
-import type { RefObject } from 'react';
-import type { FC } from '../../../lib/teact/teact';
-import React, {
+import type { ElementRef, FC } from '../../../lib/teact/teact';
+import {
   memo, useCallback, useEffect, useRef,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
@@ -19,7 +18,7 @@ import styles from './StatusPickerMenu.module.scss';
 
 export type OwnProps = {
   isOpen: boolean;
-  statusButtonRef: RefObject<HTMLButtonElement>;
+  statusButtonRef: ElementRef<HTMLButtonElement>;
   onEmojiStatusSelect: (emojiStatus: ApiSticker) => void;
   onClose: () => void;
 };
@@ -83,7 +82,7 @@ const StatusPickerMenu: FC<OwnProps & StateProps> = ({
   );
 };
 
-export default memo(withGlobal<OwnProps>((global): StateProps => {
+export default memo(withGlobal<OwnProps>((global): Complete<StateProps> => {
   return {
     areFeaturedStickersLoaded: Boolean(global.customEmojis.featuredIds?.length),
     isTranslucent: selectIsContextMenuTranslucent(global),

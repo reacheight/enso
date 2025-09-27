@@ -1,5 +1,5 @@
 import type { FC } from '../../lib/teact/teact';
-import React, { memo, useMemo } from '../../lib/teact/teact';
+import { memo, useMemo } from '../../lib/teact/teact';
 import { getActions } from '../../global';
 
 import buildClassName from '../../util/buildClassName';
@@ -43,7 +43,9 @@ const InviteLink: FC<OwnProps> = ({
   const copyLink = useLastCallback(() => {
     copyTextToClipboard(link);
     showNotification({
-      message: lang('LinkCopied'),
+      message: {
+        key: 'LinkCopied',
+      },
     });
   });
 
@@ -67,7 +69,7 @@ const InviteLink: FC<OwnProps> = ({
         onClick={onTrigger}
         ariaLabel={lang('AccDescrOpenMenu2')}
       >
-        <i className="icon icon-more" />
+        <Icon name="more" />
       </Button>
     );
   }, [isMobile, lang]);
@@ -110,9 +112,9 @@ const InviteLink: FC<OwnProps> = ({
       </div>
       {withShare && (
         <Button
-          size="smaller"
           disabled={isDisabled}
           onClick={handleShare}
+          className={styles.share}
         >
           {lang('FolderLinkScreen.LinkActionShare')}
         </Button>

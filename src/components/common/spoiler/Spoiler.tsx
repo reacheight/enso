@@ -1,9 +1,11 @@
 import type { TeactNode } from '../../../lib/teact/teact';
-import React, { memo, useEffect, useRef } from '../../../lib/teact/teact';
+import type React from '../../../lib/teact/teact';
+import { memo, useEffect, useRef } from '../../../lib/teact/teact';
 
 import { ApiMessageEntityTypes } from '../../../api/types';
 
 import { createClassNameBuilder } from '../../../util/buildClassName';
+import stopEvent from '../../../util/stopEvent';
 
 import useFlag from '../../../hooks/useFlag';
 import useLastCallback from '../../../hooks/useLastCallback';
@@ -15,7 +17,7 @@ type OwnProps = {
   containerId?: string;
 };
 
-const revealByContainerId: Map<string, VoidFunction[]> = new Map();
+const revealByContainerId = new Map<string, VoidFunction[]>();
 
 const buildClassName = createClassNameBuilder('Spoiler');
 
@@ -23,16 +25,16 @@ const Spoiler = ({
   children,
   containerId,
 }: OwnProps) => {
-  // eslint-disable-next-line no-null/no-null
-  const contentRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>();
 
   const [isRevealed, revealSpoiler] = useFlag();
 
   const handleClick = useLastCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     if (!containerId) return;
 
-    e.preventDefault();
-    e.stopPropagation();
+    if (!isRevealed) {
+      stopEvent(e);
+    }
 
     revealByContainerId.get(containerId)?.forEach((reveal) => reveal());
   });

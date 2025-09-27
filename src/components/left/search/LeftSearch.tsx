@@ -1,21 +1,25 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo,
+  useEffect,
   useMemo,
   useRef,
   useState,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
-import { GlobalSearchContent } from '../../../types';
+import type { RegularLangKey } from '../../../types/language';
+import { type AnimationLevel, GlobalSearchContent } from '../../../types';
 
 import { selectTabState } from '../../../global/selectors';
+import { selectSharedSettings } from '../../../global/selectors/sharedState.ts';
 import { parseDateString } from '../../../util/dates/dateFormat';
+import { resolveTransitionName } from '../../../util/resolveTransitionName.ts';
 
 import useHistoryBack from '../../../hooks/useHistoryBack';
 import useKeyboardListNavigation from '../../../hooks/useKeyboardListNavigation';
+import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
-import useOldLang from '../../../hooks/useOldLang';
 
 import TabList from '../../ui/TabList';
 import Transition from '../../ui/Transition';
@@ -26,6 +30,7 @@ import ChatResults from './ChatResults';
 import FileResults from './FileResults';
 import LinkResults from './LinkResults';
 import MediaResults from './MediaResults';
+import PublicPostsResults from './PublicPostsResults';
 
 import './LeftSearch.scss';
 
@@ -39,21 +44,28 @@ export type OwnProps = {
 type StateProps = {
   currentContent?: GlobalSearchContent;
   chatId?: string;
+  animationLevel: AnimationLevel;
 };
 
-const TABS = [
-  { type: GlobalSearchContent.ChatList, title: 'SearchAllChatsShort' },
-  { type: GlobalSearchContent.ChannelList, title: 'ChannelsTab' },
-  { type: GlobalSearchContent.BotApps, title: 'AppsTab' },
-  { type: GlobalSearchContent.Media, title: 'SharedMediaTab2' },
-  { type: GlobalSearchContent.Links, title: 'SharedLinksTab2' },
-  { type: GlobalSearchContent.Files, title: 'SharedFilesTab2' },
-  { type: GlobalSearchContent.Music, title: 'SharedMusicTab2' },
-  { type: GlobalSearchContent.Voice, title: 'SharedVoiceTab2' },
+type TabInfo = {
+  type: GlobalSearchContent;
+  key: RegularLangKey;
+};
+
+const TABS: TabInfo[] = [
+  { type: GlobalSearchContent.ChatList, key: 'SearchTabChats' },
+  { type: GlobalSearchContent.ChannelList, key: 'SearchTabChannels' },
+  { type: GlobalSearchContent.BotApps, key: 'SearchTabApps' },
+  { type: GlobalSearchContent.PublicPosts, key: 'SearchTabPublicPosts' },
+  { type: GlobalSearchContent.Media, key: 'SearchTabMedia' },
+  { type: GlobalSearchContent.Links, key: 'SearchTabLinks' },
+  { type: GlobalSearchContent.Files, key: 'SearchTabFiles' },
+  { type: GlobalSearchContent.Music, key: 'SearchTabMusic' },
+  { type: GlobalSearchContent.Voice, key: 'SearchTabVoice' },
 ];
 
-const CHAT_TABS = [
-  { type: GlobalSearchContent.ChatList, title: 'All Messages' },
+const CHAT_TABS: TabInfo[] = [
+  { type: GlobalSearchContent.ChatList, key: 'SearchTabMessages' },
   ...TABS.slice(3), // Skip ChatList, ChannelList and BotApps, replaced with All Messages
 ];
 
@@ -63,18 +75,32 @@ const LeftSearch: FC<OwnProps & StateProps> = ({
   isActive,
   currentContent = GlobalSearchContent.ChatList,
   chatId,
+  animationLevel,
   onReset,
 }) => {
   const {
     setGlobalSearchContent,
     setGlobalSearchDate,
+    checkSearchPostsFlood,
   } = getActions();
 
-  const lang = useOldLang();
+  const lang = useLang();
   const [activeTab, setActiveTab] = useState(currentContent);
   const dateSearchQuery = useMemo(() => parseDateString(searchQuery), [searchQuery]);
 
-  const tabs = chatId ? CHAT_TABS : TABS;
+  useEffect(() => {
+    if (isActive) {
+      checkSearchPostsFlood({});
+    }
+  }, [isActive]);
+
+  const tabs = useMemo(() => {
+    const arr = chatId ? CHAT_TABS : TABS;
+    return arr.map((tab) => ({
+      ...tab,
+      title: lang(tab.key),
+    }));
+  }, [chatId, lang]);
 
   const handleSwitchTab = useLastCallback((index: number) => {
     const tab = tabs[index];
@@ -91,15 +117,14 @@ const LeftSearch: FC<OwnProps & StateProps> = ({
     onBack: onReset,
   });
 
-  // eslint-disable-next-line no-null/no-null
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>();
   const handleKeyDown = useKeyboardListNavigation(containerRef, isActive, undefined, '.ListItem-button', true);
 
   return (
     <div className="LeftSearch" ref={containerRef} onKeyDown={handleKeyDown}>
       <TabList activeTab={activeTab} tabs={tabs} onSwitchTab={handleSwitchTab} />
       <Transition
-        name={lang.isRtl ? 'slideOptimizedRtl' : 'slideOptimized'}
+        name={resolveTransitionName('slideOptimized', animationLevel, undefined, lang.isRtl)}
         renderCount={tabs.length}
         activeKey={currentContent}
       >
@@ -155,6 +180,13 @@ const LeftSearch: FC<OwnProps & StateProps> = ({
                   searchQuery={searchQuery}
                 />
               );
+            case GlobalSearchContent.PublicPosts:
+              return (
+                <PublicPostsResults
+                  key="publicPosts"
+                  searchQuery={searchQuery}
+                />
+              );
             default:
               return undefined;
           }
@@ -165,9 +197,10 @@ const LeftSearch: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     const { currentContent, chatId } = selectTabState(global).globalSearch;
+    const { animationLevel } = selectSharedSettings(global);
 
-    return { currentContent, chatId };
+    return { currentContent, chatId, animationLevel };
   },
 )(LeftSearch));

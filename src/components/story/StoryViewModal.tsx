@@ -1,5 +1,5 @@
 import type { FC } from '../../lib/teact/teact';
-import React, {
+import {
   memo, useEffect, useMemo, useState,
 } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
@@ -26,6 +26,7 @@ import useLastCallback from '../../hooks/useLastCallback';
 import useOldLang from '../../hooks/useOldLang';
 import useScrolledState from '../../hooks/useScrolledState';
 
+import Icon from '../common/icons/Icon';
 import Button from '../ui/Button';
 import DropdownMenu from '../ui/DropdownMenu';
 import InfiniteScroll from '../ui/InfiniteScroll';
@@ -43,7 +44,7 @@ interface StateProps {
   isLoading?: boolean;
   views?: ApiTypeStoryView[];
   nextOffset?: string;
-  viewersExpirePeriod: number;
+  viewersExpireDate?: number;
   isCurrentUserPremium?: boolean;
 }
 
@@ -51,7 +52,7 @@ const REFETCH_DEBOUNCE = 250;
 
 function StoryViewModal({
   story,
-  viewersExpirePeriod,
+  viewersExpireDate,
   views,
   nextOffset,
   isLoading,
@@ -68,7 +69,7 @@ function StoryViewModal({
   const lang = useOldLang();
 
   const isOpen = Boolean(story);
-  const isExpired = Boolean(story?.date) && (story!.date + viewersExpirePeriod) < getServerTime();
+  const isExpired = Boolean(viewersExpireDate) && viewersExpireDate < getServerTime();
   const { viewsCount = 0, reactionsCount = 0 } = story?.views || {};
 
   const shouldShowJustContacts = story?.isPublic && viewsCount > STORY_VIEWS_MIN_CONTACTS_FILTER;
@@ -98,7 +99,7 @@ function StoryViewModal({
 
   const placeholderCount = !sortedViews?.length ? Math.min(viewsCount, 8) : 1;
 
-  const notAllAvailable = Boolean(sortedViews?.length) && sortedViews!.length < viewsCount && isExpired;
+  const notAllAvailable = Boolean(sortedViews?.length) && sortedViews.length < viewsCount && isExpired;
 
   const handleLoadMore = useLastCallback(() => {
     if (!story?.id || nextOffset === undefined) return;
@@ -129,13 +130,8 @@ function StoryViewModal({
         onClick={onTrigger}
         ariaLabel={lang('SortBy')}
       >
-        <i className={buildClassName(
-          'icon',
-          areReactionsFirst ? 'icon-heart-outline' : 'icon-recent',
-          styles.iconSort,
-        )}
-        />
-        <i className={buildClassName('icon icon-down', styles.iconDown)} />
+        <Icon name={areReactionsFirst ? 'heart-outline' : 'recent'} className={styles.iconSort} />
+        <Icon name="down" className={styles.iconDown} />
       </Button>
     );
   }, [areReactionsFirst, lang]);
@@ -181,13 +177,13 @@ function StoryViewModal({
               <MenuItem icon="heart-outline" onClick={markReactionsFirst}>
                 {lang('SortByReactions')}
                 {areReactionsFirst && (
-                  <i className={buildClassName('icon icon-check', styles.check)} aria-hidden />
+                  <Icon name="check" className={styles.check} />
                 )}
               </MenuItem>
               <MenuItem icon="recent" onClick={unmarkReactionsFirst}>
                 {lang('SortByTime')}
                 {!areReactionsFirst && (
-                  <i className={buildClassName('icon icon-check', styles.check)} aria-hidden />
+                  <Icon name="check" className={styles.check} />
                 )}
               </MenuItem>
             </DropdownMenu>
@@ -227,7 +223,7 @@ function StoryViewModal({
           })}
           {isLoading && Array.from({ length: placeholderCount }).map((_, i) => (
             <ListItem
-              // eslint-disable-next-line react/no-array-index-key
+
               key={`placeholder-${i}`}
               className="chat-item-clickable contact-list-item scroll-item small-icon"
               disabled
@@ -272,22 +268,21 @@ function prepareComparator(areReactionsFirst?: boolean) {
   };
 }
 
-export default memo(withGlobal((global) => {
+export default memo(withGlobal((global): Complete<StateProps> => {
   const { appConfig } = global;
   const { storyViewer: { viewModal } } = selectTabState(global);
   const {
     storyId, views, nextOffset, isLoading,
   } = viewModal || {};
   const story = storyId ? selectPeerStory(global, global.currentUserId!, storyId) : undefined;
+  const storyExpireDate = story?.['@type'] === 'story' ? story.expireDate : undefined;
 
   return {
-    storyId,
     views,
-    viewersExpirePeriod: appConfig!.storyExpirePeriod + appConfig!.storyViewersExpirePeriod,
+    viewersExpireDate: storyExpireDate ? (storyExpireDate + appConfig.storyViewersExpirePeriod) : undefined,
     story: story && 'content' in story ? story : undefined,
     nextOffset,
     isLoading,
-    availableReactions: global.reactions.availableReactions,
     isCurrentUserPremium: selectIsCurrentUserPremium(global),
   };
 })(StoryViewModal));

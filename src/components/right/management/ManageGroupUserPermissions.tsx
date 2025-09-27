@@ -1,5 +1,5 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo, useCallback, useEffect, useMemo, useState,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
@@ -16,6 +16,7 @@ import useLang from '../../../hooks/useLang';
 import useOldLang from '../../../hooks/useOldLang';
 import useManagePermissions from '../hooks/useManagePermissions';
 
+import Icon from '../../common/icons/Icon';
 import PrivateChatInfo from '../../common/PrivateChatInfo';
 import PermissionCheckboxList from '../../main/PermissionCheckboxList';
 import ConfirmDialog from '../../ui/ConfirmDialog';
@@ -39,7 +40,7 @@ type StateProps = {
   isFormFullyDisabled?: boolean;
 };
 
-const ITEM_HEIGHT = 24 + 32;
+const ITEM_HEIGHT = 48;
 const SHIFT_HEIGHT_MINUS = 1;
 const BEFORE_ITEMS_COUNT = 2;
 const BEFORE_USER_INFO_HEIGHT = 96;
@@ -132,7 +133,7 @@ const ManageGroupUserPermissions: FC<OwnProps & StateProps> = ({
     <div
       className="Management with-shifted-dropdown"
       style={`--shift-height: ${ITEMS_COUNT * ITEM_HEIGHT - SHIFT_HEIGHT_MINUS}px;`
-           + `--before-shift-height: ${BEFORE_ITEMS_COUNT * ITEM_HEIGHT + BEFORE_USER_INFO_HEIGHT}px;`}
+        + `--before-shift-height: ${BEFORE_ITEMS_COUNT * ITEM_HEIGHT + BEFORE_USER_INFO_HEIGHT}px;`}
     >
       <div className="custom-scroll">
         <div className="section without-bottom-shadow">
@@ -180,7 +181,7 @@ const ManageGroupUserPermissions: FC<OwnProps & StateProps> = ({
         {isLoading ? (
           <Spinner color="white" />
         ) : (
-          <i className="icon icon-check" />
+          <Icon name="check" />
         )}
       </FloatingActionButton>
 
@@ -197,7 +198,7 @@ const ManageGroupUserPermissions: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { chatId, isPromotedByCurrentUser }): StateProps => {
+  (global, { chatId, isPromotedByCurrentUser }): Complete<StateProps> => {
     const chat = selectChat(global, chatId)!;
     const fullInfo = selectChatFullInfo(global, chatId);
     const isFormFullyDisabled = !(chat.isCreator || isPromotedByCurrentUser);

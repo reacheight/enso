@@ -1,11 +1,12 @@
 import type { InlineBotSettings } from '../../types';
+import type { WebApp, WebAppModalStateType } from '../../types/webapp';
 import type {
-  GlobalState, TabArgs, WebApp, WebAppModalStateType,
+  GlobalState, TabArgs,
 } from '../types';
 
 import { getCurrentTabId } from '../../util/establishMultitabRole';
 import { getWebAppKey } from '../helpers/bots';
-import { selectTabState } from '../selectors';
+import { selectActiveWebApp, selectTabState } from '../selectors';
 import { updateTabState } from './tabs';
 
 export function replaceInlineBotSettings<T extends GlobalState>(
@@ -36,34 +37,28 @@ export function replaceInlineBotsIsLoading<T extends GlobalState>(
   }, tabId);
 }
 
-export function updateWebApp <T extends GlobalState>(
-  global: T, webApp: Partial<WebApp>,
+export function updateWebApp<T extends GlobalState>(
+  global: T, key: string, webAppUpdate: Partial<WebApp>,
   ...[tabId = getCurrentTabId()]: TabArgs<T>
 ): T {
   const currentTabState = selectTabState(global, tabId);
   const openedWebApps = currentTabState.webApps.openedWebApps;
 
-  const key = webApp && getWebAppKey(webApp);
-  const originalWebApp = key ? openedWebApps[key] : undefined;
+  const originalWebApp = openedWebApps[key];
 
   if (!originalWebApp) return global;
 
   const updatedValue = {
     ...originalWebApp,
-    ...webApp,
+    ...webAppUpdate,
   };
 
   const updatedWebAppKey = getWebAppKey(updatedValue);
   if (!updatedWebAppKey) return global;
 
-  const activeWebApp = currentTabState.webApps.activeWebApp;
-  const activeWebAppKey = activeWebApp && getWebAppKey(activeWebApp);
   global = updateTabState(global, {
     webApps: {
       ...currentTabState.webApps,
-      ...updatedWebAppKey === activeWebAppKey && {
-        activeWebApp: updatedValue,
-      },
       openedWebApps: {
         ...openedWebApps,
         [updatedWebAppKey]: updatedValue,
@@ -85,12 +80,11 @@ export function activateWebAppIfOpen<T extends GlobalState>(
     return global;
   }
 
-  const newActiveWebApp = openedWebApps[webAppKey];
-
   global = updateTabState(global, {
     webApps: {
       ...currentTabState.webApps,
-      activeWebApp: newActiveWebApp,
+      isMoreAppsTabActive: false,
+      activeWebAppKey: webAppKey,
       modalState: 'maximized',
     },
   }, tabId);
@@ -119,7 +113,8 @@ export function addWebAppToOpenList<T extends GlobalState>(
   global = updateTabState(global, {
     webApps: {
       ...currentTabState.webApps,
-      ...makeActive && { activeWebApp: webApp },
+      ...makeActive && { activeWebAppKey: key },
+      isMoreAppsTabActive: false,
       isModalOpen: openModalIfNotOpen,
       modalState: 'maximized',
       openedWebApps: {
@@ -138,46 +133,47 @@ export function removeActiveWebAppFromOpenList<T extends GlobalState>(
   global: T, ...[tabId = getCurrentTabId()]: TabArgs<T>
 ): T {
   const currentTabState = selectTabState(global, tabId);
+  const activeWebAppKey = currentTabState.webApps.activeWebAppKey;
 
-  if (!currentTabState.webApps.activeWebApp) return global;
+  if (!activeWebAppKey) return global;
 
-  return removeWebAppFromOpenList(global, currentTabState.webApps.activeWebApp, false, tabId);
+  return removeWebAppFromOpenList(global, activeWebAppKey, false, tabId);
 }
 
 export function removeWebAppFromOpenList<T extends GlobalState>(
-  global: T, webApp: WebApp, skipClosingConfirmation?: boolean,
+  global: T, key: string, skipClosingConfirmation?: boolean,
   ...[tabId = getCurrentTabId()]: TabArgs<T>
 ): T {
   const currentTabState = selectTabState(global, tabId);
-  const openedWebApps = currentTabState.webApps.openedWebApps;
+  const { openedWebApps, openedOrderedKeys, activeWebAppKey } = currentTabState.webApps;
+  const webApp = openedWebApps[key];
+  if (!webApp) return global;
 
   if (!skipClosingConfirmation && webApp.shouldConfirmClosing) {
-    return updateWebApp(global, { ...webApp, isCloseModalOpen: true }, tabId);
+    return updateWebApp(global, key, { isCloseModalOpen: true }, tabId);
   }
 
   const updatedOpenedWebApps = { ...openedWebApps };
   const removingWebAppKey = getWebAppKey(webApp);
 
-  let newOpenedKeys = currentTabState.webApps.openedOrderedKeys;
+  let newOpenedKeys = openedOrderedKeys;
 
   if (removingWebAppKey) {
     delete updatedOpenedWebApps[removingWebAppKey];
-    newOpenedKeys = currentTabState.webApps.openedOrderedKeys.filter((key) => key !== removingWebAppKey);
+    newOpenedKeys = openedOrderedKeys.filter((k) => k !== removingWebAppKey);
   }
 
-  const activeWebApp = currentTabState.webApps.activeWebApp;
+  const isRemovedAppActive = activeWebAppKey === getWebAppKey(webApp);
 
-  const isRemovedAppActive = activeWebApp && (getWebAppKey(activeWebApp) === getWebAppKey(webApp));
-
-  const openedWebAppsValues = Object.values(updatedOpenedWebApps);
-  const openedWebAppsCount = openedWebAppsValues.length;
+  const openedWebAppsKeys = Object.keys(updatedOpenedWebApps);
+  const openedWebAppsCount = openedWebAppsKeys.length;
 
   global = updateTabState(global, {
     webApps: {
       ...currentTabState.webApps,
       ...isRemovedAppActive && {
-        activeWebApp: openedWebAppsCount
-          ? openedWebAppsValues[openedWebAppsCount - 1] : undefined,
+        activeWebAppKey: openedWebAppsCount
+          ? openedWebAppsKeys[openedWebAppsCount - 1] : undefined,
       },
       openedWebApps: updatedOpenedWebApps,
       openedOrderedKeys: newOpenedKeys,
@@ -198,8 +194,7 @@ export function clearOpenedWebApps<T extends GlobalState>(
 
   const webAppsNotAllowedToClose = Object.fromEntries(
     Object.entries(currentTabState.webApps.openedWebApps).filter(
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      ([url, webApp]) => webApp.shouldConfirmClosing,
+      ([, webApp]) => webApp.shouldConfirmClosing,
     ),
   );
 
@@ -210,7 +205,7 @@ export function clearOpenedWebApps<T extends GlobalState>(
     return updateTabState(global, {
       webApps: {
         ...currentTabState.webApps,
-        activeWebApp: undefined,
+        activeWebAppKey: undefined,
         openedWebApps: {},
         openedOrderedKeys: [],
         sessionKeys: [],
@@ -218,22 +213,26 @@ export function clearOpenedWebApps<T extends GlobalState>(
     }, tabId);
   }
 
-  const currentActiveWebApp = currentTabState.webApps.activeWebApp;
+  const currentActiveWebApp = selectActiveWebApp(global, tabId);
 
   const newActiveWebApp = currentActiveWebApp?.shouldConfirmClosing
     ? currentActiveWebApp : webAppsNotAllowedToCloseValues[0];
 
-  newActiveWebApp.isCloseModalOpen = true;
+  const newActiveWebAppKey = getWebAppKey(newActiveWebApp);
 
-  const key = getWebAppKey(newActiveWebApp);
-
-  if (key) webAppsNotAllowedToClose[key] = newActiveWebApp;
-  const newOpenedKeys = currentTabState.webApps.openedOrderedKeys.filter((k) => k in webAppsNotAllowedToClose);
+  if (newActiveWebAppKey) {
+    webAppsNotAllowedToClose[newActiveWebAppKey] = {
+      ...newActiveWebApp,
+      isCloseModalOpen: true,
+    };
+  }
+  const newOpenedKeys = currentTabState.webApps.openedOrderedKeys.filter((k) => webAppsNotAllowedToClose[k]);
 
   return updateTabState(global, {
     webApps: {
       ...currentTabState.webApps,
-      activeWebApp: newActiveWebApp,
+      activeWebAppKey: newActiveWebAppKey,
+      isMoreAppsTabActive: false,
       openedWebApps: webAppsNotAllowedToClose,
       openedOrderedKeys: newOpenedKeys,
     },
@@ -244,6 +243,12 @@ export function hasOpenedWebApps<T extends GlobalState>(
   global: T, ...[tabId = getCurrentTabId()]: TabArgs<T>
 ): boolean {
   return Object.keys(selectTabState(global, tabId).webApps.openedWebApps).length > 0;
+}
+
+export function hasOpenedMoreThanOneWebApps<T extends GlobalState>(
+  global: T, ...[tabId = getCurrentTabId()]: TabArgs<T>
+): boolean {
+  return Object.keys(selectTabState(global, tabId).webApps.openedWebApps).length > 1;
 }
 
 export function replaceWebAppModalState<T extends GlobalState>(

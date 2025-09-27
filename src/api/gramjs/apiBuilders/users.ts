@@ -2,7 +2,8 @@ import { Api as GramJs } from '../../../lib/gramjs';
 
 import type {
   ApiBirthday,
-  ApiPremiumGiftOption,
+  ApiPeerSettings,
+  ApiStarsRating,
   ApiUser,
   ApiUserFullInfo,
   ApiUserStatus,
@@ -11,7 +12,10 @@ import type {
 
 import { buildApiBotInfo } from './bots';
 import { buildApiBusinessIntro, buildApiBusinessLocation, buildApiBusinessWorkHours } from './business';
-import { buildApiPhoto, buildApiUsernames, buildAvatarPhotoId } from './common';
+import {
+  buildApiBotVerification, buildApiPhoto, buildApiUsernames, buildAvatarPhotoId,
+} from './common';
+import { buildApiDisallowedGiftsSettings } from './gifts';
 import { omitVirtualClassFields } from './helpers';
 import { buildApiEmojiStatus, buildApiPeerColor, buildApiPeerId } from './peers';
 
@@ -19,10 +23,12 @@ export function buildApiUserFullInfo(mtpUserFull: GramJs.users.UserFull): ApiUse
   const {
     fullUser: {
       about, commonChatsCount, pinnedMsgId, botInfo, blocked,
-      profilePhoto, voiceMessagesForbidden, premiumGifts,
+      profilePhoto, voiceMessagesForbidden, hasScheduled,
       fallbackPhoto, personalPhoto, translationsDisabled, storiesPinnedAvailable,
       contactRequirePremium, businessWorkHours, businessLocation, businessIntro,
-      birthday, personalChannelId, personalChannelMessage, sponsoredEnabled,
+      birthday, personalChannelId, personalChannelMessage, sponsoredEnabled, stargiftsCount, botVerification,
+      botCanManageEmojiStatus, settings, sendPaidMessagesStars, displayGiftsButton, disallowedGifts,
+      starsRating, starsMyPendingRating, starsMyPendingRatingDate,
     },
     users,
   } = mtpUserFull;
@@ -40,16 +46,50 @@ export function buildApiUserFullInfo(mtpUserFull: GramJs.users.UserFull): ApiUse
     profilePhoto: profilePhoto instanceof GramJs.Photo ? buildApiPhoto(profilePhoto) : undefined,
     fallbackPhoto: fallbackPhoto instanceof GramJs.Photo ? buildApiPhoto(fallbackPhoto) : undefined,
     personalPhoto: personalPhoto instanceof GramJs.Photo ? buildApiPhoto(personalPhoto) : undefined,
-    premiumGifts: premiumGifts?.map((gift) => buildApiPremiumGiftOption(gift)),
     botInfo: botInfo && buildApiBotInfo(botInfo, userId),
     isContactRequirePremium: contactRequirePremium,
+    shouldDisplayGiftsButton: displayGiftsButton,
+    disallowedGifts: disallowedGifts && buildApiDisallowedGiftsSettings(disallowedGifts),
     birthday: birthday && buildApiBirthday(birthday),
     businessLocation: businessLocation && buildApiBusinessLocation(businessLocation),
     businessWorkHours: businessWorkHours && buildApiBusinessWorkHours(businessWorkHours),
     businessIntro: businessIntro && buildApiBusinessIntro(businessIntro),
     personalChannelId: personalChannelId && buildApiPeerId(personalChannelId, 'channel'),
     personalChannelMessageId: personalChannelMessage,
+    botVerification: botVerification && buildApiBotVerification(botVerification),
     areAdsEnabled: sponsoredEnabled,
+    starGiftCount: stargiftsCount,
+    starsRating: starsRating && buildApiStarsRating(starsRating),
+    starsMyPendingRating: starsMyPendingRating && buildApiStarsRating(starsMyPendingRating),
+    starsMyPendingRatingDate,
+    isBotCanManageEmojiStatus: botCanManageEmojiStatus,
+    hasScheduledMessages: hasScheduled,
+    paidMessagesStars: sendPaidMessagesStars?.toJSNumber(),
+    settings: buildApiPeerSettings(settings),
+  };
+}
+
+export function buildApiPeerSettings({
+  autoarchived,
+  reportSpam,
+  addContact,
+  blockContact,
+  registrationMonth,
+  phoneCountry,
+  nameChangeDate,
+  photoChangeDate,
+  chargePaidMessageStars,
+}: GramJs.PeerSettings): ApiPeerSettings {
+  return {
+    isAutoArchived: Boolean(autoarchived),
+    canReportSpam: Boolean(reportSpam),
+    canAddContact: Boolean(addContact),
+    canBlockContact: Boolean(blockContact),
+    registrationMonth,
+    phoneCountry,
+    nameChangeDate,
+    photoChangeDate,
+    chargedPaidMessageStars: chargePaidMessageStars?.toJSNumber(),
   };
 }
 
@@ -60,7 +100,8 @@ export function buildApiUser(mtpUser: GramJs.TypeUser): ApiUser | undefined {
 
   const {
     id, firstName, lastName, fake, scam, support, closeFriend, storiesUnavailable, storiesMaxId,
-    bot, botActiveUsers, botInlinePlaceholder, botAttachMenu, botCanEdit,
+    bot, botActiveUsers, botVerificationIcon, botInlinePlaceholder, botAttachMenu, botCanEdit,
+    sendPaidMessagesStars, username,
   } = mtpUser;
   const hasVideoAvatar = mtpUser.photo instanceof GramJs.UserProfilePhoto ? Boolean(mtpUser.photo.hasVideo) : undefined;
   const avatarPhotoId = mtpUser.photo && buildAvatarPhotoId(mtpUser.photo);
@@ -85,6 +126,7 @@ export function buildApiUser(mtpUser: GramJs.TypeUser): ApiUser | undefined {
     canEditBot: botCanEdit,
     ...(userType === 'userTypeBot' && { canBeInvitedToGroup: !mtpUser.botNochats }),
     ...(usernames && { usernames }),
+    hasUsername: Boolean(username),
     phoneNumber: mtpUser.phone || '',
     noStatus: !mtpUser.status,
     ...(mtpUser.accessHash && { accessHash: String(mtpUser.accessHash) }),
@@ -97,7 +139,9 @@ export function buildApiUser(mtpUser: GramJs.TypeUser): ApiUser | undefined {
     ...(bot && botInlinePlaceholder && { botPlaceholder: botInlinePlaceholder }),
     ...(bot && botAttachMenu && { isAttachBot: botAttachMenu }),
     botActiveUsers,
+    botVerificationIconId: botVerificationIcon?.toString(),
     color: mtpUser.color && buildApiPeerColor(mtpUser.color),
+    paidMessagesStars: sendPaidMessagesStars?.toJSNumber(),
   };
 }
 
@@ -140,19 +184,15 @@ export function buildApiUserStatuses(mtpUsers: GramJs.TypeUser[]) {
   return userStatusesById;
 }
 
-export function buildApiPremiumGiftOption(option: GramJs.TypePremiumGiftOption): ApiPremiumGiftOption {
-  const {
-    months, currency, amount, botUrl,
-  } = option;
-
-  return {
-    months,
-    currency,
-    amount: amount.toJSNumber(),
-    botUrl,
-  };
-}
-
 export function buildApiBirthday(birthday: GramJs.TypeBirthday): ApiBirthday {
   return omitVirtualClassFields(birthday);
+}
+
+export function buildApiStarsRating(starsRating: GramJs.StarsRating): ApiStarsRating {
+  return {
+    level: starsRating.level,
+    currentLevelStars: starsRating.currentLevelStars.toJSNumber(),
+    stars: starsRating.stars.toJSNumber(),
+    nextLevelStars: starsRating.nextLevelStars?.toJSNumber(),
+  };
 }

@@ -1,5 +1,5 @@
 import type { FC } from '../../lib/teact/teact';
-import React from '../../lib/teact/teact';
+import type React from '../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../global';
 
 import type { TabState } from '../../global/types';
@@ -171,7 +171,7 @@ const UiLoader: FC<OwnProps & StateProps> = ({
 };
 
 export default withGlobal<OwnProps>(
-  (global, { isMobile }): StateProps => {
+  (global, { isMobile }): Complete<StateProps> => {
     const tabState = selectTabState(global);
 
     return {

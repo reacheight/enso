@@ -3,8 +3,9 @@ import type {
 } from '../../api/types';
 import type { GlobalState } from '../types';
 
+import { isUserId } from '../../util/entities/ids';
 import { omit, uniqueByField } from '../../util/iteratees';
-import { isChatChannel, isUserId } from '../helpers';
+import { isChatChannel } from '../helpers';
 import {
   selectChatFullInfo,
   selectPeer,
@@ -62,15 +63,21 @@ export function replacePeerPhotos<T extends GlobalState>(
   if (!value) {
     return {
       ...global,
-      profilePhotosById: omit(global.profilePhotosById, [peerId]),
+      peers: {
+        ...global.peers,
+        profilePhotosById: omit(global.peers.profilePhotosById, [peerId]),
+      },
     };
   }
 
   return {
     ...global,
-    profilePhotosById: {
-      ...global.profilePhotosById,
-      [peerId]: value,
+    peers: {
+      ...global.peers,
+      profilePhotosById: {
+        ...global.peers.profilePhotosById,
+        [peerId]: value,
+      },
     },
   };
 }
@@ -120,7 +127,7 @@ export function updatePeerPhotos<T extends GlobalState>(
     });
   }
 
-  const hasFallbackPhoto = currentPhotos.photos[currentPhotos.photos.length - 1].id === fallbackPhoto?.id;
+  const hasFallbackPhoto = currentPhotos.photos.at(-1).id === fallbackPhoto?.id;
   const currentPhotoArray = hasFallbackPhoto ? currentPhotos.photos.slice(0, -1) : currentPhotos.photos;
 
   const photos = uniqueByField([...currentPhotoArray, ...newPhotos, fallbackPhoto].filter(Boolean), 'id');

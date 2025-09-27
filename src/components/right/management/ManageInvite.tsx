@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react';
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useCallback, useState } from '../../../lib/teact/teact';
+import { memo, useCallback, useState } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiExportedInvite } from '../../../api/types';
@@ -16,6 +16,7 @@ import useOldLang from '../../../hooks/useOldLang';
 import useSyncEffect from '../../../hooks/useSyncEffect';
 
 import CalendarModal from '../../common/CalendarModal';
+import Icon from '../../common/icons/Icon';
 import Button from '../../ui/Button';
 import Checkbox from '../../ui/Checkbox';
 import FloatingActionButton from '../../ui/FloatingActionButton';
@@ -157,7 +158,7 @@ const ManageInvite: FC<OwnProps & StateProps> = ({
 
   return (
     <div className="Management ManageInvite">
-      <div className="custom-scroll">
+      <div className="panel-content custom-scroll">
         <div className="section">
           <Checkbox
             label={lang('ApproveNewMembers')}
@@ -173,10 +174,10 @@ const ManageInvite: FC<OwnProps & StateProps> = ({
             value={title}
             onChange={handleTitleChange}
           />
-          <p className="text-muted hint">{lang('LinkNameHelp')}</p>
+          <p className="section-help hint">{lang('LinkNameHelp')}</p>
         </div>
         <div className="section">
-          <div className="section-header">{lang('LimitByPeriod')}</div>
+          <div className="section-heading">{lang('LimitByPeriod')}</div>
           <RadioGroup
             name="expireOptions"
             options={[
@@ -206,14 +207,16 @@ const ManageInvite: FC<OwnProps & StateProps> = ({
           />
           {selectedExpireOption === 'custom' && (
             <Button className="expire-limit" isText onClick={openCalendar}>
-              {formatFullDate(lang, customExpireDate)} {formatTime(lang, customExpireDate)}
+              {formatFullDate(lang, customExpireDate)}
+              {' '}
+              {formatTime(lang, customExpireDate)}
             </Button>
           )}
-          <p className="text-muted hint">{lang('TimeLimitHelp')}</p>
+          <p className="section-help hint">{lang('TimeLimitHelp')}</p>
         </div>
         {!isRequestNeeded && (
           <div className="section">
-            <div className="section-header">{lang('LimitNumberOfUses')}</div>
+            <div className="section-heading">{lang('LimitNumberOfUses')}</div>
             <RadioGroup
               name="usageOptions"
               options={[
@@ -240,7 +243,7 @@ const ManageInvite: FC<OwnProps & StateProps> = ({
                 onChange={handleCustomUsageLimitChange}
               />
             )}
-            <p className="text-muted hint">{lang('UsesLimitHelp')}</p>
+            <p className="section-help hint">{lang('UsesLimitHelp')}</p>
           </div>
         )}
         <FloatingActionButton
@@ -249,7 +252,7 @@ const ManageInvite: FC<OwnProps & StateProps> = ({
           disabled={isSubmitBlocked}
           ariaLabel={editingInvite ? lang('SaveLink') : lang('CreateLink')}
         >
-          <i className="icon icon-check" />
+          <Icon name="check" />
         </FloatingActionButton>
       </div>
       <CalendarModal
@@ -266,7 +269,7 @@ const ManageInvite: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { chatId }): StateProps => {
+  (global, { chatId }): Complete<StateProps> => {
     const { editingInvite } = selectTabState(global).management.byChatId[chatId] || {};
 
     return {

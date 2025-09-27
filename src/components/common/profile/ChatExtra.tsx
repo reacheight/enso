@@ -1,36 +1,45 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
-  memo, useEffect, useMemo, useState,
+import {
+  memo, useMemo,
 } from '../../../lib/teact/teact';
-import { getActions, withGlobal } from '../../../global';
+import { getActions, getGlobal, withGlobal } from '../../../global';
 
 import type {
-  ApiChat, ApiCountryCode, ApiUser, ApiUserFullInfo, ApiUsername,
+  ApiBotVerification,
+  ApiChat,
+  ApiCountryCode,
+  ApiUser,
+  ApiUserFullInfo,
+  ApiUsername,
 } from '../../../api/types';
+import type { BotAppPermissions } from '../../../types';
 import { MAIN_THREAD_ID } from '../../../api/types';
 
-import { FRAGMENT_PHONE_CODE, FRAGMENT_PHONE_LENGTH } from '../../../config';
+import {
+  FRAGMENT_PHONE_CODE, FRAGMENT_PHONE_LENGTH, MUTE_INDEFINITE_TIMESTAMP, UNMUTE_TIMESTAMP,
+} from '../../../config';
 import {
   buildStaticMapHash,
   getChatLink,
   getHasAdminRight,
   isChatChannel,
   isUserRightBanned,
-  selectIsChatMuted,
 } from '../../../global/helpers';
+import { getIsChatMuted } from '../../../global/helpers/notifications';
 import {
+  selectBotAppPermissions,
   selectChat,
   selectChatFullInfo,
   selectCurrentMessageList,
-  selectNotifyExceptions,
-  selectNotifySettings,
+  selectIsChatRestricted,
+  selectNotifyDefaults,
+  selectNotifyException,
   selectTopicLink,
   selectUser,
   selectUserFullInfo,
 } from '../../../global/selectors';
 import { copyTextToClipboard } from '../../../util/clipboard';
 import { formatPhoneNumberWithCode } from '../../../util/phoneNumber';
-import { debounce } from '../../../util/schedulers';
 import stopEvent from '../../../util/stopEvent';
 import { extractCurrentThemeParams } from '../../../util/themeStyle';
 import { ChatAnimationTypes } from '../../left/main/hooks';
@@ -49,6 +58,7 @@ import Button from '../../ui/Button';
 import ListItem from '../../ui/ListItem';
 import Skeleton from '../../ui/placeholder/Skeleton';
 import Switcher from '../../ui/Switcher';
+import CustomEmoji from '../CustomEmoji';
 import SafeLink from '../SafeLink';
 import BusinessHours from './BusinessHours';
 import UserBirthday from './UserBirthday';
@@ -75,6 +85,9 @@ type StateProps = {
   hasSavedMessages?: boolean;
   personalChannel?: ApiChat;
   hasMainMiniApp?: boolean;
+  isBotCanManageEmojiStatus?: boolean;
+  botAppPermissions?: BotAppPermissions;
+  botVerification?: ApiBotVerification;
 };
 
 const DEFAULT_MAP_CONFIG = {
@@ -83,7 +96,7 @@ const DEFAULT_MAP_CONFIG = {
   zoom: 15,
 };
 
-const runDebounced = debounce((cb) => cb(), 500, false);
+const BOT_VERIFICATION_ICON_SIZE = 16;
 
 const ChatExtra: FC<OwnProps & StateProps> = ({
   chatOrUserId,
@@ -101,6 +114,9 @@ const ChatExtra: FC<OwnProps & StateProps> = ({
   hasSavedMessages,
   personalChannel,
   hasMainMiniApp,
+  isBotCanManageEmojiStatus,
+  botAppPermissions,
+  botVerification,
 }) => {
   const {
     showNotification,
@@ -111,6 +127,8 @@ const ChatExtra: FC<OwnProps & StateProps> = ({
     openMapModal,
     requestCollectibleInfo,
     requestMainWebView,
+    toggleUserEmojiStatusPermission,
+    toggleUserLocationPermission,
   } = getActions();
 
   const {
@@ -129,12 +147,6 @@ const ChatExtra: FC<OwnProps & StateProps> = ({
   } = userFullInfo || {};
   const oldLang = useOldLang();
   const lang = useLang();
-
-  const [areNotificationsEnabled, setAreNotificationsEnabled] = useState(!isMuted);
-
-  useEffect(() => {
-    setAreNotificationsEnabled(!isMuted);
-  }, [isMuted]);
 
   useEffectWithPrevDeps(([prevPeerId]) => {
     if (!peerId || prevPeerId === peerId) return;
@@ -192,24 +204,27 @@ const ChatExtra: FC<OwnProps & StateProps> = ({
     openMapModal({ geoPoint: geo, zoom });
   });
 
-  const handleNotificationChange = useLastCallback(() => {
-    setAreNotificationsEnabled((current) => {
-      const newAreNotificationsEnabled = !current;
-
-      runDebounced(() => {
-        if (isTopicInfo) {
-          updateTopicMutedState({
-            chatId: chatId!,
-            topicId: topicId!,
-            isMuted: !newAreNotificationsEnabled,
-          });
-        } else {
-          updateChatMutedState({ chatId: chatId!, isMuted: !newAreNotificationsEnabled });
-        }
+  const handleToggleNotifications = useLastCallback(() => {
+    const mutedUntil = isMuted ? UNMUTE_TIMESTAMP : MUTE_INDEFINITE_TIMESTAMP;
+    if (isTopicInfo) {
+      updateTopicMutedState({
+        chatId: chatId!,
+        topicId: topicId!,
+        mutedUntil,
       });
+    } else {
+      updateChatMutedState({ chatId: chatId!, mutedUntil });
+    }
+  });
 
-      return newAreNotificationsEnabled;
-    });
+  const manageEmojiStatusChange = useLastCallback(() => {
+    if (!user) return;
+    toggleUserEmojiStatusPermission({ botId: user.id, isEnabled: !isBotCanManageEmojiStatus });
+  });
+
+  const handleLocationPermissionChange = useLastCallback(() => {
+    if (!user) return;
+    toggleUserLocationPermission({ botId: user.id, isAccessGranted: !botAppPermissions?.geolocation });
   });
 
   const handleOpenSavedDialog = useLastCallback(() => {
@@ -240,9 +255,6 @@ const ChatExtra: FC<OwnProps & StateProps> = ({
   });
 
   const handleOpenApp = useLastCallback(() => {
-    if (!chat) {
-      return;
-    }
     const botId = user?.id;
     if (!botId) {
       return;
@@ -265,7 +277,8 @@ const ChatExtra: FC<OwnProps & StateProps> = ({
     ),
   }, { withNodes: true });
 
-  if (!chat || chat.isRestricted || (isSelf && !isInSettings)) {
+  const isRestricted = chatId ? selectIsChatRestricted(getGlobal(), chatId) : false;
+  if (isRestricted || (isSelf && !isInSettings)) {
     return undefined;
   }
 
@@ -273,7 +286,7 @@ const ChatExtra: FC<OwnProps & StateProps> = ({
     const [mainUsername, ...otherUsernames] = usernameList;
 
     const usernameLinks = otherUsernames.length
-      ? (oldLang('UsernameAlso', '%USERNAMES%') as string)
+      ? (oldLang('UsernameAlso', '%USERNAMES%'))
         .split('%')
         .map((s) => {
           return (s === 'USERNAMES' ? (
@@ -308,7 +321,7 @@ const ChatExtra: FC<OwnProps & StateProps> = ({
         multiline
         narrow
         ripple
-        // eslint-disable-next-line react/jsx-no-bind
+
         onClick={() => {
           handleUsernameClick(mainUsername, isChat);
         }}
@@ -343,7 +356,7 @@ const ChatExtra: FC<OwnProps & StateProps> = ({
         </div>
       )}
       {Boolean(formattedNumber?.length) && (
-        // eslint-disable-next-line react/jsx-no-bind
+
         <ListItem icon="phone" multiline narrow ripple onClick={handlePhoneClick}>
           <span className="title" dir={lang.isRtl ? 'rtl' : undefined}>{formattedNumber}</span>
           <span className="subtitle">{oldLang('Phone')}</span>
@@ -377,7 +390,7 @@ const ChatExtra: FC<OwnProps & StateProps> = ({
           multiline
           narrow
           ripple
-          // eslint-disable-next-line react/jsx-no-bind
+
           onClick={() => copy(link, oldLang('SetUrlPlaceholder'))}
         >
           <div className="title">{link}</div>
@@ -387,7 +400,7 @@ const ChatExtra: FC<OwnProps & StateProps> = ({
       {birthday && (
         <UserBirthday key={peerId} birthday={birthday} user={user!} isInSettings={isInSettings} />
       )}
-      { hasMainMiniApp && (
+      {hasMainMiniApp && (
         <ListItem
           multiline
           isStatic
@@ -395,7 +408,6 @@ const ChatExtra: FC<OwnProps & StateProps> = ({
         >
           <Button
             className={styles.openAppButton}
-            size="smaller"
             onClick={handleOpenApp}
           >
             {oldLang('ProfileBotOpenApp')}
@@ -406,12 +418,12 @@ const ChatExtra: FC<OwnProps & StateProps> = ({
         </ListItem>
       )}
       {!isInSettings && (
-        <ListItem icon="unmute" narrow ripple onClick={handleNotificationChange}>
+        <ListItem icon={isMuted ? 'unmute' : 'mute'} narrow ripple onClick={handleToggleNotifications}>
           <span>{oldLang('Notifications')}</span>
           <Switcher
             id="group-notifications"
             label={userId ? 'Toggle User Notifications' : 'Toggle Chat Notifications'}
-            checked={areNotificationsEnabled}
+            checked={!isMuted}
             inactive
           />
         </ListItem>
@@ -437,26 +449,58 @@ const ChatExtra: FC<OwnProps & StateProps> = ({
           <span>{oldLang('SavedMessagesTab')}</span>
         </ListItem>
       )}
+      {userFullInfo && 'isBotAccessEmojiGranted' in userFullInfo && (
+        <ListItem icon="user" narrow ripple onClick={manageEmojiStatusChange}>
+          <span>{oldLang('BotProfilePermissionEmojiStatus')}</span>
+          <Switcher
+            label={oldLang('BotProfilePermissionEmojiStatus')}
+            checked={isBotCanManageEmojiStatus}
+            inactive
+          />
+        </ListItem>
+      )}
+      {botAppPermissions?.geolocation !== undefined && (
+        <ListItem icon="location" narrow ripple onClick={handleLocationPermissionChange}>
+          <span>{oldLang('BotProfilePermissionLocation')}</span>
+          <Switcher
+            label={oldLang('BotProfilePermissionLocation')}
+            checked={botAppPermissions?.geolocation}
+            inactive
+          />
+        </ListItem>
+      )}
+      {botVerification && (
+        <div className={styles.botVerificationSection}>
+          <CustomEmoji
+            className={styles.botVerificationIcon}
+            documentId={botVerification.iconId}
+            size={BOT_VERIFICATION_ICON_SIZE}
+          />
+          {botVerification.description}
+        </div>
+      )}
     </div>
   );
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { chatOrUserId, isSavedDialog }): StateProps => {
+  (global, { chatOrUserId, isSavedDialog }): Complete<StateProps> => {
     const { countryList: { phoneCodes: phoneCodeList } } = global;
 
     const chat = chatOrUserId ? selectChat(global, chatOrUserId) : undefined;
     const user = chatOrUserId ? selectUser(global, chatOrUserId) : undefined;
+    const botAppPermissions = chatOrUserId ? selectBotAppPermissions(global, chatOrUserId) : undefined;
     const isForum = chat?.isForum;
-    const isMuted = chat && selectIsChatMuted(chat, selectNotifySettings(global), selectNotifyExceptions(global));
+    const isMuted = chat && getIsChatMuted(chat, selectNotifyDefaults(global), selectNotifyException(global, chat.id));
     const { threadId } = selectCurrentMessageList(global) || {};
     const topicId = isForum && threadId ? Number(threadId) : undefined;
 
     const chatFullInfo = chat && selectChatFullInfo(global, chat.id);
     const userFullInfo = user && selectUserFullInfo(global, user.id);
 
-    const chatInviteLink = chatFullInfo?.inviteLink;
+    const botVerification = userFullInfo?.botVerification || chatFullInfo?.botVerification;
 
+    const chatInviteLink = chatFullInfo?.inviteLink;
     const description = userFullInfo?.bio || chatFullInfo?.about;
 
     const canInviteUsers = chat && !user && (
@@ -480,6 +524,7 @@ export default memo(withGlobal<OwnProps>(
       user,
       userFullInfo,
       canInviteUsers,
+      botAppPermissions,
       isMuted,
       topicId,
       chatInviteLink,
@@ -488,6 +533,8 @@ export default memo(withGlobal<OwnProps>(
       hasSavedMessages,
       personalChannel,
       hasMainMiniApp,
+      isBotCanManageEmojiStatus: userFullInfo?.isBotCanManageEmojiStatus,
+      botVerification,
     };
   },
 )(ChatExtra));

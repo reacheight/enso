@@ -1,4 +1,4 @@
-import React, { memo } from '../../lib/teact/teact';
+import { memo } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
 import type { ApiUser } from '../../api/types';
@@ -110,7 +110,6 @@ const PrivacySettingsNoticeModal = ({ isOpen, isReadDate, user }: OwnProps & Sta
           )}
         </p>
         <Button
-          size="smaller"
           onClick={isReadDate ? handleShowReadTime : handleShowLastSeen}
           className={styles.button}
         >
@@ -126,7 +125,6 @@ const PrivacySettingsNoticeModal = ({ isOpen, isReadDate, user }: OwnProps & Sta
         </p>
         <Button
           withPremiumGradient
-          size="smaller"
           onClick={handleOpenPremium}
           className={styles.button}
         >
@@ -138,7 +136,7 @@ const PrivacySettingsNoticeModal = ({ isOpen, isReadDate, user }: OwnProps & Sta
 };
 
 export default memo(
-  withGlobal<OwnProps>((global): StateProps => {
+  withGlobal<OwnProps>((global): Complete<StateProps> => {
     const { chatId, isReadDate } = selectTabState(global).privacySettingsNoticeModal || {};
     const user = chatId ? selectUser(global, chatId) : undefined;
 

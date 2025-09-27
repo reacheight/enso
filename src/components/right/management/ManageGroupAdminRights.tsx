@@ -1,5 +1,6 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import type React from '../../../lib/teact/teact';
+import {
   memo, useCallback, useEffect, useMemo, useState,
 } from '../../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../../global';
@@ -16,6 +17,7 @@ import useFlag from '../../../hooks/useFlag';
 import useHistoryBack from '../../../hooks/useHistoryBack';
 import useOldLang from '../../../hooks/useOldLang';
 
+import Icon from '../../common/icons/Icon';
 import PrivateChatInfo from '../../common/PrivateChatInfo';
 import Checkbox from '../../ui/Checkbox';
 import ConfirmDialog from '../../ui/ConfirmDialog';
@@ -169,7 +171,7 @@ const ManageGroupAdminRights: FC<OwnProps & StateProps> = ({
       return false;
     }
 
-    return !chat.adminRights![key];
+    return !chat.adminRights[key];
   }, [chat, isFormFullyDisabled]);
 
   const memberStatus = useMemo(() => {
@@ -204,7 +206,7 @@ const ManageGroupAdminRights: FC<OwnProps & StateProps> = ({
 
   return (
     <div className="Management">
-      <div className="custom-scroll">
+      <div className="panel-content custom-scroll">
         <div className="section">
           <ListItem inactive className="chat-item-clickable">
             <PrivateChatInfo
@@ -403,7 +405,7 @@ const ManageGroupAdminRights: FC<OwnProps & StateProps> = ({
         {isLoading ? (
           <Spinner color="white" />
         ) : (
-          <i className="icon icon-check" />
+          <Icon name="check" />
         )}
       </FloatingActionButton>
 
@@ -422,7 +424,7 @@ const ManageGroupAdminRights: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { chatId, isPromotedByCurrentUser }): StateProps => {
+  (global, { chatId, isPromotedByCurrentUser }): Complete<StateProps> => {
     const chat = selectChat(global, chatId)!;
     const fullInfo = selectChatFullInfo(global, chatId);
     const { byId: usersById } = global.users;

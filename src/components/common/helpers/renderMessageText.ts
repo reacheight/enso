@@ -1,10 +1,12 @@
+import { getGlobal } from '../../../global';
+
 import type { ApiMessage, ApiSponsoredMessage } from '../../../api/types';
-import type { LangFn } from '../../../hooks/useOldLang';
-import type { TextPart } from '../../../types';
+import type { TextPart, ThreadId } from '../../../types';
 import { ApiMessageEntityTypes } from '../../../api/types';
 
 import {
-  getMessageText,
+  getMessageStatefulContent,
+  getMessageTextWithFallback,
 } from '../../../global/helpers';
 import {
   getMessageSummaryDescription,
@@ -13,6 +15,7 @@ import {
   TRUNCATED_SUMMARY_LENGTH,
 } from '../../../global/helpers/messageSummary';
 import { getMessageKey } from '../../../util/keys/messageKey';
+import { getTranslationFn, type LangFn } from '../../../util/localization';
 import trimText from '../../../util/trimText';
 import renderText from './renderText';
 import { renderTextWithEntities } from './renderTextWithEntities';
@@ -21,27 +24,31 @@ export function renderMessageText({
   message,
   highlight,
   emojiSize,
-  isSimple,
+  asPreview,
   truncateLength,
   isProtected,
   forcePlayback,
   shouldRenderAsHtml,
   isForMediaViewer,
-} : {
+  threadId,
+  maxTimestamp,
+}: {
   message: ApiMessage | ApiSponsoredMessage;
   highlight?: string;
   emojiSize?: number;
-  isSimple?: boolean;
+  asPreview?: boolean;
   truncateLength?: number;
   isProtected?: boolean;
   forcePlayback?: boolean;
   shouldRenderAsHtml?: boolean;
   isForMediaViewer?: boolean;
+  threadId?: ThreadId;
+  maxTimestamp?: number;
 }) {
   const { text, entities } = message.content.text || {};
 
   if (!text) {
-    const contentNotSupportedText = getMessageText(message);
+    const contentNotSupportedText = getMessageTextWithFallback(getTranslationFn(), message)?.text;
     return contentNotSupportedText ? [trimText(contentNotSupportedText, truncateLength)] : undefined;
   }
 
@@ -54,9 +61,13 @@ export function renderMessageText({
     emojiSize,
     shouldRenderAsHtml,
     containerId: `${isForMediaViewer ? 'mv-' : ''}${messageKey}`,
-    isSimple,
+    asPreview,
     isProtected,
     forcePlayback,
+    messageId: 'id' in message ? message.id : undefined,
+    chatId: message.chatId,
+    threadId,
+    maxTimestamp,
   });
 }
 
@@ -70,10 +81,13 @@ export function renderMessageSummary(
 ): TextPart[] {
   const { entities } = message.content.text || {};
 
+  const global = getGlobal();
+  const statefulContent = getMessageStatefulContent(global, message);
+
   const hasSpoilers = entities?.some((e) => e.type === ApiMessageEntityTypes.Spoiler);
   const hasCustomEmoji = entities?.some((e) => e.type === ApiMessageEntityTypes.CustomEmoji);
   if (!hasSpoilers && !hasCustomEmoji) {
-    const text = trimText(getMessageSummaryText(lang, message, noEmoji), truncateLength);
+    const text = trimText(getMessageSummaryText(lang, message, statefulContent, noEmoji), truncateLength);
 
     if (highlight) {
       return renderText(text, ['emoji', 'highlight'], { highlight });
@@ -86,9 +100,9 @@ export function renderMessageSummary(
   const emojiWithSpace = emoji ? `${emoji} ` : '';
 
   const text = renderMessageText({
-    message, highlight, isSimple: true, truncateLength,
+    message, highlight, asPreview: true, truncateLength,
   });
-  const description = getMessageSummaryDescription(lang, message, text);
+  const description = getMessageSummaryDescription(lang, message, statefulContent, text);
 
   return [
     ...renderText(emojiWithSpace),

@@ -1,12 +1,12 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   beginHeavyAnimation,
   memo, useEffect, useMemo, useRef, useState,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiChat } from '../../../api/types';
-import type { TopicsInfo } from '../../../global/types';
+import type { TopicsInfo } from '../../../types';
 import { MAIN_THREAD_ID } from '../../../api/types';
 
 import {
@@ -22,11 +22,11 @@ import {
   selectTabState,
   selectTopicsInfo,
 } from '../../../global/selectors';
+import { IS_TOUCH_ENV } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
 import captureEscKeyListener from '../../../util/captureEscKeyListener';
 import { captureEvents, SwipeDirection } from '../../../util/captureEvents';
 import { waitForTransitionEnd } from '../../../util/cssAnimationEndListeners';
-import { IS_TOUCH_ENV } from '../../../util/windowEnvironment';
 
 import useAppLayout from '../../../hooks/useAppLayout';
 import useHistoryBack from '../../../hooks/useHistoryBack';
@@ -39,6 +39,7 @@ import useOrderDiff from './hooks/useOrderDiff';
 
 import GroupCallTopPane from '../../calls/group/GroupCallTopPane';
 import GroupChatInfo from '../../common/GroupChatInfo';
+import Icon from '../../common/icons/Icon';
 import HeaderActions from '../../middle/HeaderActions';
 import Button from '../../ui/Button';
 import InfiniteScroll from '../../ui/InfiniteScroll';
@@ -80,13 +81,10 @@ const ForumPanel: FC<OwnProps & StateProps> = ({
     closeForumPanel, openChatWithInfo, loadTopics,
   } = getActions();
 
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>();
 
-  // eslint-disable-next-line no-null/no-null
-  const containerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const scrollTopHandlerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>();
+  const scrollTopHandlerRef = useRef<HTMLDivElement>();
   const { isMobile } = useAppLayout();
   const chatId = chat?.id;
 
@@ -167,10 +165,10 @@ const ForumPanel: FC<OwnProps & StateProps> = ({
 
         if (isVisible) {
           shouldRenderRef.current = true;
-          ref.current!.style.transform = 'none';
+          ref.current.style.transform = 'none';
         } else {
           shouldRenderRef.current = false;
-          ref.current!.style.transform = '';
+          ref.current.style.transform = '';
         }
       });
     }
@@ -183,7 +181,7 @@ const ForumPanel: FC<OwnProps & StateProps> = ({
 
     return captureEvents(ref.current!, {
       selectorToPreventScroll: '.chat-list',
-      onSwipe: ((e, direction) => {
+      onSwipe: (e, direction) => {
         const closeDirection = lang.isRtl ? SwipeDirection.Left : SwipeDirection.Right;
 
         if (direction === closeDirection) {
@@ -192,12 +190,12 @@ const ForumPanel: FC<OwnProps & StateProps> = ({
         }
 
         return false;
-      }),
+      },
     });
   }, [closeForumPanel, lang.isRtl]);
 
   function renderTopics() {
-    const viewportOffset = orderedIds!.indexOf(viewportIds![0]);
+    const viewportOffset = orderedIds.indexOf(viewportIds![0]);
 
     return viewportIds?.map((id, i) => (
       <Topic
@@ -234,7 +232,7 @@ const ForumPanel: FC<OwnProps & StateProps> = ({
           onClick={handleClose}
           ariaLabel={lang('Close')}
         >
-          <i className="icon icon-close" />
+          <Icon name="close" />
         </Button>
 
         {chat && (
@@ -260,7 +258,7 @@ const ForumPanel: FC<OwnProps & StateProps> = ({
           )}
       </div>
 
-      {chat && <GroupCallTopPane chatId={chat.id} hasPinnedOffset={false} className={styles.groupCall} />}
+      {chat && <GroupCallTopPane chatId={chat.id} />}
 
       <div className={styles.notch} />
 
@@ -290,7 +288,7 @@ const ForumPanel: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     const chatId = selectTabState(global).forumPanelChatId;
     const chat = chatId ? selectChat(global, chatId) : undefined;
     const {

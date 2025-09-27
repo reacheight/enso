@@ -1,5 +1,6 @@
 import type { FC } from '../../lib/teact/teact';
-import React, {
+import type React from '../../lib/teact/teact';
+import {
   memo, useCallback, useEffect, useRef, useState,
 } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
@@ -8,8 +9,8 @@ import type { ApiCountryCode, ApiUser, ApiUserStatus } from '../../api/types';
 
 import { getUserStatus } from '../../global/helpers';
 import { selectUser, selectUserStatus } from '../../global/selectors';
+import { IS_TOUCH_ENV } from '../../util/browser/windowEnvironment';
 import { formatPhoneNumberWithCode } from '../../util/phoneNumber';
-import { IS_TOUCH_ENV } from '../../util/windowEnvironment';
 import renderText from '../common/helpers/renderText';
 
 import useCurrentOrPrev from '../../hooks/useCurrentOrPrev';
@@ -51,8 +52,7 @@ const NewContactModal: FC<OwnProps & StateProps> = ({
   const lang = useOldLang();
   const renderingUser = useCurrentOrPrev(user);
   const renderingIsByPhoneNumber = useCurrentOrPrev(isByPhoneNumber);
-  // eslint-disable-next-line no-null/no-null
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>();
 
   const [isShown, markIsShown, unmarkIsShown] = useFlag();
   const [firstName, setFirstName] = useState<string>(renderingUser?.firstName ?? '');
@@ -73,7 +73,9 @@ const NewContactModal: FC<OwnProps & StateProps> = ({
 
   useEffect(() => {
     if (!IS_TOUCH_ENV && isShown) {
-      setTimeout(() => { inputRef.current?.focus(); }, ANIMATION_DURATION);
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, ANIMATION_DURATION);
     }
   }, [isShown]);
 
@@ -157,12 +159,13 @@ const NewContactModal: FC<OwnProps & StateProps> = ({
           )}
         </p>
         <Checkbox
+          className="dialog-checkbox"
           checked={shouldSharePhoneNumber}
           tabIndex={0}
           onCheck={setShouldSharePhoneNumber}
           label={lang('lng_new_contact_share')}
         />
-        <p className="NewContactModal__help-text">
+        <p className="NewContactModal__help-text NewContactModal__help-text__negative">
           {renderText(lang('AddContact.SharedContactExceptionInfo', renderingUser?.firstName))}
         </p>
       </>
@@ -213,17 +216,17 @@ const NewContactModal: FC<OwnProps & StateProps> = ({
         <Button
           isText
           className="confirm-dialog-button"
-          onClick={handleClose}
-        >
-          {lang('Cancel')}
-        </Button>
-        <Button
-          isText
-          className="confirm-dialog-button"
           disabled={!canBeSubmitted}
           onClick={handleSubmit}
         >
           {lang('Done')}
+        </Button>
+        <Button
+          isText
+          className="confirm-dialog-button"
+          onClick={handleClose}
+        >
+          {lang('Cancel')}
         </Button>
       </div>
     </Modal>
@@ -231,7 +234,7 @@ const NewContactModal: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global, { userId }): StateProps => {
+  (global, { userId }): Complete<StateProps> => {
     const user = userId ? selectUser(global, userId) : undefined;
     return {
       user,

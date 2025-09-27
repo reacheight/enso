@@ -4,40 +4,43 @@ import type {
   ApiLanguage,
   CachedLangData,
   LangPack,
+  LangPackStringValue,
 } from '../../api/types';
-import type { LangKey } from '../../types/language';
+import type { LangKey, LangVariable } from '../../types/language';
 import {
   type AdvancedLangFnOptions,
+  type AdvancedLangFnOptionsWithPlural,
+  type AdvancedLangFnParameters,
   areAdvancedLangFnOptions,
   isDeletedLangString,
   isPluralLangString,
   type LangFn,
   type LangFnOptions,
+  type LangFnOptionsWithPlural,
   type LangFnParameters,
-  type LangFnWithFunction,
   type LangFormatters,
+  type RegularLangFnParameters,
 } from './types';
 
-import { DEBUG } from '../../config';
+import { DEBUG, LANG_PACK } from '../../config';
 import { callApi } from '../../api/gramjs';
-import renderText, { type TextFilter } from '../../components/common/helpers/renderText';
+import renderText from '../../components/common/helpers/renderText';
+import { IS_INTL_LIST_FORMAT_SUPPORTED } from '../browser/globalEnvironment';
 import { MAIN_IDB_STORE } from '../browser/idb';
 import { getBasicListFormat } from '../browser/intlListFormat';
+import { notifyLangpackUpdate } from '../browser/multitab';
 import { createCallbackManager } from '../callbacks';
 import readFallbackStrings from '../data/readFallbackStrings';
 import { initialEstablishmentPromise, isCurrentTabMaster } from '../establishMultitabRole';
-import { omit } from '../iteratees';
-import { notifyLangpackUpdate } from '../multitab';
+import { omit, unique } from '../iteratees';
 import { replaceInStringsWithTeact } from '../replaceWithTeact';
 import { fastRaf } from '../schedulers';
-import { IS_INTL_LIST_FORMAT_SUPPORTED, IS_MULTITAB_SUPPORTED } from '../windowEnvironment';
 
 import Deferred from '../Deferred';
 import LimitedMap from '../primitives/LimitedMap';
 
 import initialStrings from '../../assets/localization/initialStrings';
 
-const LANG_PACK = 'weba';
 const LANGPACK_STORE_PREFIX = 'langpack-';
 const FORMATTERS_FALLBACK_LANG = 'en';
 
@@ -105,24 +108,30 @@ async function fetchDifference() {
     return;
   }
 
-  if (IS_MULTITAB_SUPPORTED) {
-    await initialEstablishmentPromise;
-    if (!isCurrentTabMaster()) return;
-  }
+  await initialEstablishmentPromise;
+  if (!isCurrentTabMaster()) return;
 
   const result = await callApi('fetchLangDifference', {
     langPack: LANG_PACK,
     langCode: langPack.langCode,
     fromVersion: langPack.version,
   });
-  if (!result || result.version === langPack.version) return;
+  if (!result) return;
+
+  applyLangPackDifference(result.version, result.strings, result.keysToRemove);
+}
+
+export function applyLangPackDifference(
+  version: number, strings: Record<string, LangPackStringValue>, keysToRemove: string[],
+) {
+  if (!langPack || !language || version === langPack.version) return;
 
   const newLangPack = {
     ...langPack,
-    version: result.version,
+    version,
     strings: {
-      ...omit(langPack.strings, result.keysToRemove),
-      ...result.strings,
+      ...omit(langPack.strings, keysToRemove),
+      ...strings,
     },
   };
   updateLangPack(newLangPack);
@@ -160,6 +169,10 @@ function createFormatters() {
       conjunction: createListFormat(langCode, 'conjunction'),
       disjunction: createListFormat(langCode, 'disjunction'),
       number: new Intl.NumberFormat(langCode),
+      preciseNumber: new Intl.NumberFormat(langCode, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 10,
+      }),
     };
   } catch (e) {
     // eslint-disable-next-line no-console
@@ -170,6 +183,10 @@ function createFormatters() {
       conjunction: createListFormat(FORMATTERS_FALLBACK_LANG, 'conjunction'),
       disjunction: createListFormat(FORMATTERS_FALLBACK_LANG, 'disjunction'),
       number: new Intl.NumberFormat(FORMATTERS_FALLBACK_LANG),
+      preciseNumber: new Intl.NumberFormat(FORMATTERS_FALLBACK_LANG, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 10,
+      }),
     };
   }
 }
@@ -194,9 +211,10 @@ export async function initLocalization(langCode: string, canLoadFromServer?: boo
     fetchDifference();
   } else if (canLoadFromServer) {
     await loadAndChangeLanguage(langCode);
-  } else {
-    loadFallbackPack();
   }
+
+  // Always start loading fallback pack in the background. Some languages may not have every string translated.
+  loadFallbackPack();
 
   translationFn = createTranslationFn();
   scheduleCallbacks();
@@ -221,10 +239,8 @@ export async function loadAndChangeLanguage(langCode: string, shouldCheckCache?:
     }
   }
 
-  if (IS_MULTITAB_SUPPORTED) {
-    await initialEstablishmentPromise;
-    if (!isCurrentTabMaster()) return undefined;
-  }
+  await initialEstablishmentPromise;
+  if (!isCurrentTabMaster()) return undefined;
 
   const remoteLanguage = await callApi('fetchLanguage', {
     langPack: LANG_PACK,
@@ -242,6 +258,11 @@ export async function loadAndChangeLanguage(langCode: string, shouldCheckCache?:
   return changeLanguage(remoteLanguage);
 }
 
+export function requestLangPackDifference(langCode: string) {
+  if (language?.langCode !== langCode) return;
+  fetchDifference();
+}
+
 export async function changeLanguage(newLanguage: ApiLanguage) {
   if (langPack && language?.langCode === newLanguage.langCode) return;
 
@@ -252,10 +273,8 @@ export async function changeLanguage(newLanguage: ApiLanguage) {
 
     fetchDifference();
   } else {
-    if (IS_MULTITAB_SUPPORTED) {
-      await initialEstablishmentPromise;
-      if (!isCurrentTabMaster()) return;
-    }
+    await initialEstablishmentPromise;
+    if (!isCurrentTabMaster()) return;
     const remoteLangPack = await callApi('fetchLangPack', {
       langPack: LANG_PACK,
       langCode: newLanguage.langCode,
@@ -295,19 +314,28 @@ function createTranslationFn(): LangFn {
     }
     return processTranslation(key, variables as Record<string, string | number>, options);
   }) as LangFn;
-  fn.code = language?.langCode || FORMATTERS_FALLBACK_LANG;
+  fn.rawCode = language?.langCode || FORMATTERS_FALLBACK_LANG;
   fn.isRtl = language?.isRtl;
-  fn.pluralCode = language?.pluralCode || FORMATTERS_FALLBACK_LANG;
-  fn.with = (({ key, variables, options }: LangFnParameters) => {
+  fn.code = language?.pluralCode || FORMATTERS_FALLBACK_LANG;
+  fn.with = ({ key, variables, options }: LangFnParameters) => {
     if (options && areAdvancedLangFnOptions(options)) {
-      return processTranslationAdvanced(key, variables as Record<string, TeactNode>, options);
+      return processTranslationAdvanced(key, variables as Record<string, TeactNode | undefined>, options);
     }
-    return processTranslation(key, variables as Record<string, string | number>, options);
-  }) as LangFnWithFunction;
+    return processTranslation(key, variables as Record<string, LangVariable>, options);
+  };
+  fn.withRegular = ({ key, variables, options }: RegularLangFnParameters) => {
+    return processTranslation(key, variables, options);
+  };
+  fn.withAdvanced = ({ key, variables, options }: AdvancedLangFnParameters) => {
+    return processTranslationAdvanced(key, variables, options);
+  };
   fn.region = (code: string) => formatters?.region.of(code);
   fn.conjunction = (list: string[]) => formatters?.conjunction.format(list) || list.join(', ');
   fn.disjunction = (list: string[]) => formatters?.disjunction.format(list) || list.join(', ');
   fn.number = (value: number) => formatters?.number.format(value) || String(value);
+  fn.preciseNumber = (value: number) => formatters?.preciseNumber.format(value) || String(value);
+  fn.internalFormatters = formatters!;
+  fn.languageInfo = language!;
   return fn;
 }
 
@@ -315,7 +343,7 @@ export function getTranslationFn(): LangFn {
   return translationFn;
 }
 
-function getString(langKey: LangKey, count: number, options?: Pick<LangFnOptions, 'pluralValue'>) {
+function getString(langKey: LangKey, count: number) {
   let langPackStringValue = langPack?.strings[langKey];
 
   if (!langPackStringValue && !fallbackLangPack) {
@@ -327,7 +355,7 @@ function getString(langKey: LangKey, count: number, options?: Pick<LangFnOptions
 
   if (!langPackStringValue || isDeletedLangString(langPackStringValue)) return undefined;
 
-  const pluralSuffix = formatters?.pluralRules.select(options?.pluralValue || count) || 'other';
+  const pluralSuffix = formatters?.pluralRules.select(count) || 'other';
 
   const string = isPluralLangString(langPackStringValue)
     ? (langPackStringValue[pluralSuffix] || langPackStringValue.other)
@@ -337,20 +365,29 @@ function getString(langKey: LangKey, count: number, options?: Pick<LangFnOptions
 }
 
 function processTranslation(
-  langKey: LangKey, variables?: Record<string, string | number>, options?: LangFnOptions,
+  langKey: LangKey,
+  variables?: Record<string, LangVariable | RegularLangFnParameters>,
+  options?: LangFnOptions | LangFnOptionsWithPlural,
 ): string {
   const cacheKey = `${langKey}-${JSON.stringify(variables)}-${JSON.stringify(options)}`;
   if (TRANSLATION_CACHE.has(cacheKey)) {
     return TRANSLATION_CACHE.get(cacheKey)!;
   }
 
-  const string = getString(langKey, options?.pluralValue || Number(variables?.count) || 0, options);
+  const pluralValue = options && 'pluralValue' in options ? Number(options.pluralValue) : 0;
+  const string = getString(langKey, pluralValue);
 
   if (!string) return langKey;
 
   const variableEntries = variables ? Object.entries(variables) : [];
   const finalString = variableEntries.reduce((result, [key, value]) => {
-    return result.replace(`{${key}}`, String(value));
+    if (value === undefined) return result;
+    if (typeof value === 'object') { // Allow recursive variables in basic `lang.with`
+      value = processTranslation(value.key, value.variables, value.options);
+    }
+
+    const valueAsString = Number.isFinite(value) ? formatters!.number.format(value as number) : String(value);
+    return result.replaceAll(`{${key}}`, valueAsString);
   }, string);
 
   TRANSLATION_CACHE.set(cacheKey, finalString);
@@ -359,9 +396,12 @@ function processTranslation(
 }
 
 function processTranslationAdvanced(
-  langKey: LangKey, variables?: Record<string, TeactNode>, options?: AdvancedLangFnOptions,
+  langKey: LangKey,
+  variables?: Record<string, TeactNode | undefined>,
+  options?: AdvancedLangFnOptions | AdvancedLangFnOptionsWithPlural,
 ): TeactNode {
-  const string = getString(langKey, options?.pluralValue || Number(variables?.count) || 0, options);
+  const pluralValue = options && 'pluralValue' in options ? Number(options.pluralValue) : 0;
+  const string = getString(langKey, pluralValue);
   if (!string) return langKey;
 
   const variableEntries = variables ? Object.entries(variables) : [];
@@ -377,17 +417,22 @@ function processTranslationAdvanced(
   const withRenderText = options?.withMarkdown || options?.renderTextFilters;
 
   if (withRenderText) {
+    const filters = options?.withMarkdown
+      ? unique((options.renderTextFilters || []).concat(['simple_markdown', 'emoji']))
+      : options.renderTextFilters;
+
     return tempResult.flatMap((curr: TeactNode) => {
       if (typeof curr !== 'string') {
         return curr;
       }
 
-      const filters = options?.withMarkdown ? ['simple_markdown', 'emoji'] as TextFilter[] : options.renderTextFilters!;
-
       return renderText(curr, filters, {
         markdownPostProcessor: (part: string) => {
           return variableEntries.reduce((result, [key, value]): TeactNode[] => {
-            return replaceInStringsWithTeact(result, `{${key}}`, value);
+            if (value === undefined) return result;
+
+            const preparedValue = Number.isFinite(value) ? formatters!.number.format(value as number) : value;
+            return replaceInStringsWithTeact(result, `{${key}}`, renderText(preparedValue));
           }, [part] as TeactNode[]);
         },
       });
@@ -395,7 +440,10 @@ function processTranslationAdvanced(
   }
 
   return variableEntries.reduce((result, [key, value]): TeactNode[] => {
-    return replaceInStringsWithTeact(result, `{${key}}`, value);
+    if (value === undefined) return result;
+
+    const preparedValue = Number.isFinite(value) ? formatters!.number.format(value as number) : value;
+    return replaceInStringsWithTeact(result, `{${key}}`, renderText(preparedValue));
   }, tempResult);
 }
 
@@ -409,4 +457,6 @@ export {
 export type {
   LangFn,
   LangFnParameters,
+  RegularLangFnParameters,
+  AdvancedLangFnParameters,
 };

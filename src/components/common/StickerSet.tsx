@@ -1,14 +1,17 @@
 import type { FC } from '../../lib/teact/teact';
-import React, {
+import {
   memo, useEffect, useMemo, useRef, useState,
 } from '../../lib/teact/teact';
-import { getActions, getGlobal } from '../../global';
+import { getActions, getGlobal, withGlobal } from '../../global';
 
-import type { ApiAvailableReaction, ApiReaction, ApiSticker } from '../../api/types';
+import type {
+  ApiAvailableReaction, ApiEmojiStatusType, ApiReactionWithPaid, ApiSticker,
+} from '../../api/types';
 import type { ObserveFn } from '../../hooks/useIntersectionObserver';
 import type { StickerSetOrReactionsSetOrRecent } from '../../types';
 
 import {
+  COLLECTIBLE_STATUS_SET_ID,
   DEFAULT_STATUS_ICON_ID,
   DEFAULT_TOPIC_ICON_STICKER_ID,
   EFFECT_EMOJIS_SET_ID,
@@ -35,7 +38,7 @@ import useWindowSize from '../../hooks/window/useWindowSize';
 import Button from '../ui/Button';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import Icon from './icons/Icon';
-import ReactionEmoji from './ReactionEmoji';
+import ReactionEmoji from './reactions/ReactionEmoji';
 import StickerButton from './StickerButton';
 
 import grey from '../../assets/icons/forumTopic/grey.svg';
@@ -65,7 +68,8 @@ type OwnProps = {
   observeIntersectionForShowingItems: ObserveFn;
   availableReactions?: ApiAvailableReaction[];
   onStickerSelect?: (sticker: ApiSticker, isSilent?: boolean, shouldSchedule?: boolean) => void;
-  onReactionSelect?: (reaction: ApiReaction) => void;
+  onReactionSelect?: (reaction: ApiReactionWithPaid) => void;
+  onReactionContext?: (reaction: ApiReactionWithPaid) => void;
   onStickerUnfave?: (sticker: ApiSticker) => void;
   onStickerFave?: (sticker: ApiSticker) => void;
   onStickerRemoveRecent?: (sticker: ApiSticker) => void;
@@ -74,13 +78,17 @@ type OwnProps = {
   onContextMenuClick?: NoneToVoidFunction;
 };
 
+type StateProps = {
+  collectibleStatuses?: ApiEmojiStatusType[];
+};
+
 const ITEMS_PER_ROW_FALLBACK = 8;
 const ITEMS_MOBILE_PER_ROW_FALLBACK = 7;
 const ITEMS_MINI_MOBILE_PER_ROW_FALLBACK = 6;
 const MOBILE_WIDTH_THRESHOLD_PX = 440;
 const MINI_MOBILE_WIDTH_THRESHOLD_PX = 362;
 
-const StickerSet: FC<OwnProps> = ({
+const StickerSet: FC<OwnProps & StateProps> = ({
   stickerSet,
   loadAndPlay,
   index,
@@ -105,6 +113,7 @@ const StickerSet: FC<OwnProps> = ({
   observeIntersectionForPlayingItems,
   observeIntersectionForShowingItems,
   onReactionSelect,
+  onReactionContext,
   onStickerSelect,
   onStickerUnfave,
   onStickerFave,
@@ -112,6 +121,7 @@ const StickerSet: FC<OwnProps> = ({
   onContextMenuOpen,
   onContextMenuClose,
   onContextMenuClick,
+  collectibleStatuses,
 }) => {
   const {
     clearRecentStickers,
@@ -122,13 +132,10 @@ const StickerSet: FC<OwnProps> = ({
     loadStickers,
   } = getActions();
 
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>();
 
-  // eslint-disable-next-line no-null/no-null
-  const sharedCanvasRef = useRef<HTMLCanvasElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const sharedCanvasHqRef = useRef<HTMLCanvasElement>(null);
+  const sharedCanvasRef = useRef<HTMLCanvasElement>();
+  const sharedCanvasHqRef = useRef<HTMLCanvasElement>();
 
   const lang = useOldLang();
   const { width: windowWidth } = useWindowSize();
@@ -147,6 +154,7 @@ const StickerSet: FC<OwnProps> = ({
   const emojiMarginPx = isMobile ? 8 : 10;
   const emojiVerticalMarginPx = isMobile ? 8 : 4;
   const isRecent = stickerSet.id === RECENT_SYMBOL_SET_ID;
+  const isStatusCollectible = stickerSet.id === COLLECTIBLE_STATUS_SET_ID;
   const isFavorite = stickerSet.id === FAVORITE_SYMBOL_SET_ID;
   const isPopular = stickerSet.id === POPULAR_SYMBOL_SET_ID;
   const isEmoji = stickerSet.isEmoji;
@@ -253,7 +261,11 @@ const StickerSet: FC<OwnProps> = ({
   const favoriteStickerIdsSet = useMemo(() => (
     favoriteStickers ? new Set(favoriteStickers.map(({ id }) => id)) : undefined
   ), [favoriteStickers]);
-  const withAddSetButton = !shouldHideHeader && !isRecent && isEmoji && !isPopular && !isChatEmojiSet
+  const collectibleEmojiIdsSet = useMemo(() => (
+    collectibleStatuses ? new Set(collectibleStatuses.map(({ documentId }) => documentId)) : undefined
+  ), [collectibleStatuses]);
+  const withAddSetButton = !shouldHideHeader && !isRecent && !isStatusCollectible
+    && isEmoji && !isPopular && !isChatEmojiSet
     && (!isInstalled || (!isCurrentUserPremium && !isSavedMessages));
   const addSetButtonText = useMemo(() => {
     if (isLocked) {
@@ -351,6 +363,7 @@ const StickerSet: FC<OwnProps> = ({
               availableReactions={availableReactions}
               observeIntersection={observeIntersectionForPlayingItems}
               onClick={onReactionSelect!}
+              onContextMenu={onReactionContext}
               sharedCanvasRef={sharedCanvasRef}
               sharedCanvasHqRef={sharedCanvasHqRef}
               forcePlayback={forcePlayback}
@@ -366,6 +379,9 @@ const StickerSet: FC<OwnProps> = ({
               : sharedCanvasRef;
             const reactionId = sticker.isCustomEmoji ? sticker.id : sticker.emoji;
             const isSelected = reactionId ? selectedReactionIds?.includes(reactionId) : undefined;
+
+            const withSparkles = sticker.id === COLLECTIBLE_STATUS_SET_ID
+              || collectibleEmojiIdsSet?.has(sticker.id);
 
             return (
               <StickerButton
@@ -396,6 +412,7 @@ const StickerSet: FC<OwnProps> = ({
                 isEffectEmoji={stickerSet.id === EFFECT_EMOJIS_SET_ID}
                 noShowPremium={isCurrentUserPremium
                   && (stickerSet.id === EFFECT_STICKERS_SET_ID || stickerSet.id === EFFECT_EMOJIS_SET_ID)}
+                withSparkles={withSparkles}
               />
             );
           })}
@@ -407,7 +424,8 @@ const StickerSet: FC<OwnProps> = ({
             onClick={expand}
             key="more"
           >
-            +{totalItemsCount - itemsBeforeCutout}
+            +
+            {totalItemsCount - itemsBeforeCutout}
           </Button>
         )}
       </div>
@@ -425,7 +443,13 @@ const StickerSet: FC<OwnProps> = ({
   );
 };
 
-export default memo(StickerSet);
+export default memo(withGlobal<OwnProps>(
+  (global): Complete<StateProps> => {
+    const collectibleStatuses = global.collectibleEmojiStatuses?.statuses;
+
+    return { collectibleStatuses };
+  },
+)(StickerSet));
 
 function getItemsPerRowFallback(windowWidth: number): number {
   return windowWidth > MOBILE_WIDTH_THRESHOLD_PX

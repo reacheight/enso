@@ -1,5 +1,5 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   useEffect,
   useState,
 } from '../../../lib/teact/teact';
@@ -8,6 +8,10 @@ import type { ApiPollAnswer, ApiPollResult } from '../../../api/types';
 
 import buildClassName from '../../../util/buildClassName';
 import { renderTextWithEntities } from '../../common/helpers/renderTextWithEntities';
+
+import useLang from '../../../hooks/useLang';
+
+import Icon from '../../common/icons/Icon';
 
 import './PollOption.scss';
 
@@ -28,6 +32,7 @@ const PollOption: FC<OwnProps> = ({
   correctResults,
   shouldAnimate,
 }) => {
+  const lang = useLang();
   const result = voteResults && voteResults.find((r) => r.option === answer.option);
   const correctAnswer = correctResults.length === 0 || correctResults.indexOf(answer.option) !== -1;
   const showIcon = (correctResults.length > 0 && correctAnswer) || (result?.isChosen);
@@ -49,9 +54,10 @@ const PollOption: FC<OwnProps> = ({
   const lineStyle = `width: ${lineWidth}%; transform:scaleX(${isAnimationDoesNotStart ? 0 : 1})`;
 
   return (
-    <div className="PollOption" dir="ltr">
+    <div className="PollOption" dir={lang.isRtl ? 'rtl' : undefined}>
       <div className={`poll-option-share ${answerPercent === '100' ? 'limit-width' : ''}`}>
-        {answerPercent}%
+        {answerPercent}
+        %
         {showIcon && (
           <span className={buildClassName(
             'poll-option-chosen',
@@ -59,7 +65,7 @@ const PollOption: FC<OwnProps> = ({
             shouldAnimate && 'animate',
           )}
           >
-            <i className={buildClassName('icon', correctAnswer ? 'icon-check' : 'icon-close')} />
+            <Icon name={correctAnswer ? 'check' : 'close'} className="poll-option-icon" />
           </span>
         )}
       </div>

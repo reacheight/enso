@@ -1,6 +1,7 @@
+import bigInt from 'big-integer';
 import { Api as GramJs } from '../../../lib/gramjs';
 
-import type { TelegramClient } from '../../../lib/gramjs';
+import type { SizeType, TelegramClient } from '../../../lib/gramjs';
 import type { ApiOnProgress, ApiParsedMedia } from '../../types';
 import {
   ApiMediaFormat,
@@ -17,7 +18,7 @@ import * as cacheApi from '../../../util/cacheApi';
 import { getEntityTypeById } from '../gramjsBuilders';
 import localDb from '../localDb';
 
-const MEDIA_ENTITY_TYPES: Set<EntityType> = new Set([
+const MEDIA_ENTITY_TYPES = new Set<EntityType>([
   'sticker', 'wallpaper', 'photo', 'webDocument', 'document',
 ]);
 
@@ -41,7 +42,7 @@ export default async function downloadMedia(
     return undefined;
   }
 
-  const parsed = await parseMedia(data, mediaFormat, mimeType);
+  const parsed = parseMedia(data, mediaFormat, mimeType);
   if (!parsed) {
     return undefined;
   }
@@ -88,15 +89,16 @@ async function download(
   } = parsed;
 
   if (entityType === 'staticMap') {
-    const accessHash = entityId;
+    const accessHash = bigInt(entityId);
     const parsedParams = new URLSearchParams(params);
-    const long = parsedParams.get('long');
-    const lat = parsedParams.get('lat');
-    const w = parsedParams.get('w');
-    const h = parsedParams.get('h');
-    const zoom = parsedParams.get('zoom');
-    const scale = parsedParams.get('scale');
-    const accuracyRadius = parsedParams.get('accuracy_radius');
+    const long = Number(parsedParams.get('long'));
+    const lat = Number(parsedParams.get('lat'));
+    const w = Number(parsedParams.get('w'));
+    const h = Number(parsedParams.get('h'));
+    const zoom = Number(parsedParams.get('zoom'));
+    const scale = Number(parsedParams.get('scale'));
+    const accuracyRadiusStr = parsedParams.get('accuracy_radius');
+    const accuracyRadius = accuracyRadiusStr ? Number(accuracyRadiusStr) : undefined;
 
     const data = await client.downloadStaticMap(accessHash, long, lat, w, h, zoom, scale, accuracyRadius);
     return {
@@ -140,7 +142,10 @@ async function download(
   }
 
   if (MEDIA_ENTITY_TYPES.has(entityType)) {
-    const data = await client.downloadMedia(entity, {
+    const entityWithType = entity as (
+      GramJs.Photo | GramJs.Document | GramJs.WebDocument
+    );
+    const data = await client.downloadMedia(entityWithType, {
       sizeType, start, end, progressCallback: onProgress, workers: DOWNLOAD_WORKERS,
     });
     let mimeType;
@@ -167,22 +172,25 @@ async function download(
 
     return { mimeType, data, fullSize };
   } else if (entityType === 'stickerSet') {
-    const data = await client.downloadStickerSetThumb(entity);
-    const mimeType = getMimeType(data);
+    const data = await client.downloadStickerSetThumb(entity as GramJs.StickerSet);
+    const mimeType = data && getMimeType(data);
 
     return { mimeType, data };
   } else {
-    const data = await client.downloadProfilePhoto(entity, mediaMatchType === 'profile');
-    const mimeType = getMimeType(data);
+    const data = await client.downloadProfilePhoto(entity as GramJs.Chat | GramJs.User, mediaMatchType === 'profile');
+    const mimeType = data && getMimeType(data);
 
     return { mimeType, data };
   }
 }
 
-// eslint-disable-next-line no-async-without-await/no-async-without-await
-async function parseMedia(
-  data: Buffer, mediaFormat: ApiMediaFormat, mimeType?: string,
-): Promise<ApiParsedMedia | undefined> {
+function parseMedia(
+  data: Buffer | File, mediaFormat: ApiMediaFormat, mimeType?: string,
+): ApiParsedMedia | undefined {
+  if (data instanceof File) {
+    return data;
+  }
+
   switch (mediaFormat) {
     case ApiMediaFormat.BlobUrl:
       return new Blob([data], { type: mimeType });
@@ -234,7 +242,7 @@ export function parseMediaUrl(url: string) {
     : url.startsWith('webDocument')
       ? url.match(/(webDocument):(.+)/)
       : url.match(
-        // eslint-disable-next-line max-len
+
         /(avatar|profile|photo|stickerSet|sticker|wallpaper|document)([-\d\w./]+)(?::\d+)?(\?size=\w+)?/,
       );
   if (!mediaMatch) {
@@ -246,7 +254,7 @@ export function parseMediaUrl(url: string) {
 
   let entityType: EntityType;
   const params = mediaMatch[3];
-  const sizeType = params?.replace('?size=', '') || undefined;
+  const sizeType = params?.replace('?size=', '') as SizeType || undefined;
 
   if (mediaMatch[1] === 'avatar' || mediaMatch[1] === 'profile') {
     entityType = getEntityTypeById(entityId);

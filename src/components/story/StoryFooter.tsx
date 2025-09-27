@@ -1,11 +1,14 @@
-import React, { memo, useMemo } from '../../lib/teact/teact';
+import { memo, useMemo } from '../../lib/teact/teact';
 import { getActions, getGlobal } from '../../global';
 
 import type { ApiStory } from '../../api/types';
 
 import { HEART_REACTION } from '../../config';
-import { getStoryKey, isUserId } from '../../global/helpers';
+import {
+  getReactionKey, getStoryKey, isSameReaction,
+} from '../../global/helpers';
 import buildClassName from '../../util/buildClassName';
+import { isUserId } from '../../util/entities/ids';
 
 import useLastCallback from '../../hooks/useLastCallback';
 import useOldLang from '../../hooks/useOldLang';
@@ -35,8 +38,7 @@ const StoryFooter = ({
   const { viewsCount, forwardsCount, reactionsCount } = views || {};
   const isChannel = !isUserId(peerId);
 
-  const isSentStoryReactionHeart = sentReaction && 'emoticon' in sentReaction
-    ? sentReaction.emoticon === HEART_REACTION.emoticon : false;
+  const isSentStoryReactionHeart = sentReaction && isSameReaction(sentReaction, HEART_REACTION);
 
   const canForward = Boolean(
     (isOut || isChannel)
@@ -101,7 +103,10 @@ const StoryFooter = ({
         )}
 
         {isChannel ? (
-          <span className={styles.views}><Icon name="channelviews" className={styles.viewIcon} />{viewsCount}</span>
+          <span className={styles.views}>
+            <Icon name="channelviews" className={styles.viewIcon} />
+            {viewsCount}
+          </span>
         ) : (
           <span className={styles.views}>{lang('Views', viewsCount, 'i')}</span>
         )}
@@ -152,7 +157,7 @@ const StoryFooter = ({
             >
               {sentReaction && (
                 <ReactionAnimatedEmoji
-                  key={'documentId' in sentReaction ? sentReaction.documentId : sentReaction.emoticon}
+                  key={getReactionKey(sentReaction)}
                   containerId={containerId}
                   reaction={sentReaction}
                   withEffectOnly={isSentStoryReactionHeart}

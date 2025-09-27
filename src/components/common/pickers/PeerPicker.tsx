@@ -1,4 +1,5 @@
-import React, {
+import type React from '../../../lib/teact/teact';
+import {
   memo, useCallback, useEffect, useMemo, useRef,
 } from '../../../lib/teact/teact';
 import { getGlobal } from '../../../global';
@@ -7,7 +8,7 @@ import type { CustomPeerType, UniqueCustomPeer } from '../../../types';
 
 import { DEBUG } from '../../../config';
 import { requestMeasure } from '../../../lib/fasterdom/fasterdom';
-import { getGroupStatus, getUserStatus, isUserOnline } from '../../../global/helpers';
+import { getGroupStatus, getMainUsername, getUserStatus, isUserOnline } from '../../../global/helpers';
 import { getPeerTypeKey, isApiPeerChat } from '../../../global/helpers/peers';
 import { selectPeer, selectUserStatus } from '../../../global/selectors';
 import buildClassName from '../../../util/buildClassName';
@@ -26,23 +27,23 @@ import Radio from '../../ui/Radio';
 import Avatar from '../Avatar';
 import FullNameTitle from '../FullNameTitle';
 import Icon from '../icons/Icon';
+import PeerChip from '../PeerChip';
 import PickerItem from './PickerItem';
-import PickerSelectedItem from './PickerSelectedItem';
 
 import styles from './PickerStyles.module.scss';
 
-type SingleModeProps = {
+type SingleModeProps<CategoryType extends string> = {
   allowMultiple?: false;
   itemInputType?: 'radio';
   selectedId?: string;
   selectedIds?: never; // Help TS to throw an error if this is passed
-  selectedCategory?: CustomPeerType;
+  selectedCategory?: CategoryType;
   selectedCategories?: never;
-  onSelectedCategoryChange?: (category: CustomPeerType) => void;
+  onSelectedCategoryChange?: (category: CategoryType) => void;
   onSelectedIdChange?: (id: string) => void;
 };
 
-type MultipleModeProps = {
+type MultipleModeProps<CategoryType extends string> = {
   allowMultiple: true;
   itemInputType: 'checkbox';
   selectedId?: never;
@@ -50,14 +51,14 @@ type MultipleModeProps = {
   lockedSelectedIds?: string[];
   lockedUnselectedIds?: string[];
   selectedCategory?: never;
-  selectedCategories?: CustomPeerType[];
-  onSelectedCategoriesChange?: (categories: CustomPeerType[]) => void;
+  selectedCategories?: CategoryType[];
+  onSelectedCategoriesChange?: (categories: CategoryType[]) => void;
   onSelectedIdsChange?: (Ids: string[]) => void;
 };
 
-type OwnProps = {
+type OwnProps<CategoryType extends string> = {
   className?: string;
-  categories?: UniqueCustomPeer[];
+  categories?: UniqueCustomPeer<CategoryType>[];
   itemIds: string[];
   lockedUnselectedSubtitle?: string;
   filterValue?: string;
@@ -73,11 +74,12 @@ type OwnProps = {
   isViewOnly?: boolean;
   withStatus?: boolean;
   withPeerTypes?: boolean;
+  withPeerUsernames?: boolean;
   withDefaultPadding?: boolean;
   onFilterChange?: (value: string) => void;
   onDisabledClick?: (id: string, isSelected: boolean) => void;
   onLoadMore?: () => void;
-} & (SingleModeProps | MultipleModeProps);
+} & (SingleModeProps<CategoryType> | MultipleModeProps<CategoryType>);
 
 // Focus slows down animation, also it breaks transition layout in Chrome
 const FOCUS_DELAY_MS = 500;
@@ -87,7 +89,7 @@ const ALWAYS_FULL_ITEMS_COUNT = 5;
 
 const ITEM_CLASS_NAME = 'PeerPickerItem';
 
-const PeerPicker = ({
+const PeerPicker = <CategoryType extends string = CustomPeerType>({
   className,
   categories,
   itemIds,
@@ -106,12 +108,13 @@ const PeerPicker = ({
   itemInputType,
   withStatus,
   withPeerTypes,
+  withPeerUsernames,
   withDefaultPadding,
   onFilterChange,
   onDisabledClick,
   onLoadMore,
   ...optionalProps
-}: OwnProps) => {
+}: OwnProps<CategoryType>) => {
   const lang = useOldLang();
 
   const allowMultiple = optionalProps.allowMultiple;
@@ -133,8 +136,7 @@ const PeerPicker = ({
     return optionalProps.selectedId ? [optionalProps.selectedId] : MEMO_EMPTY_ARRAY;
   }, [allowMultiple, optionalProps.selectedId, optionalProps.selectedIds]);
 
-  // eslint-disable-next-line no-null/no-null
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>();
   const shouldMinimize = selectedIds.length > MAX_FULL_ITEMS;
 
   useEffect(() => {
@@ -244,7 +246,14 @@ const PeerPicker = ({
 
     const peerOrCategory = peer || category;
     if (!peerOrCategory) {
-      if (DEBUG) return <div key={id}>No peer or category with ID {id}</div>;
+      if (DEBUG) {
+        return (
+          <div key={id}>
+            No peer or category with ID
+            {id}
+          </div>
+        );
+      }
       return undefined;
     }
 
@@ -268,7 +277,16 @@ const PeerPicker = ({
 
     function getSubtitle() {
       if (isAlwaysUnselected) return [lockedUnselectedSubtitle];
-      if (withStatus && peer) {
+      if (!peer) return undefined;
+
+      if (withPeerUsernames) {
+        const username = getMainUsername(peer);
+        if (username) {
+          return [`@${username}`];
+        }
+      }
+
+      if (withStatus) {
         if (isApiPeerChat(peer)) {
           return [getGroupStatus(lang, peer)];
         }
@@ -279,10 +297,12 @@ const PeerPicker = ({
           buildClassName(isUserOnline(peer, userStatus, true) && styles.onlineStatus),
         ];
       }
-      if (withPeerTypes && peer) {
+
+      if (withPeerTypes) {
         const langKey = getPeerTypeKey(peer);
         return langKey && [lang(langKey)];
       }
+
       return undefined;
     }
 
@@ -307,16 +327,16 @@ const PeerPicker = ({
         ripple
         inputElement={getInputElement()}
         inputPosition="end"
-        // eslint-disable-next-line react/jsx-no-bind
+
         onClick={() => handleItemClick(id)}
-        // eslint-disable-next-line react/jsx-no-bind
+
         onDisabledClick={onDisabledClick && (() => onDisabledClick(id, isAlwaysSelected))}
       />
     );
   }, [
     categoriesByType, forceShowSelf, isViewOnly, itemClassName, itemInputType, lang, lockedSelectedIdsSet,
     lockedUnselectedIdsSet, lockedUnselectedSubtitle, onDisabledClick, selectedCategories, selectedIds,
-    withPeerTypes, withStatus,
+    withPeerTypes, withStatus, withPeerUsernames,
   ]);
 
   const beforeChildren = useMemo(() => {
@@ -335,7 +355,8 @@ const PeerPicker = ({
       {isSearchable && (
         <div className={buildClassName(styles.header, 'custom-scroll')} dir={lang.isRtl ? 'rtl' : undefined}>
           {selectedCategories?.map((category) => (
-            <PickerSelectedItem
+            <PeerChip
+              className={styles.peerChip}
               customPeer={categoriesByType[category]}
               onClick={handleItemClick}
               clickArg={category}
@@ -343,7 +364,8 @@ const PeerPicker = ({
             />
           ))}
           {lockedSelectedIds?.map((id, i) => (
-            <PickerSelectedItem
+            <PeerChip
+              className={styles.peerChip}
               peerId={id}
               isMinimized={shouldMinimize && i < selectedIds.length - ALWAYS_FULL_ITEMS_COUNT}
               forceShowSelf={forceShowSelf}
@@ -352,7 +374,8 @@ const PeerPicker = ({
             />
           ))}
           {unlockedSelectedIds.map((id, i) => (
-            <PickerSelectedItem
+            <PeerChip
+              className={styles.peerChip}
               peerId={id}
               isMinimized={
                 shouldMinimize && i + (lockedSelectedIds?.length || 0) < selectedIds.length - ALWAYS_FULL_ITEMS_COUNT

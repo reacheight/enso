@@ -1,5 +1,5 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo, useCallback, useEffect,
   useMemo, useState,
 } from '../../../lib/teact/teact';
@@ -7,7 +7,8 @@ import { getActions, withGlobal } from '../../../global';
 
 import type { ApiUser } from '../../../api/types';
 
-import { filterUsersByName, getUserFullName } from '../../../global/helpers';
+import { getUserFullName } from '../../../global/helpers';
+import { filterPeersByQuery } from '../../../global/helpers/peers';
 import { selectTabState } from '../../../global/selectors';
 import { unique } from '../../../util/iteratees';
 
@@ -57,7 +58,7 @@ const BlockUserModal: FC<OwnProps & StateProps> = ({
       return contactId !== currentUserId && !blockedIds.includes(contactId);
     }));
 
-    return filterUsersByName(availableContactIds, usersById, search)
+    return filterPeersByQuery({ ids: availableContactIds, query: search, type: 'user' })
       .sort((firstId, secondId) => {
         const firstName = getUserFullName(usersById[firstId]) || '';
         const secondName = getUserFullName(usersById[secondId]) || '';
@@ -85,7 +86,7 @@ const BlockUserModal: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     const {
       users: {
         byId: usersById,

@@ -1,18 +1,21 @@
 import type { PerformanceType } from '../types';
-import type { GlobalState, TabState } from './types';
-import { NewChatMembersProgress } from '../types';
+import type { GlobalState, SharedState, TabState } from './types';
+import { LeftColumnContent, NewChatMembersProgress, SettingsScreens } from '../types';
 
 import {
   ANIMATION_LEVEL_DEFAULT,
   DARK_THEME_PATTERN_COLOR,
+  DEFAULT_GIFT_PROFILE_FILTER_OPTIONS,
   DEFAULT_MESSAGE_TEXT_SIZE_PX,
   DEFAULT_PATTERN_COLOR,
   DEFAULT_PLAYBACK_RATE,
+  DEFAULT_RESALE_GIFTS_FILTER_OPTIONS,
   DEFAULT_VOLUME,
   IOS_DEFAULT_MESSAGE_TEXT_SIZE_PX,
   MACOS_DEFAULT_MESSAGE_TEXT_SIZE_PX,
 } from '../config';
-import { IS_IOS, IS_MAC_OS } from '../util/windowEnvironment';
+import { IS_IOS, IS_MAC_OS } from '../util/browser/windowEnvironment';
+import { DEFAULT_APP_CONFIG } from '../limits';
 
 export const INITIAL_PERFORMANCE_STATE_MAX: PerformanceType = {
   animatedEmoji: true,
@@ -29,9 +32,10 @@ export const INITIAL_PERFORMANCE_STATE_MAX: PerformanceType = {
   rightColumnAnimations: true,
   stickerEffects: true,
   storyRibbonAnimations: true,
+  snapEffect: true,
 };
 
-export const INITIAL_PERFORMANCE_STATE_MID: PerformanceType = {
+export const INITIAL_PERFORMANCE_STATE_MED: PerformanceType = {
   animatedEmoji: true,
   autoplayGifs: true,
   autoplayVideos: true,
@@ -44,8 +48,9 @@ export const INITIAL_PERFORMANCE_STATE_MID: PerformanceType = {
   pageTransitions: true,
   reactionEffects: true,
   rightColumnAnimations: false,
-  stickerEffects: false,
-  storyRibbonAnimations: false,
+  stickerEffects: true,
+  storyRibbonAnimations: true,
+  snapEffect: false,
 };
 
 export const INITIAL_PERFORMANCE_STATE_MIN: PerformanceType = {
@@ -63,16 +68,40 @@ export const INITIAL_PERFORMANCE_STATE_MIN: PerformanceType = {
   rightColumnAnimations: false,
   stickerEffects: false,
   storyRibbonAnimations: false,
+  snapEffect: false,
+};
+
+export const INITIAL_SHARED_STATE: SharedState = {
+  settings: {
+    theme: 'light',
+    shouldUseSystemTheme: true,
+    messageTextSize: IS_IOS
+      ? IOS_DEFAULT_MESSAGE_TEXT_SIZE_PX
+      : (IS_MAC_OS ? MACOS_DEFAULT_MESSAGE_TEXT_SIZE_PX : DEFAULT_MESSAGE_TEXT_SIZE_PX),
+    animationLevel: ANIMATION_LEVEL_DEFAULT,
+    messageSendKeyCombo: 'enter',
+    performance: INITIAL_PERFORMANCE_STATE_MAX,
+    shouldSkipWebAppCloseConfirmation: false,
+    language: 'en',
+    timeFormat: '24h',
+    wasTimeFormatSetManually: false,
+    isConnectionStatusMinimized: true,
+    canDisplayChatInTitle: true,
+    shouldAllowHttpTransport: true,
+    shouldWarnAboutFiles: true,
+  },
+  isInitial: true,
 };
 
 export const INITIAL_GLOBAL_STATE: GlobalState = {
+  cacheVersion: 2,
   isInited: true,
   attachMenu: { bots: {} },
   passcode: {},
   twoFaSettings: {},
   isAppUpdateAvailable: false,
-  isElectronUpdateAvailable: false,
   shouldShowContextMenuHint: true,
+  appConfig: DEFAULT_APP_CONFIG,
 
   audioPlayer: {
     lastPlaybackRate: DEFAULT_PLAYBACK_RATE,
@@ -99,6 +128,11 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
     fullInfoById: {},
     previewMediaByBotId: {},
     commonChatsById: {},
+    botAppPermissionsById: {},
+  },
+
+  peers: {
+    profilePhotosById: {},
   },
 
   chats: {
@@ -110,7 +144,9 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
     byId: {},
     fullInfoById: {},
     similarChannelsById: {},
+    similarBotsById: {},
     topicsInfoById: {},
+    notifyExceptionById: {},
     loadingParameters: {
       active: {},
       archived: {},
@@ -121,10 +157,14 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
   messages: {
     byChatId: {},
     sponsoredByChatId: {},
+    pollById: {},
+    webPageById: {},
+    playbackByChatId: {},
   },
 
   stories: {
     byPeerId: {},
+    albumsByPeerId: {},
     orderedPeerIds: {
       archived: [],
       active: [],
@@ -142,6 +182,8 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
     shouldCompress: true,
     shouldSendGrouped: true,
     isInvertedMedia: undefined,
+    webPageMediaSize: undefined,
+    shouldSendInHighQuality: false,
   },
 
   scheduledMessages: {
@@ -156,6 +198,7 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
   chatFolders: {
     byId: {},
     invites: {},
+    areTagsEnabled: false,
   },
 
   fileUploads: {
@@ -230,13 +273,6 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
 
   settings: {
     byKey: {
-      theme: 'light',
-      shouldUseSystemTheme: true,
-      messageTextSize: IS_IOS
-        ? IOS_DEFAULT_MESSAGE_TEXT_SIZE_PX
-        : (IS_MAC_OS ? MACOS_DEFAULT_MESSAGE_TEXT_SIZE_PX : DEFAULT_MESSAGE_TEXT_SIZE_PX),
-      animationLevel: ANIMATION_LEVEL_DEFAULT,
-      messageSendKeyCombo: 'enter',
       canAutoLoadPhotoFromContacts: true,
       canAutoLoadPhotoInPrivateChats: true,
       canAutoLoadPhotoInGroups: true,
@@ -255,21 +291,19 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
       notificationSoundVolume: 5,
       shouldSuggestStickers: true,
       shouldSuggestCustomEmoji: true,
+      shouldPaidMessageAutoApprove: false,
       shouldUpdateStickerSetOrder: true,
-      language: 'en',
-      timeFormat: '24h',
-      wasTimeFormatSetManually: false,
-      isConnectionStatusMinimized: true,
       shouldArchiveAndMuteNewNonContact: false,
       shouldNewNonContactPeersRequirePremium: false,
+      disallowedGifts: undefined,
+      nonContactPeersPaidStars: 0,
       shouldHideReadMarks: false,
       canTranslate: false,
       canTranslateChats: true,
       doNotTranslate: [],
-      canDisplayChatInTitle: true,
-      shouldAllowHttpTransport: true,
-      shouldWarnAboutSvg: true,
     },
+    privacy: {},
+    botVerificationShownPeerIds: [],
     themes: {
       light: {
         isBlurred: true,
@@ -280,9 +314,7 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
         patternColor: DARK_THEME_PATTERN_COLOR,
       },
     },
-    performance: INITIAL_PERFORMANCE_STATE_MAX,
-    privacy: {},
-    notifyExceptions: {},
+    accountDaysTtl: 365,
   },
 
   serviceNotifications: [],
@@ -294,14 +326,12 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
   },
 
   byTabId: {},
+  sharedState: INITIAL_SHARED_STATE,
 
   archiveSettings: {
     isMinimized: false,
     isHidden: false,
   },
-
-  profilePhotosById: {},
-  monetizationInfo: {},
 
   workspaces: {
     isCreatorOpen: false,
@@ -336,11 +366,17 @@ export const INITIAL_TAB_STATE: TabState = {
     sessionKeys: [],
     modalState: 'maximized',
     isModalOpen: false,
+    isMoreAppsTabActive: false,
   },
 
   globalSearch: {},
 
   userSearch: {},
+
+  leftColumn: {
+    contentKey: LeftColumnContent.ChatList,
+    settingsScreen: SettingsScreens.Main,
+  },
 
   middleSearch: {
     byChatThreadKey: {},
@@ -356,6 +392,23 @@ export const INITIAL_TAB_STATE: TabState = {
 
   management: {
     byChatId: {},
+  },
+
+  savedGifts: {
+    filter: {
+      ...DEFAULT_GIFT_PROFILE_FILTER_OPTIONS,
+    },
+    collectionsByPeerId: {},
+    activeCollectionByPeerId: {},
+  },
+
+  resaleGifts: {
+    gifts: [],
+    count: 0,
+    updateIteration: 0,
+    filter: {
+      ...DEFAULT_RESALE_GIFTS_FILTER_OPTIONS,
+    },
   },
 
   storyViewer: {
@@ -377,6 +430,8 @@ export const INITIAL_TAB_STATE: TabState = {
 
   isShareMessageModalShown: false,
 
+  isWebAppsCloseConfirmationModalOpen: false,
+
   forwardMessages: {},
 
   replyingMessage: {},
@@ -384,6 +439,7 @@ export const INITIAL_TAB_STATE: TabState = {
   pollResults: {},
 
   payment: {},
+  starsPayment: {},
 
   notifications: [],
 
@@ -404,4 +460,6 @@ export const INITIAL_TAB_STATE: TabState = {
   requestedTranslations: {
     byChatId: {},
   },
+
+  isPaymentMessageConfirmDialogOpen: false,
 };

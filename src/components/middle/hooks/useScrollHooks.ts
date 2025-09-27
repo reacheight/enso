@@ -1,14 +1,14 @@
-import type { RefObject } from 'react';
+import type { ElementRef } from '../../../lib/teact/teact';
 import { useEffect, useMemo, useRef } from '../../../lib/teact/teact';
 import { getActions } from '../../../global';
 
-import type { MessageListType } from '../../../global/types';
+import type { MessageListType } from '../../../types';
 import type { Signal } from '../../../util/signals';
 import { LoadMoreDirection } from '../../../types';
 
 import { requestMeasure } from '../../../lib/fasterdom/fasterdom';
+import { MESSAGE_LIST_SENSITIVE_AREA } from '../../../util/browser/windowEnvironment';
 import { debounce } from '../../../util/schedulers';
-import { MESSAGE_LIST_SENSITIVE_AREA } from '../../../util/windowEnvironment';
 
 import { useDebouncedSignal } from '../../../hooks/useAsyncResolvers';
 import { useIntersectionObserver, useOnIntersect } from '../../../hooks/useIntersectionObserver';
@@ -23,7 +23,7 @@ const TOOLS_FREEZE_TIMEOUT = 350; // Approximate message sending animation durat
 
 export default function useScrollHooks(
   type: MessageListType,
-  containerRef: RefObject<HTMLDivElement>,
+  containerRef: ElementRef<HTMLDivElement>,
   messageIds: number[],
   getContainerHeight: Signal<number | undefined>,
   isViewportNewest: boolean,
@@ -43,12 +43,9 @@ export default function useScrollHooks(
     [loadViewportMessages, messageIds],
   );
 
-  // eslint-disable-next-line no-null/no-null
-  const backwardsTriggerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const forwardsTriggerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const fabTriggerRef = useRef<HTMLDivElement>(null);
+  const backwardsTriggerRef = useRef<HTMLDivElement>();
+  const forwardsTriggerRef = useRef<HTMLDivElement>();
+  const fabTriggerRef = useRef<HTMLDivElement>();
 
   const toggleScrollTools = useLastCallback(() => {
     if (!isReady) return;
@@ -66,12 +63,12 @@ export default function useScrollHooks(
     }
 
     const container = containerRef.current;
-    if (!container) {
-      return;
-    }
+    const fabTrigger = fabTriggerRef.current;
+    if (!container || !fabTrigger) return;
 
     const { offsetHeight, scrollHeight, scrollTop } = container;
-    const scrollBottom = Math.round(scrollHeight - scrollTop - offsetHeight);
+    const fabOffsetTop = fabTrigger.offsetTop;
+    const scrollBottom = Math.round(fabOffsetTop - scrollTop - offsetHeight);
     const isNearBottom = scrollBottom <= FAB_THRESHOLD;
     const isAtBottom = scrollBottom <= NOTCH_THRESHOLD;
 

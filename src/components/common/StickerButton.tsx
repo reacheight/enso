@@ -1,5 +1,8 @@
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
-import React, {
+import type {
+  ElementRef } from '../../lib/teact/teact';
+import type React from '../../lib/teact/teact';
+import {
   memo, useEffect, useMemo, useRef,
 } from '../../lib/teact/teact';
 import { getActions } from '../../global';
@@ -7,9 +10,9 @@ import { getActions } from '../../global';
 import type { ApiBotInlineMediaResult, ApiSticker } from '../../api/types';
 import type { ObserveFn } from '../../hooks/useIntersectionObserver';
 
+import { IS_TOUCH_ENV } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
-import { getServerTimeOffset } from '../../util/serverTime';
-import { IS_TOUCH_ENV } from '../../util/windowEnvironment';
+import { getServerTime } from '../../util/serverTime';
 import { preventMessageInputBlurWithBubbling } from '../middle/helpers/preventMessageInputBlur';
 
 import useDynamicColorListener from '../../hooks/stickers/useDynamicColorListener';
@@ -22,6 +25,7 @@ import Button from '../ui/Button';
 import Menu from '../ui/Menu';
 import MenuItem from '../ui/MenuItem';
 import Icon from './icons/Icon';
+import Sparkles from './Sparkles';
 import StickerView from './StickerView';
 
 import './StickerButton.scss';
@@ -39,7 +43,7 @@ type OwnProps<T> = {
   isSelected?: boolean;
   isCurrentUserPremium?: boolean;
   shouldIgnorePremium?: boolean;
-  sharedCanvasRef?: React.RefObject<HTMLCanvasElement>;
+  sharedCanvasRef?: ElementRef<HTMLCanvasElement>;
   withTranslucentThumb?: boolean;
   forcePlayback?: boolean;
   observeIntersection: ObserveFn;
@@ -54,6 +58,7 @@ type OwnProps<T> = {
   onContextMenuClose?: NoneToVoidFunction;
   onContextMenuClick?: NoneToVoidFunction;
   isEffectEmoji?: boolean;
+  withSparkles?: boolean;
 };
 
 const contentForStatusMenuContext = [
@@ -92,15 +97,14 @@ const StickerButton = <T extends number | ApiSticker | ApiBotInlineMediaResult |
   onContextMenuClose,
   onContextMenuClick,
   isEffectEmoji,
+  withSparkles,
 }: OwnProps<T>) => {
   const { openStickerSet, openPremiumModal, setEmojiStatus } = getActions();
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const menuRef = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>();
+  const menuRef = useRef<HTMLDivElement>();
   const lang = useOldLang();
   const hasCustomColor = sticker.shouldUseTextColor;
-  const customColor = useDynamicColorListener(ref, !hasCustomColor);
+  const customColor = useDynamicColorListener(ref, undefined, !hasCustomColor);
 
   const {
     id, stickerSetInfo,
@@ -198,8 +202,7 @@ const StickerButton = <T extends number | ApiSticker | ApiBotInlineMediaResult |
     handleContextMenuClose();
     onContextMenuClick?.();
     setEmojiStatus({
-      emojiStatus: sticker,
-      expires: Date.now() / 1000 + duration + getServerTimeOffset(),
+      emojiStatus: { type: 'regular', documentId: sticker.id, until: getServerTime() + duration },
     });
   });
 
@@ -289,6 +292,7 @@ const StickerButton = <T extends number | ApiSticker | ApiBotInlineMediaResult |
       onClick={handleClick}
       onContextMenu={handleContextMenu}
     >
+      {withSparkles && <Sparkles preset="button" />}
       {isIntesectingForShowing && (
         <StickerView
           containerRef={ref}

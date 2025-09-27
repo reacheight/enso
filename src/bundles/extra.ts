@@ -17,25 +17,30 @@ export { default as BotTrustModal } from '../components/main/BotTrustModal';
 export { default as AttachBotInstallModal } from '../components/modals/attachBotInstall/AttachBotInstallModal';
 export { default as DeleteFolderDialog } from '../components/main/DeleteFolderDialog';
 export { default as PremiumMainModal } from '../components/main/premium/PremiumMainModal';
-export { default as PremiumGiftModal } from '../components/main/premium/PremiumGiftModal';
-export { default as StarsGiftModal } from '../components/main/premium/StarsGiftModal';
 export { default as GiveawayModal } from '../components/main/premium/GiveawayModal';
-export { default as PremiumGiftingPickerModal } from '../components/main/premium/PremiumGiftingPickerModal';
-export { default as StarsGiftingPickerModal } from '../components/main/premium/StarsGiftingPickerModal';
 export { default as PremiumLimitReachedModal } from '../components/main/premium/common/PremiumLimitReachedModal';
 export { default as StatusPickerMenu } from '../components/left/main/StatusPickerMenu';
+export { default as SuggestedStatusModal } from '../components/modals/suggestedStatus/SuggestedStatusModal';
 export { default as BoostModal } from '../components/modals/boost/BoostModal';
 export { default as GiftCodeModal } from '../components/modals/giftcode/GiftCodeModal';
+export { default as DeleteAccountModal } from '../components/modals/deleteAccount/DeleteAccountModal';
+export { default as AgeVerificationModal } from '../components/modals/ageVerification/AgeVerificationModal';
 export { default as ChatlistModal } from '../components/modals/chatlist/ChatlistModal';
-export { default as StarsBalanceModal } from '../components/modals/stars/StarsBalanceModal';
-export { default as StarPaymentModal } from '../components/modals/stars/StarsPaymentModal';
-export { default as StarsTransactionInfoModal } from '../components/modals/stars/transaction/StarsTransactionModal';
-export { default as WorkspaceSettingsPageRoot } from '../components/main/workspace/WorkspaceSettingsPageRoot.react';
+export { default as ChatInviteModal } from '../components/modals/chatInvite/ChatInviteModal';
 
-export { default as AboutAdsModal } from '../components/common/AboutAdsModal';
+export { default as AboutAdsModal } from '../components/modals/aboutAds/AboutAdsModal';
 export { default as AboutMonetizationModal } from '../components/common/AboutMonetizationModal';
 export { default as VerificationMonetizationModal } from '../components/common/VerificationMonetizationModal';
+export { default as EmojiStatusAccessModal } from '../components/modals/emojiStatusAccess/EmojiStatusAccessModal';
+export { default as LocationAccessModal } from '../components/modals/locationAccess/LocationAccessModal';
 export { default as ReportAdModal } from '../components/modals/reportAd/ReportAdModal';
+export { default as ReportModal } from '../components/modals/reportModal/ReportModal';
+export { default as PreparedMessageModal } from '../components/modals/preparedMessage/PreparedMessageModal';
+export { default as SharePreparedMessageModal }
+  from '../components/modals/sharePreparedMessage/SharePreparedMessageModal';
+export { default as SuggestMessageModal } from '../components/modals/suggestMessage/SuggestMessageModal';
+export { default as SuggestedPostApprovalModal }
+  from '../components/modals/suggestedPostApproval/SuggestedPostApprovalModal';
 export { default as CalendarModal } from '../components/common/CalendarModal';
 export { default as DeleteMessageModal } from '../components/common/DeleteMessageModal';
 export { default as PinMessageModal } from '../components/common/PinMessageModal';
@@ -58,8 +63,7 @@ export { default as ChatFolderModal } from '../components/left/ChatFolderModal';
 export { default as MuteChatModal } from '../components/left/MuteChatModal';
 
 export { default as ContextMenuContainer } from '../components/middle/message/ContextMenuContainer';
-export { default as SponsoredMessageContextMenuContainer }
-  from '../components/middle/message/SponsoredMessageContextMenuContainer';
+export { default as SponsoredContextMenuContainer } from '../components/middle/message/SponsoredContextMenuContainer';
 export { default as StickerSetModal } from '../components/common/StickerSetModal';
 export { default as CustomEmojiSetsModal } from '../components/common/CustomEmojiSetsModal';
 export { default as HeaderMenuContainer } from '../components/middle/HeaderMenuContainer';
@@ -68,6 +72,7 @@ export { default as ReactionPicker } from '../components/middle/message/reaction
 
 export { default as AttachmentModal } from '../components/middle/composer/AttachmentModal';
 export { default as PollModal } from '../components/middle/composer/PollModal';
+export { default as ToDoListModal } from '../components/middle/composer/ToDoListModal';
 export { default as SymbolMenu } from '../components/middle/composer/SymbolMenu';
 export { default as ChatCommandTooltip } from '../components/middle/composer/ChatCommandTooltip';
 export { default as BotCommandMenu } from '../components/middle/composer/BotCommandMenu';
@@ -96,3 +101,6 @@ export { default as PaymentModal } from '../components/payment/PaymentModal';
 export { default as ReceiptModal } from '../components/payment/ReceiptModal';
 export { default as InviteViaLinkModal } from '../components/modals/inviteViaLink/InviteViaLinkModal';
 export { default as OneTimeMediaModal } from '../components/modals/oneTimeMedia/OneTimeMediaModal';
+export { default as WebAppsCloseConfirmationModal } from '../components/main/WebAppsCloseConfirmationModal';
+export { default as FrozenAccountModal } from '../components/modals/frozenAccount/FrozenAccountModal';
+export { default as ProfileRatingModal } from '../components/modals/profileRating/ProfileRatingModal';

@@ -1,5 +1,6 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import type React from '../../../lib/teact/teact';
+import {
   memo, useCallback, useMemo, useRef, useState,
 } from '../../../lib/teact/teact';
 import { getActions, getGlobal } from '../../../global';
@@ -13,7 +14,7 @@ import {
   getCanPostInChat, getGroupStatus, getUserStatus, isUserOnline,
 } from '../../../global/helpers';
 import { isApiPeerChat } from '../../../global/helpers/peers';
-import { selectPeer, selectTopics, selectUserStatus } from '../../../global/selectors';
+import { selectMonoforumChannel, selectPeer, selectTopics, selectUserStatus } from '../../../global/selectors';
 import buildClassName from '../../../util/buildClassName';
 import { REM } from '../helpers/mediaDimensions';
 import renderText from '../helpers/renderText';
@@ -33,6 +34,7 @@ import Modal from '../../ui/Modal';
 import Transition from '../../ui/Transition';
 import Avatar from '../Avatar';
 import FullNameTitle from '../FullNameTitle';
+import Icon from '../icons/Icon';
 import TopicIcon from '../TopicIcon';
 import PickerItem from './PickerItem';
 
@@ -45,6 +47,7 @@ export type OwnProps = {
   searchPlaceholder: string;
   search: string;
   className?: string;
+  isLowStackPriority?: boolean;
   loadMore?: NoneToVoidFunction;
   onSearchChange: (search: string) => void;
   onSelectChatOrUser: (chatOrUserId: string, threadId?: ThreadId) => void;
@@ -70,23 +73,20 @@ const ChatOrUserPicker: FC<OwnProps> = ({
   onSelectChatOrUser,
   onClose,
   onCloseAnimationEnd,
+  isLowStackPriority,
 }) => {
   const { loadTopics } = getActions();
 
-  const lang = useOldLang();
-  // eslint-disable-next-line no-null/no-null
-  const containerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const topicContainerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const searchRef = useRef<HTMLInputElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const topicSearchRef = useRef<HTMLInputElement>(null);
+  const oldLang = useOldLang();
+  const containerRef = useRef<HTMLDivElement>();
+  const topicContainerRef = useRef<HTMLDivElement>();
+  const searchRef = useRef<HTMLInputElement>();
+  const topicSearchRef = useRef<HTMLInputElement>();
   const [viewportIds, getMore] = useInfiniteScroll(loadMore, chatOrUserIds, Boolean(search));
   const [forumId, setForumId] = useState<string | undefined>(undefined);
   const [topicSearch, setTopicSearch] = useState<string>('');
   const activeKey = forumId ? TOPIC_LIST_SLIDE : CHAT_LIST_SLIDE;
-  const viewportOffset = chatOrUserIds!.indexOf(viewportIds![0]);
+  const viewportOffset = chatOrUserIds.indexOf(viewportIds![0]);
 
   const resetSearch = useLastCallback(() => {
     onSearchChange('');
@@ -181,23 +181,28 @@ const ChatOrUserPicker: FC<OwnProps> = ({
 
   const renderChatItem = useCallback((id: string, index: number) => {
     const global = getGlobal();
-    const peer = selectPeer(global, id);
+    let peer = selectPeer(global, id);
     if (!peer) {
       return undefined;
+    }
+
+    const monoforumChannel = selectMonoforumChannel(global, id);
+    if (monoforumChannel) {
+      peer = monoforumChannel;
     }
 
     const isSelf = peer && !isApiPeerChat(peer) ? peer.isSelf : undefined;
 
     function getSubtitle() {
       if (!peer) return undefined;
-      if (peer.id === currentUserId) return [lang('SavedMessagesInfo')];
+      if (peer.id === currentUserId) return [oldLang('SavedMessagesInfo')];
       if (isApiPeerChat(peer)) {
-        return [getGroupStatus(lang, peer)];
+        return [getGroupStatus(oldLang, peer)];
       }
 
       const userStatus = selectUserStatus(global, peer.id);
       return [
-        getUserStatus(lang, peer, userStatus),
+        getUserStatus(oldLang, peer, userStatus),
         buildClassName(isUserOnline(peer, userStatus, true) && 'online'),
       ];
     }
@@ -208,10 +213,20 @@ const ChatOrUserPicker: FC<OwnProps> = ({
       <PickerItem
         key={id}
         className={ITEM_CLASS_NAME}
-        title={<FullNameTitle peer={peer} isSavedMessages={isSelf} />}
+        title={(
+          <div className="title-wrapper">
+            <FullNameTitle
+              className="item-title"
+              peer={peer}
+              isMonoforum={Boolean(monoforumChannel)}
+              isSavedMessages={isSelf}
+            />
+          </div>
+        )}
         avatarElement={(
           <Avatar
             peer={peer}
+            asMessageBubble={Boolean(monoforumChannel)}
             isSavedMessages={isSelf}
             size="medium"
           />
@@ -220,18 +235,18 @@ const ChatOrUserPicker: FC<OwnProps> = ({
         subtitleClassName={subtitleClassName}
         ripple
         style={`top: ${(viewportOffset + index) * PEER_PICKER_ITEM_HEIGHT_PX}px;`}
-        // eslint-disable-next-line react/jsx-no-bind
+
         onClick={() => handleClick(id)}
       />
     );
-  }, [currentUserId, lang, viewportOffset]);
+  }, [currentUserId, oldLang, viewportOffset]);
 
   function renderTopicList() {
     return (
       <>
-        <div className="modal-header" dir={lang.isRtl ? 'rtl' : undefined}>
-          <Button round color="translucent" size="smaller" ariaLabel={lang('Back')} onClick={handleHeaderBackClick}>
-            <i className="icon icon-arrow-left" />
+        <div className="modal-header" dir={oldLang.isRtl ? 'rtl' : undefined}>
+          <Button round color="translucent" size="smaller" ariaLabel={oldLang('Back')} onClick={handleHeaderBackClick}>
+            <Icon name="arrow-left" />
           </Button>
           <InputText
             ref={topicSearchRef}
@@ -254,7 +269,7 @@ const ChatOrUserPicker: FC<OwnProps> = ({
             <PickerItem
               key={`${forumId}_${topicId}`}
               className={ITEM_CLASS_NAME}
-              // eslint-disable-next-line react/jsx-no-bind
+
               onClick={() => onSelectChatOrUser(forumId!, topicId)}
               style={`top: ${(viewportOffset + i) * TOPIC_ITEM_HEIGHT_PX}px;`}
               avatarElement={(
@@ -276,15 +291,15 @@ const ChatOrUserPicker: FC<OwnProps> = ({
   function renderChatList() {
     return (
       <>
-        <div className="modal-header" dir={lang.isRtl ? 'rtl' : undefined}>
+        <div className="modal-header" dir={oldLang.isRtl ? 'rtl' : undefined}>
           <Button
             round
             color="translucent"
             size="smaller"
-            ariaLabel={lang('Close')}
+            ariaLabel={oldLang('Close')}
             onClick={onClose}
           >
-            <i className="icon icon-close" />
+            <Icon name="close" />
           </Button>
           <InputText
             ref={searchRef}
@@ -302,13 +317,13 @@ const ChatOrUserPicker: FC<OwnProps> = ({
             itemSelector={`.${ITEM_CLASS_NAME}`}
             onLoadMore={getMore}
             withAbsolutePositioning
-            maxHeight={chatOrUserIds!.length * PEER_PICKER_ITEM_HEIGHT_PX}
+            maxHeight={chatOrUserIds.length * PEER_PICKER_ITEM_HEIGHT_PX}
             onKeyDown={handleKeyDown}
           >
             {viewportIds.map(renderChatItem)}
           </InfiniteScroll>
         ) : viewportIds && !viewportIds.length ? (
-          <p className="no-results">{lang('lng_blocked_list_not_found')}</p>
+          <p className="no-results">{oldLang('lng_blocked_list_not_found')}</p>
         ) : (
           <Loading />
         )}
@@ -322,6 +337,7 @@ const ChatOrUserPicker: FC<OwnProps> = ({
       className={buildClassName('ChatOrUserPicker', className)}
       onClose={onClose}
       onCloseAnimationEnd={onCloseAnimationEnd}
+      isLowStackPriority={isLowStackPriority}
     >
       <Transition activeKey={activeKey} name="slideFade" slideClassName="ChatOrUserPicker_slide">
         {() => {

@@ -1,5 +1,5 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useCallback } from '../../../lib/teact/teact';
+import { memo, useCallback } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiSticker } from '../../../api/types';
@@ -54,7 +54,6 @@ const EmptyForum: FC<OwnProps & StateProps> = ({
           ripple={!isMobile}
           fluid
           onClick={handleCreateTopic}
-          size="smaller"
           isRtl={lang.isRtl}
         >
           <div className={styles.buttonText}>
@@ -66,7 +65,7 @@ const EmptyForum: FC<OwnProps & StateProps> = ({
   );
 };
 
-export default memo(withGlobal<OwnProps>((global, { chatId }): StateProps => {
+export default memo(withGlobal<OwnProps>((global, { chatId }): Complete<StateProps> => {
   const chat = selectChat(global, chatId);
   const canManageTopics = chat && (chat.isCreator || getHasAdminRight(chat, 'manageTopics'));
 

@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from '../../../lib/teact/teact';
-import { getActions } from '../../../global';
+import type React from '../../../lib/teact/teact';
+import { memo, useEffect, useRef, useState } from '../../../lib/teact/teact';
+import { getActions, withGlobal } from '../../../global';
 
 import type { ApiMediaExtendedPreview, ApiVideo } from '../../../api/types';
 import type { ObserveFn } from '../../../hooks/useIntersectionObserver';
@@ -26,17 +27,18 @@ import usePreviousDeprecated from '../../../hooks/usePreviousDeprecated';
 import useShowTransition from '../../../hooks/useShowTransition';
 import useBlurredMediaThumbRef from './hooks/useBlurredMediaThumbRef';
 
+import Icon from '../../common/icons/Icon';
 import MediaSpoiler from '../../common/MediaSpoiler';
+import SensitiveContentConfirmModal from '../../common/SensitiveContentConfirmModal';
 import OptimizedVideo from '../../ui/OptimizedVideo';
 import ProgressSpinner from '../../ui/ProgressSpinner';
 
 export type OwnProps<T> = {
   id?: string;
   video: ApiVideo | ApiMediaExtendedPreview;
+  lastPlaybackTimestamp?: number;
   isOwn?: boolean;
   isInWebPage?: boolean;
-  observeIntersectionForLoading?: ObserveFn;
-  observeIntersectionForPlaying?: ObserveFn;
   noAvatars?: boolean;
   canAutoLoad?: boolean;
   canAutoPlay?: boolean;
@@ -48,18 +50,22 @@ export type OwnProps<T> = {
   isProtected?: boolean;
   className?: string;
   clickArg?: T;
+  isMediaNsfw?: boolean;
+  observeIntersectionForLoading?: ObserveFn;
+  observeIntersectionForPlaying?: ObserveFn;
   onClick?: (arg: T, e: React.MouseEvent<HTMLElement>) => void;
   onCancelUpload?: (arg: T) => void;
 };
 
-// eslint-disable-next-line @typescript-eslint/comma-dangle
+type StateProps = {
+  needsAgeVerification?: boolean;
+};
+
 const Video = <T,>({
   id,
   video,
   isOwn,
   isInWebPage,
-  observeIntersectionForLoading,
-  observeIntersectionForPlaying,
   noAvatars,
   canAutoLoad,
   canAutoPlay,
@@ -70,29 +76,44 @@ const Video = <T,>({
   isDownloading,
   isProtected,
   className,
+  lastPlaybackTimestamp,
   clickArg,
+  isMediaNsfw,
+  observeIntersectionForLoading,
+  observeIntersectionForPlaying,
   onClick,
   onCancelUpload,
-}: OwnProps<T>) => {
-  const { cancelMediaDownload } = getActions();
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const videoRef = useRef<HTMLVideoElement>(null);
+  needsAgeVerification,
+}: OwnProps<T> & StateProps) => {
+  const { cancelMediaDownload, updateContentSettings, openAgeVerificationModal } = getActions();
+  const ref = useRef<HTMLDivElement>();
+  const videoRef = useRef<HTMLVideoElement>();
+  const [isNsfwModalOpen, openNsfwModal, closeNsfwModal] = useFlag();
+  const [shouldAlwaysShowNsfw, setShouldAlwaysShowNsfw] = useState(false);
 
   const isPaidPreview = video.mediaType === 'extendedMediaPreview';
 
   const localBlobUrl = !isPaidPreview ? video.blobUrl : undefined;
 
-  const [isSpoilerShown, showSpoiler, hideSpoiler] = useFlag(isPaidPreview || video.isSpoiler);
+  const shouldShowSpoiler = isPaidPreview || video.isSpoiler || isMediaNsfw;
+  const [isSpoilerShown, showSpoiler, hideSpoiler] = useFlag(shouldShowSpoiler);
 
   useEffect(() => {
-    if (isPaidPreview || video.isSpoiler) {
+    if (shouldShowSpoiler) {
       showSpoiler();
     } else {
       hideSpoiler();
     }
-  }, [isPaidPreview, video]);
+  }, [shouldShowSpoiler]);
+
+  const handleNsfwConfirm = useLastCallback(() => {
+    closeNsfwModal();
+    hideSpoiler();
+
+    if (shouldAlwaysShowNsfw) {
+      updateContentSettings({ isSensitiveEnabled: true });
+    }
+  });
 
   const isIntersectingForLoading = useIsIntersecting(ref, observeIntersectionForLoading);
   const isIntersectingForPlaying = (
@@ -123,20 +144,24 @@ const Video = <T,>({
   const hasThumb = Boolean(thumbDataUri);
   const withBlurredBackground = Boolean(forcedWidth);
 
+  const isInline = fullMediaData && wasIntersectedRef.current;
+
+  const isUnsupported = useUnsupportedMedia(videoRef, true, !isInline);
+
   const previewMediaHash = !isPaidPreview ? getVideoMediaHash(video, 'preview') : undefined;
   const [isPreviewPreloaded] = useState(Boolean(previewMediaHash && mediaLoader.getFromMemory(previewMediaHash)));
   const canLoadPreview = isIntersectingForLoading;
   const previewBlobUrl = useMedia(previewMediaHash, !canLoadPreview);
-  const previewRef = useMediaTransition<HTMLImageElement>((hasThumb || previewBlobUrl) && !isPlayerReady);
+  const shouldHidePreview = isPlayerReady && !isUnsupported;
+  const { ref: previewRef } = useMediaTransition<HTMLImageElement>({
+    hasMediaData: Boolean((hasThumb || previewBlobUrl) && !shouldHidePreview),
+  });
 
   const noThumb = Boolean(!hasThumb || previewBlobUrl || isPlayerReady);
   const thumbRef = useBlurredMediaThumbRef(video, noThumb);
-  useMediaTransition(!noThumb, { ref: thumbRef });
+  useMediaTransition({ ref: thumbRef, hasMediaData: !noThumb });
   const blurredBackgroundRef = useBlurredMediaThumbRef(video, !withBlurredBackground);
 
-  const isInline = fullMediaData && wasIntersectedRef.current;
-
-  const isUnsupported = useUnsupportedMedia(videoRef, true, !isInline);
   const { loadProgress: downloadProgress } = useMediaWithLoadProgress(
     !isPaidPreview ? getVideoMediaHash(video, 'download') : undefined,
     !isDownloading,
@@ -169,7 +194,8 @@ const Video = <T,>({
     setPlayProgress(Math.max(0, e.currentTarget.currentTime - 1));
   });
 
-  const duration = (Number.isFinite(videoRef.current?.duration) ? videoRef.current?.duration : video.duration) || 0;
+  const duration = (Number.isFinite(videoRef.current?.duration) && !isUnsupported
+    ? videoRef.current?.duration : video.duration) || 0;
 
   const {
     width, height,
@@ -200,6 +226,14 @@ const Video = <T,>({
     }
 
     if (isSpoilerShown) {
+      if (isMediaNsfw) {
+        if (needsAgeVerification) {
+          openAgeVerificationModal();
+          return;
+        }
+        openNsfwModal();
+        return;
+      }
       hideSpoiler();
       return;
     }
@@ -246,9 +280,11 @@ const Video = <T,>({
           src={fullMediaData}
           className={buildClassName('full-media', withBlurredBackground && 'with-blurred-bg')}
           canPlay={isPlayAllowed && isIntersectingForPlaying && !isUnsupported}
+          defaultMuted
           muted
           loop
           playsInline
+          disablePictureInPicture
           draggable={!isProtected}
           onTimeUpdate={handleTimeUpdate}
           onReady={markPlayerReady}
@@ -267,11 +303,12 @@ const Video = <T,>({
         <canvas ref={thumbRef} className="thumbnail" />
       )}
       {isProtected && <span className="protector" />}
-      <i ref={playButtonRef} className="icon icon-large-play" />
+      <Icon ref={playButtonRef} name="large-play" />
       <MediaSpoiler
         isVisible={isSpoilerShown}
         withAnimation
         thumbDataUri={thumbDataUri}
+        isNsfw={isMediaNsfw}
         width={width}
         height={height}
         className="media-spoiler"
@@ -285,7 +322,7 @@ const Video = <T,>({
         </div>
       )}
       {!isLoadAllowed && !fullMediaData && (
-        <i className="icon icon-download" />
+        <Icon name="download" />
       )}
       {isTransferring && (!isUnsupported || isDownloading) ? (
         <span className="message-transfer-progress">
@@ -294,11 +331,31 @@ const Video = <T,>({
       ) : (
         <div className="message-media-duration">
           {!isPaidPreview && video.isGif ? 'GIF' : formatMediaDuration(Math.max(duration - playProgress, 0))}
-          {isUnsupported && <i className="icon icon-message-failed playback-failed" />}
+          {isUnsupported && <Icon name="message-failed" className="playback-failed" />}
         </div>
       )}
+      {Boolean(lastPlaybackTimestamp) && (
+        <div
+          className="message-media-last-progress"
+          style={`--_progress: ${Math.floor((lastPlaybackTimestamp / duration) * 100)}%`}
+        />
+      )}
+      <SensitiveContentConfirmModal
+        isOpen={isNsfwModalOpen}
+        onClose={closeNsfwModal}
+        shouldAlwaysShow={shouldAlwaysShowNsfw}
+        onAlwaysShowChanged={setShouldAlwaysShowNsfw}
+        confirmHandler={handleNsfwConfirm}
+      />
     </div>
   );
 };
 
-export default Video;
+export default memo(withGlobal((global): Complete<StateProps> => {
+  const appConfig = global.appConfig;
+  const needsAgeVerification = appConfig.needAgeVideoVerification;
+
+  return {
+    needsAgeVerification,
+  };
+})(Video));

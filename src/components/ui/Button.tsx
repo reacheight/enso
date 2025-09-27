@@ -1,32 +1,39 @@
-import type { MouseEvent as ReactMouseEvent, RefObject } from 'react';
-import type { FC } from '../../lib/teact/teact';
-import React, { useRef, useState } from '../../lib/teact/teact';
+import type { MouseEvent as ReactMouseEvent } from 'react';
+import type { ElementRef, FC } from '../../lib/teact/teact';
+import type React from '../../lib/teact/teact';
+import { useRef, useState } from '../../lib/teact/teact';
 
+import type { IconName } from '../../types/icons';
+
+import { IS_TOUCH_ENV, MouseButton } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
 import buildStyle from '../../util/buildStyle';
-import { IS_TOUCH_ENV, MouseButton } from '../../util/windowEnvironment';
 
 import useLastCallback from '../../hooks/useLastCallback';
+import useOldLang from '../../hooks/useOldLang';
 
+import Icon from '../common/icons/Icon';
+import Sparkles from '../common/Sparkles';
 import RippleEffect from './RippleEffect';
 import Spinner from './Spinner';
 
 import './Button.scss';
 
 export type OwnProps = {
-  ref?: RefObject<HTMLButtonElement | HTMLAnchorElement>;
+  ref?: ElementRef<HTMLButtonElement | HTMLAnchorElement>;
   type?: 'button' | 'submit' | 'reset';
   children: React.ReactNode;
   size?: 'default' | 'smaller' | 'tiny';
   color?: (
     'primary' | 'secondary' | 'gray' | 'danger' | 'translucent' | 'translucent-white' | 'translucent-black'
-    | 'translucent-bordered' | 'dark' | 'green' | 'adaptive'
+    | 'translucent-bordered' | 'dark' | 'green' | 'adaptive' | 'stars' | 'bluredStarsBadge' | 'transparentBlured'
   );
   backgroundImage?: string;
   id?: string;
   className?: string;
   round?: boolean;
   pill?: boolean;
+  badge?: boolean;
   fluid?: boolean;
   isText?: boolean;
   isLoading?: boolean;
@@ -46,10 +53,14 @@ export type OwnProps = {
   isShiny?: boolean;
   isRectangular?: boolean;
   withPremiumGradient?: boolean;
+  withSparkleEffect?: boolean;
   noPreventDefault?: boolean;
   noForcedUpperCase?: boolean;
   shouldStopPropagation?: boolean;
   style?: string;
+  iconName?: IconName;
+  iconAlignment?: 'top' | 'bottom' | 'start' | 'end';
+  iconClassName?: string;
   onClick?: (e: ReactMouseEvent<HTMLButtonElement, MouseEvent>) => void;
   onContextMenu?: (e: ReactMouseEvent<HTMLButtonElement, MouseEvent>) => void;
   onMouseDown?: (e: ReactMouseEvent<HTMLButtonElement>) => void;
@@ -81,11 +92,13 @@ const Button: FC<OwnProps> = ({
   className,
   round,
   pill,
+  badge,
   fluid,
   isText,
   isLoading,
   isShiny,
   withPremiumGradient,
+  withSparkleEffect,
   onTransitionEnd,
   ariaLabel,
   ariaControls,
@@ -105,12 +118,16 @@ const Button: FC<OwnProps> = ({
   shouldStopPropagation,
   noForcedUpperCase,
   style,
+  iconName,
+  iconAlignment = 'start',
+  iconClassName,
 }) => {
-  // eslint-disable-next-line no-null/no-null
-  let elementRef = useRef<HTMLButtonElement | HTMLAnchorElement>(null);
+  let elementRef = useRef<HTMLButtonElement | HTMLAnchorElement>();
   if (ref) {
     elementRef = ref;
   }
+
+  const lang = useOldLang();
 
   const [isClicked, setIsClicked] = useState(false);
 
@@ -124,6 +141,7 @@ const Button: FC<OwnProps> = ({
     round && 'round',
     pill && 'pill',
     fluid && 'fluid',
+    badge && 'badge',
     isNotInteractive && 'disabled',
     nonInteractive && 'non-interactive',
     allowDisabledClick && 'click-allowed',
@@ -137,6 +155,7 @@ const Button: FC<OwnProps> = ({
     withPremiumGradient && 'premium',
     isRectangular && 'rectangular',
     noForcedUpperCase && 'no-upper-case',
+    iconAlignment && iconName && `content-with-icon-${iconAlignment}`,
   );
 
   const handleClick = useLastCallback((e: ReactMouseEvent<HTMLButtonElement, MouseEvent>) => {
@@ -164,10 +183,49 @@ const Button: FC<OwnProps> = ({
     }
   });
 
+  const renderIcon = () => {
+    if (!iconName) return undefined;
+    return <Icon name={iconName} className={iconClassName} />;
+  };
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div>
+          <span dir={isRtl ? 'auto' : undefined}>{lang('Cache.ClearProgress')}</span>
+          <Spinner color={isText ? 'blue' : 'white'} />
+        </div>
+      );
+    }
+
+    const icon = renderIcon();
+
+    if (!icon) {
+      return children;
+    }
+
+    return (
+      <div className={`with-icon-${iconAlignment}`}>
+        {icon}
+        {children}
+      </div>
+    );
+  };
+
+  const content = (
+    <>
+      {withSparkleEffect && <Sparkles preset="button" />}
+      {renderContent()}
+      {!isNotInteractive && ripple && (
+        <RippleEffect />
+      )}
+    </>
+  );
+
   if (href) {
     return (
       <a
-        ref={elementRef as RefObject<HTMLAnchorElement>}
+        ref={elementRef as ElementRef<HTMLAnchorElement>}
         id={id}
         className={fullClassName}
         href={href}
@@ -182,17 +240,14 @@ const Button: FC<OwnProps> = ({
         target="_blank"
         rel="noreferrer"
       >
-        {children}
-        {!isNotInteractive && ripple && (
-          <RippleEffect />
-        )}
+        {content}
       </a>
     );
   }
 
   return (
     <button
-      ref={elementRef as RefObject<HTMLButtonElement>}
+      ref={elementRef as ElementRef<HTMLButtonElement>}
       id={id}
       type={type}
       className={fullClassName}
@@ -212,15 +267,7 @@ const Button: FC<OwnProps> = ({
       dir={isRtl ? 'rtl' : undefined}
       style={buildStyle(style, backgroundImage && `background-image: url(${backgroundImage})`) || undefined}
     >
-      {isLoading ? (
-        <div>
-          <span dir={isRtl ? 'auto' : undefined}>Please wait...</span>
-          <Spinner color={isText ? 'blue' : 'white'} />
-        </div>
-      ) : children}
-      {!isNotInteractive && ripple && (
-        <RippleEffect />
-      )}
+      {content}
     </button>
   );
 };

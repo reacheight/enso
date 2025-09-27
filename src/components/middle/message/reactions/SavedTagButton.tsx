@@ -1,7 +1,10 @@
-import React, { memo, useRef } from '../../../../lib/teact/teact';
+import { memo, useRef } from '../../../../lib/teact/teact';
 import { getActions } from '../../../../global';
 
-import type { ApiReaction, ApiSavedReactionTag } from '../../../../api/types';
+import type {
+  ApiReaction,
+  ApiSavedReactionTag,
+} from '../../../../api/types';
 import type { ObserveFn } from '../../../../hooks/useIntersectionObserver';
 
 import buildClassName from '../../../../util/buildClassName';
@@ -56,10 +59,8 @@ const SavedTagButton = ({
   onRemove,
 }: OwnProps) => {
   const { editSavedReactionTag } = getActions();
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLButtonElement>(null);
-  // eslint-disable-next-line no-null/no-null
-  const menuRef = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLButtonElement>();
+  const menuRef = useRef<HTMLDivElement>();
 
   const lang = useOldLang();
   const [isRenamePromptOpen, openRenamePrompt, closeRenamePrompt] = useFlag();
@@ -90,7 +91,7 @@ const SavedTagButton = ({
     handleContextMenu,
     handleContextMenuClose,
     handleContextMenuHide,
-  } = useContextMenuHandlers(ref, !withContextMenu);
+  } = useContextMenuHandlers(ref, !withContextMenu, undefined, undefined, undefined, true);
 
   const getTriggerElement = useLastCallback(() => ref.current);
   const getRootElement = useLastCallback(() => document.body);

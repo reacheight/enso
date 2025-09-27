@@ -1,6 +1,9 @@
 import type { ActionReturnType } from '../../types';
 import { PaymentStep } from '../../../types';
 
+import { SERVICE_NOTIFICATIONS_USER_ID } from '../../../config';
+import { applyLangPackDifference, getTranslationFn, requestLangPackDifference } from '../../../util/localization';
+import { getPeerTitle } from '../../helpers/peers';
 import { addActionHandler, setGlobal } from '../../index';
 import {
   addBlockedUser,
@@ -9,23 +12,48 @@ import {
   addUsers,
   removeBlockedUser,
   removePeerStory,
+  replaceWebPage,
   setConfirmPaymentUrl,
   setPaymentStep,
+  updateFullWebPage,
   updateLastReadStoryForPeer,
   updatePeerStory,
   updatePeersWithStories,
+  updatePoll,
   updateStealthMode,
   updateThreadInfos,
 } from '../../reducers';
-import { selectPeerStories, selectPeerStory } from '../../selectors';
+import { updateTabState } from '../../reducers/tabs';
+import {
+  selectPeer,
+  selectPeerStories,
+  selectPeerStory,
+  selectTabState,
+} from '../../selectors';
 
 addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
   switch (update['@type']) {
     case 'updateEntities': {
-      const { users, chats, threadInfos } = update;
+      const {
+        users, chats, threadInfos, polls, webPages,
+      } = update;
       if (users) global = addUsers(global, users);
       if (chats) global = addChats(global, chats);
       if (threadInfos) global = updateThreadInfos(global, threadInfos);
+      if (polls) {
+        polls.forEach((poll) => {
+          global = updatePoll(global, poll.id, poll);
+        });
+      }
+      if (webPages) {
+        webPages.forEach((webPage) => {
+          if (webPage.webpageType === 'full') {
+            global = updateFullWebPage(global, webPage.id, webPage);
+          } else {
+            global = replaceWebPage(global, webPage.id, webPage);
+          }
+        });
+      }
       setGlobal(global);
       break;
     }
@@ -81,7 +109,7 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
 
     case 'updateMoveStickerSetToTop': {
       const oldOrder = update.isCustomEmoji ? global.customEmojis.added.setIds : global.stickers.added.setIds;
-      if (!oldOrder) return global;
+      if (!oldOrder?.some((id) => id === update.id)) return global;
       const newOrder = [update.id, ...oldOrder.filter((id) => id !== update.id)];
       actions.reorderStickerSets({ order: newOrder, isCustomEmoji: update.isCustomEmoji });
       break;
@@ -127,12 +155,25 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
 
     case 'updateWebViewResultSent':
       Object.values(global.byTabId).forEach((tabState) => {
-        if (tabState.webApps.activeWebApp?.queryId === update.queryId) {
-          actions.resetDraftReplyInfo({ tabId: tabState.id });
-          actions.closeActiveWebApp({ tabId: tabState.id });
-        }
+        Object.entries(tabState.webApps.openedWebApps).forEach(([webAppKey, webApp]) => {
+          if (webApp.queryId === update.queryId) {
+            actions.resetDraftReplyInfo({ tabId: tabState.id });
+            actions.closeWebApp({ key: webAppKey, tabId: tabState.id });
+          }
+        });
       });
       break;
+
+    case 'updateWebPage': {
+      const { webPage } = update;
+      if (webPage.webpageType === 'full') {
+        global = updateFullWebPage(global, webPage.id, webPage);
+      } else {
+        global = replaceWebPage(global, webPage.id, webPage);
+      }
+      setGlobal(global);
+      break;
+    }
 
     case 'updateStory':
       global = addStoriesForPeer(global, update.peerId, { [update.story.id]: update.story });
@@ -172,6 +213,95 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
       actions.processPremiumFloodWait({
         isUpload: update.isUpload,
       });
+      break;
+    }
+
+    case 'updatePaidReactionPrivacy': {
+      global = {
+        ...global,
+        settings: {
+          ...global.settings,
+          paidReactionPrivacy: update.private,
+        },
+      };
+      setGlobal(global);
+      break;
+    }
+
+    case 'updateLangPackTooLong': {
+      requestLangPackDifference(update.langCode);
+      break;
+    }
+
+    case 'updateLangPack': {
+      applyLangPackDifference(update.version, update.strings, update.keysToRemove);
+      break;
+    }
+
+    case 'newMessage': {
+      const action = update.message.content?.action;
+      if (!update.message.isOutgoing && update.message.chatId !== SERVICE_NOTIFICATIONS_USER_ID) return undefined;
+      if (action?.type !== 'starGiftUnique') return undefined;
+      const actionStarGift = action.gift;
+
+      Object.values(global.byTabId).forEach(({ id: tabId }) => {
+        const tabState = selectTabState(global, tabId);
+        if (tabState.isWaitingForStarGiftUpgrade) {
+          actions.openUniqueGiftBySlug({
+            slug: actionStarGift.slug,
+            tabId,
+          });
+
+          actions.showNotification({
+            title: { key: 'GiftUpgradedTitle' },
+            message: { key: 'GiftUpgradedDescription' },
+            tabId,
+          });
+
+          actions.requestConfetti({ withStars: true, tabId });
+
+          global = updateTabState(global, {
+            isWaitingForStarGiftUpgrade: undefined,
+          }, tabId);
+        }
+
+        if (tabState.isWaitingForStarGiftTransfer) {
+          const chatId = update.message.chatId;
+          const receiver = chatId ? selectPeer(global, chatId) : undefined;
+          if (receiver) {
+            actions.focusMessage({
+              chatId: receiver.id,
+              messageId: update.message.id!,
+              tabId,
+            });
+
+            actions.showNotification({
+              message: {
+                key: 'GiftTransferSuccessMessage',
+                variables: {
+                  gift: {
+                    key: 'GiftUnique',
+                    variables: {
+                      title: actionStarGift.title,
+                      number: actionStarGift.number,
+                    },
+                  },
+                  peer: getPeerTitle(getTranslationFn(), receiver),
+                },
+              },
+              tabId,
+            });
+          }
+
+          actions.requestConfetti({ withStars: true, tabId });
+
+          global = updateTabState(global, {
+            isWaitingForStarGiftTransfer: undefined,
+          }, tabId);
+        }
+      });
+
+      setGlobal(global);
     }
   }
 

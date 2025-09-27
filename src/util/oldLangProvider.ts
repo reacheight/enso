@@ -4,12 +4,12 @@ import type { ApiOldLangPack, ApiOldLangString } from '../api/types';
 import type { LangCode, TimeFormat } from '../types';
 
 import {
-  DEFAULT_LANG_CODE, DEFAULT_LANG_PACK, LANG_CACHE_NAME, LANG_PACKS,
+  LANG_CACHE_NAME, LANG_PACKS,
 } from '../config';
+import { selectSharedSettings } from '../global/selectors/sharedState';
 import { callApi } from '../api/gramjs';
 import * as cacheApi from './cacheApi';
 import { createCallbackManager } from './callbacks';
-import { fallbackLangPackInitial } from './fallbackLangPackInitial';
 import { loadAndChangeLanguage } from './localization';
 import { formatInteger } from './textFormat';
 
@@ -26,7 +26,7 @@ const SUBSTITUTION_REGEX = /%\d?\$?[sdf@]/g;
 const PLURAL_OPTIONS = ['value', 'zeroValue', 'oneValue', 'twoValue', 'fewValue', 'manyValue', 'otherValue'] as const;
 // Some rules edited from https://github.com/eemeli/make-plural/blob/master/packages/plurals/cardinals.js
 const PLURAL_RULES = {
-  /* eslint-disable max-len */
+  /* eslint-disable @stylistic/max-len */
   en: (n: number) => (n !== 1 ? 6 : 2),
   ar: (n: number) => (n === 0 ? 1 : n === 1 ? 2 : n === 2 ? 3 : n % 100 >= 3 && n % 100 <= 10 ? 4 : n % 100 >= 11 ? 5 : 6),
   be: (n: number) => {
@@ -34,9 +34,12 @@ const PLURAL_RULES = {
     const t0 = Number(s[0]) === n;
     const n10 = t0 ? Number(s[0].slice(-1)) : 0;
     const n100 = t0 ? Number(s[0].slice(-2)) : 0;
-    return n10 === 1 && n100 !== 11 ? 2
-      : (n10 >= 2 && n10 <= 4) && (n100 < 12 || n100 > 14) ? 4
-        : (t0 && n10 === 0) || (n10 >= 5 && n10 <= 9) || (n100 >= 11 && n100 <= 14) ? 5
+    return n10 === 1 && n100 !== 11
+      ? 2
+      : (n10 >= 2 && n10 <= 4) && (n100 < 12 || n100 > 14)
+        ? 4
+        : (t0 && n10 === 0) || (n10 >= 5 && n10 <= 9) || (n100 >= 11 && n100 <= 14)
+          ? 5
           : 6;
   },
   ca: (n: number) => (n !== 1 ? 6 : 2),
@@ -96,7 +99,7 @@ const PLURAL_RULES = {
   tr: (n: number) => (n > 1 ? 6 : 2),
   uk: (n: number) => (n % 10 === 1 && n % 100 !== 11 ? 2 : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 4 : 5),
   uz: (n: number) => (n > 1 ? 6 : 2),
-  /* eslint-enable max-len */
+  /* eslint-enable @stylistic/max-len */
 };
 
 const cache = new Map<string, string>();
@@ -129,7 +132,7 @@ function createLangFn() {
       void importFallbackLangPack();
     }
 
-    const langString = langPack?.[key] || fallbackLangPack?.[key] || fallbackLangPackInitial[key];
+    const langString = langPack?.[key] || fallbackLangPack?.[key];
     if (!langString) {
       return key;
     }
@@ -149,23 +152,6 @@ export function oldTranslate(...args: Parameters<LangFn>) {
 
 export function getTranslationFn(): LangFn {
   return translationFn;
-}
-
-export async function getTranslationForLangString(langCode: string, key: string) {
-  let translateString: ApiOldLangString | undefined;
-  const cachedValue = await cacheApi.fetch(
-    LANG_CACHE_NAME,
-    `${DEFAULT_LANG_PACK}_${langCode}_${key}`,
-    cacheApi.Type.Json,
-  );
-
-  if (cachedValue) {
-    translateString = cachedValue.value;
-  } else {
-    translateString = await fetchRemoteString(DEFAULT_LANG_PACK, langCode, key);
-  }
-
-  return processTranslation(translateString, key);
 }
 
 /**
@@ -199,7 +185,8 @@ export async function oldSetLanguage(langCode: LangCode, callback?: NoneToVoidFu
   langPack = newLangPack;
   document.documentElement.lang = langCode;
 
-  const { languages, timeFormat } = getGlobal().settings.byKey;
+  const global = getGlobal();
+  const { languages, timeFormat } = selectSharedSettings(global);
   const langInfo = languages?.find((lang) => lang.langCode === langCode);
   translationFn = createLangFn();
   translationFn.isRtl = Boolean(langInfo?.isRtl);
@@ -244,30 +231,8 @@ async function fetchRemote(langCode: string): Promise<ApiOldLangPack | undefined
   return undefined;
 }
 
-async function fetchRemoteString(
-  remoteLangPack: typeof LANG_PACKS[number], langCode: string, key: string,
-): Promise<ApiOldLangString | undefined> {
-  const remote = await callApi('oldFetchLangStrings', {
-    langPack: remoteLangPack,
-    langCode,
-    keys: [key],
-  });
-
-  if (remote?.length) {
-    const wrappedString = JSON.stringify({
-      value: remote[0],
-    });
-
-    await cacheApi.save(LANG_CACHE_NAME, `${remoteLangPack}_${langCode}_${key}`, wrappedString);
-
-    return remote[0];
-  }
-
-  return undefined;
-}
-
 function getPluralOption(amount: number) {
-  const langCode = currentLangCode || DEFAULT_LANG_CODE;
+  const langCode = currentLangCode || 'en';
   const optionIndex = PLURAL_RULES[langCode as keyof typeof PLURAL_RULES]
     ? PLURAL_RULES[langCode as keyof typeof PLURAL_RULES](amount)
     : 0;

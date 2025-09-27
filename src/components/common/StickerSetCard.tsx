@@ -1,10 +1,10 @@
 import type { FC } from '../../lib/teact/teact';
-import React, { memo } from '../../lib/teact/teact';
+import { memo } from '../../lib/teact/teact';
 
 import type { ApiSticker, ApiStickerSet } from '../../api/types';
 import type { ObserveFn } from '../../hooks/useIntersectionObserver';
 
-import { CHAT_HEIGHT_PX, STICKER_SIZE_GENERAL_SETTINGS } from '../../config';
+import { STICKER_SIZE_GENERAL_SETTINGS } from '../../config';
 import buildClassName from '../../util/buildClassName';
 
 import useLastCallback from '../../hooks/useLastCallback';
@@ -16,6 +16,8 @@ import ListItem from '../ui/ListItem';
 import StickerButton from './StickerButton';
 
 import './StickerSetCard.scss';
+
+const STICKER_SET_CARD_HEIGHT = 56;
 
 type OwnProps = {
   stickerSet?: ApiStickerSet;
@@ -79,14 +81,13 @@ const StickerSetCard: FC<OwnProps> = ({
 
   return (
     <ListItem
-      narrow
-      className={buildClassName('StickerSetCard', 'chat-item-clickable small-icon', className)}
-      style={`height: ${CHAT_HEIGHT_PX}px;`}
+      className={buildClassName('StickerSetCard', 'small-icon', className)}
+      style={`height: ${STICKER_SET_CARD_HEIGHT}px;`}
       inactive={!firstSticker}
       onClick={handleCardClick}
     >
       {renderPreview()}
-      <div className="multiline-menu-item">
+      <div className="multiline-item">
         <div className="title">{stickerSet.title}</div>
         <div className="subtitle">{lang('StickerPack.StickerCount', stickerSet.count, 'i')}</div>
       </div>

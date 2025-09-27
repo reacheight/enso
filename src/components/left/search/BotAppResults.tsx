@@ -1,14 +1,14 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, {
+import {
   memo, useCallback, useMemo, useRef,
   useState,
 } from '../../../lib/teact/teact';
-import { getActions, getGlobal, withGlobal } from '../../../global';
+import { getActions, withGlobal } from '../../../global';
 
 import { LoadMoreDirection } from '../../../types';
 
 import { SLIDE_TRANSITION_DURATION } from '../../../config';
-import { filterUsersByName } from '../../../global/helpers';
+import { filterPeersByQuery } from '../../../global/helpers/peers';
 import { selectTabState } from '../../../global/selectors';
 import { throttle } from '../../../util/schedulers';
 
@@ -20,6 +20,7 @@ import NothingFound from '../../common/NothingFound';
 import InfiniteScroll from '../../ui/InfiniteScroll';
 import Link from '../../ui/Link';
 import Loading from '../../ui/Loading';
+import Transition from '../../ui/Transition.tsx';
 import LeftSearchResultChat from './LeftSearchResultChat';
 
 export type OwnProps = {
@@ -46,8 +47,7 @@ const BotAppResults: FC<OwnProps & StateProps> = ({
     openChatWithInfo,
   } = getActions();
 
-  // eslint-disable-next-line no-null/no-null
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>();
 
   const lang = useOldLang();
 
@@ -58,8 +58,7 @@ const BotAppResults: FC<OwnProps & StateProps> = ({
     const recentSet = new Set(recentBotIds);
     const withoutRecent = foundIds.filter((id) => !recentSet.has(id));
 
-    const usersById = getGlobal().users.byId;
-    return filterUsersByName(withoutRecent, usersById, searchQuery);
+    return filterPeersByQuery({ ids: withoutRecent, query: searchQuery, type: 'user' });
   }, [foundIds, recentBotIds, searchQuery]);
 
   const handleChatClick = useLastCallback((id: string) => {
@@ -81,7 +80,13 @@ const BotAppResults: FC<OwnProps & StateProps> = ({
   const canRenderContents = useAsyncRendering([searchQuery], SLIDE_TRANSITION_DURATION) && !isLoading;
 
   return (
-    <div ref={containerRef} className="LeftSearch--content">
+    <Transition
+      ref={containerRef}
+      slideClassName="LeftSearch--content"
+      name="fade"
+      activeKey={canRenderContents ? 1 : 0}
+      shouldCleanup
+    >
       <InfiniteScroll
         className="search-content custom-scroll"
         items={canRenderContents ? filteredFoundIds : undefined}
@@ -91,6 +96,7 @@ const BotAppResults: FC<OwnProps & StateProps> = ({
         {!canRenderContents && <Loading />}
         {canRenderContents && !filteredFoundIds?.length && (
           <NothingFound
+            withSticker
             text={lang('ChatList.Search.NoResults')}
             description={lang('ChatList.Search.NoResultsDescription')}
           />
@@ -114,12 +120,13 @@ const BotAppResults: FC<OwnProps & StateProps> = ({
                 <LeftSearchResultChat
                   chatId={id}
                   onClick={handleChatClick}
+                  withOpenAppButton
                 />
               );
             })}
           </div>
         )}
-        {canRenderContents && filteredFoundIds?.length && (
+        {canRenderContents && Boolean(filteredFoundIds?.length) && (
           <div className="search-section">
             <h3 className="section-heading">{lang('SearchAppsPopular')}</h3>
             {filteredFoundIds.map((id) => {
@@ -127,17 +134,18 @@ const BotAppResults: FC<OwnProps & StateProps> = ({
                 <LeftSearchResultChat
                   chatId={id}
                   onClick={handleChatClick}
+                  withOpenAppButton
                 />
               );
             })}
           </div>
         )}
       </InfiniteScroll>
-    </div>
+    </Transition>
   );
 };
 
-export default memo(withGlobal<OwnProps>((global) => {
+export default memo(withGlobal<OwnProps>((global): Complete<StateProps> => {
   const globalSearch = selectTabState(global).globalSearch;
   const foundIds = globalSearch.popularBotApps?.peerIds;
 

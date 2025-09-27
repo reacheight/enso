@@ -1,10 +1,11 @@
 import type { FC } from '../../lib/teact/teact';
-import React, { memo } from '../../lib/teact/teact';
+import { memo } from '../../lib/teact/teact';
 
 import type { ConnectionStatus } from '../../hooks/useConnectionStatus';
 
 import useOldLang from '../../hooks/useOldLang';
 
+import Icon from '../common/icons/Icon';
 import Button from '../ui/Button';
 import Spinner from '../ui/Spinner';
 import Transition from '../ui/Transition';
@@ -37,7 +38,7 @@ const ConnectionStatusOverlay: FC<OwnProps> = ({
         size="tiny"
         color="translucent-black"
       >
-        <span className="icon icon-close" />
+        <Icon name="close" />
       </Button>
     </div>
   );

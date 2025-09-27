@@ -1,5 +1,6 @@
 import type { AriaRole } from 'react';
-import React from '../../../lib/teact/teact';
+import type { ElementRef } from '../../../lib/teact/teact';
+import type React from '../../../lib/teact/teact';
 
 import type { IconName } from '../../../types/icons';
 
@@ -11,23 +12,29 @@ type OwnProps = {
   style?: string;
   role?: AriaRole;
   ariaLabel?: string;
+  character?: string;
+  ref?: ElementRef<HTMLElement>;
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
 };
 
 const Icon = ({
   name,
+  ref,
   className,
   style,
   role,
   ariaLabel,
+  character,
   onClick,
 }: OwnProps) => {
   return (
     <i
+      ref={ref}
       className={buildClassName(`icon icon-${name}`, className)}
       style={style}
       aria-hidden={!ariaLabel}
       aria-label={ariaLabel}
+      data-char={character}
       role={role}
       onClick={onClick}
     />

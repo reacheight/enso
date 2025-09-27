@@ -1,15 +1,17 @@
 import type {
   ApiChat, ApiChatFolder, ApiChatlistExportedInvite,
   ApiChatMember, ApiError, ApiMissingInvitedUser,
+  ApiTopic,
+  LinkContext,
 } from '../../../api/types';
 import type { RequiredGlobalActions } from '../../index';
 import type {
-  ActionReturnType,
-  ChatListType, GlobalState, TabArgs,
+  ActionReturnType, GlobalState, TabArgs,
 } from '../../types';
 import { MAIN_THREAD_ID } from '../../../api/types';
 import {
   ChatCreationProgress,
+  type ChatListType,
   ManagementProgress,
   NewChatMembersProgress,
   SettingsScreens,
@@ -32,11 +34,14 @@ import {
   TOPICS_SLICE_SECOND_LOAD,
 } from '../../../config';
 import { copyTextToClipboard } from '../../../util/clipboard';
-import { formatShareText, parseChooseParameter, processDeepLink } from '../../../util/deeplink';
+import { formatShareText, processDeepLink } from '../../../util/deeplink';
 import { isDeepLink } from '../../../util/deepLinkParser';
+import { isUserId } from '../../../util/entities/ids';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import { getOrderedIds } from '../../../util/folderManager';
-import { buildCollectionByKey, omit, pick } from '../../../util/iteratees';
+import {
+  buildCollectionByKey, omit, pick, unique,
+} from '../../../util/iteratees';
 import { isLocalMessageId } from '../../../util/keys/messageKey';
 import * as langProvider from '../../../util/oldLangProvider';
 import { debounce, pause, throttle } from '../../../util/schedulers';
@@ -47,17 +52,21 @@ import {
   isChatArchived,
   isChatBasicGroup,
   isChatChannel,
+  isChatMonoforum,
   isChatSuperGroup,
   isUserBot,
-  toChannelId,
 } from '../../helpers';
 import {
   addActionHandler, getGlobal, setGlobal,
 } from '../../index';
 import {
+  addChatListIds,
   addChatMembers,
+  addChats,
   addMessages,
-  addSimilarChannels,
+  addNotifyExceptions,
+  addSimilarBots,
+  addUsers,
   addUserStatuses,
   deleteChatMessages,
   deletePeerPhoto,
@@ -67,13 +76,15 @@ import {
   replaceChatFullInfo,
   replaceChatListIds,
   replaceChatListLoadingParameters,
+  replaceMessages,
+  replaceNotifyExceptions,
+  replaceSimilarChannels,
   replaceThreadParam,
   replaceUserStatuses,
   toggleSimilarChannels,
   updateChat,
   updateChatFullInfo,
   updateChatLastMessageId,
-  updateChatListIds,
   updateChatListSecondaryInfo,
   updateChats,
   updateChatsLastMessageId,
@@ -104,6 +115,7 @@ import {
   selectDraft,
   selectIsChatPinned,
   selectIsChatWithSelf,
+  selectIsCurrentUserFrozen,
   selectLastServiceNotification,
   selectPeer,
   selectSimilarChannelIds,
@@ -141,7 +153,7 @@ addActionHandler('preloadTopChatMessages', async (global, actions): Promise<void
 
     global = getGlobal();
     const currentChatIds = Object.values(global.byTabId)
-      // eslint-disable-next-line @typescript-eslint/no-loop-func
+
       .map(({ id: tabId }) => selectCurrentMessageList(global, tabId)?.chatId)
       .filter(Boolean);
 
@@ -216,7 +228,7 @@ addActionHandler('openChat', (global, actions, payload): ActionReturnType => {
   const chat = selectChat(global, id);
 
   if (chat?.hasUnreadMark) {
-    actions.toggleChatUnread({ id });
+    actions.markChatRead({ id });
   }
 
   const isChatOnlySummary = !selectChatLastMessageId(global, id);
@@ -233,8 +245,6 @@ addActionHandler('openChat', (global, actions, payload): ActionReturnType => {
   } else if (isChatOnlySummary && !chat.isMin) {
     actions.requestChatUpdate({ chatId: id });
   }
-  actions.closeStoryViewer({ tabId });
-  actions.closeStarsBalanceModal({ tabId });
 });
 
 addActionHandler('openSavedDialog', (global, actions, payload): ActionReturnType => {
@@ -336,7 +346,6 @@ addActionHandler('openThread', async (global, actions, payload): Promise<void> =
   setGlobal(global);
 
   const openPreviousChat = () => {
-    // eslint-disable-next-line eslint-multitab-tt/no-immediate-global
     const currentGlobal = getGlobal();
     if (isComments
       || selectCurrentMessageList(currentGlobal, tabId)?.chatId !== loadingChatId
@@ -359,10 +368,11 @@ addActionHandler('openThread', async (global, actions, payload): Promise<void> =
     });
   }
 
-  const result = await callApi('fetchDiscussionMessage', {
-    chat: selectChat(global, loadingChatId)!,
-    messageId: Number(loadingThreadId),
-  });
+  const result = selectIsCurrentUserFrozen(global) ? undefined
+    : await callApi('fetchDiscussionMessage', {
+      chat: selectChat(global, loadingChatId)!,
+      messageId: Number(loadingThreadId),
+    });
 
   global = getGlobal();
   loadingThread = selectTabState(global, tabId).loadingThread;
@@ -401,14 +411,19 @@ addActionHandler('openThread', async (global, actions, payload): Promise<void> =
       threadId,
     });
 
+    const lastMessageId = threadInfo?.lastMessageId !== undefined ? threadInfo.lastMessageId
+      : threadInfo?.messagesCount === 0 ? result.threadId : undefined;
+
     global = updateThreadInfo(global, chatId, threadId, {
       isCommentsInfo: false,
       threadId,
       chatId,
       fromChannelId: loadingChatId,
       fromMessageId: loadingThreadId,
+      lastMessageId,
       ...(threadInfo
-        && pick(threadInfo, ['messagesCount', 'lastMessageId', 'lastReadInboxMessageId', 'recentReplierIds'])),
+        && pick(threadInfo, ['messagesCount', 'lastReadInboxMessageId', 'recentReplierIds'])
+      ),
     });
   }
   global = updateThread(global, chatId, threadId, {
@@ -419,7 +434,7 @@ addActionHandler('openThread', async (global, actions, payload): Promise<void> =
   if (focusMessageId) {
     actions.focusMessage({
       chatId,
-      threadId: threadId!,
+      threadId,
       messageId: focusMessageId,
       tabId,
     });
@@ -456,7 +471,7 @@ addActionHandler('openThread', async (global, actions, payload): Promise<void> =
       actions.processOpenChatOrThread({
         chatId,
         type,
-        threadId: threadId!,
+        threadId,
         tabId,
         isComments,
         noForumTopicPanel,
@@ -468,7 +483,7 @@ addActionHandler('openThread', async (global, actions, payload): Promise<void> =
 });
 
 addActionHandler('openLinkedChat', async (global, actions, payload): Promise<void> => {
-  const { id, tabId = getCurrentTabId() } = payload!;
+  const { id, tabId = getCurrentTabId() } = payload;
   const chat = selectChat(global, id);
   if (!chat) {
     return;
@@ -498,7 +513,7 @@ addActionHandler('openSupportChat', async (global, actions, payload): Promise<vo
 });
 
 addActionHandler('loadAllChats', async (global, actions, payload): Promise<void> => {
-  const { onFirstBatchDone } = payload;
+  const { whenFirstBatchDone } = payload;
   const listType = payload.listType;
   let isCallbackFired = false;
   let i = 0;
@@ -525,7 +540,7 @@ addActionHandler('loadAllChats', async (global, actions, payload): Promise<void>
     );
 
     if (!isCallbackFired) {
-      onFirstBatchDone?.();
+      await whenFirstBatchDone?.();
       isCallbackFired = true;
     }
 
@@ -533,10 +548,39 @@ addActionHandler('loadAllChats', async (global, actions, payload): Promise<void>
   }
 });
 
+addActionHandler('loadPinnedDialogs', async (global, actions, payload): Promise<void> => {
+  const {
+    listType,
+  } = payload;
+
+  const result = await callApi('fetchPinnedDialogs', { listType });
+  if (!result) return;
+
+  const { dialogIds, messages, chats, users } = result;
+
+  global = getGlobal();
+  global = updateChats(global, buildCollectionByKey(chats, 'id'));
+  global = updateUsers(global, buildCollectionByKey(users, 'id'));
+  global = replaceMessages(global, messages);
+
+  global = {
+    ...global,
+    chats: {
+      ...global.chats,
+      orderedPinnedIds: {
+        ...global.chats.orderedPinnedIds,
+        [listType]: dialogIds.length ? dialogIds : undefined,
+      },
+    },
+  };
+
+  setGlobal(global);
+});
+
 addActionHandler('loadFullChat', (global, actions, payload): ActionReturnType => {
   const {
     chatId, force, withPhotos,
-  } = payload!;
+  } = payload;
   const chat = selectChat(global, chatId);
   if (!chat) {
     return;
@@ -556,10 +600,34 @@ addActionHandler('loadFullChat', (global, actions, payload): ActionReturnType =>
   }
 });
 
+addActionHandler('invalidateFullInfo', (global, actions, payload): ActionReturnType => {
+  const { peerId } = payload;
+
+  const isUser = isUserId(peerId);
+
+  if (isUser) {
+    return {
+      ...global,
+      users: {
+        ...global.users,
+        fullInfoById: omit(global.users.fullInfoById, [peerId]),
+      },
+    };
+  }
+
+  return {
+    ...global,
+    chats: {
+      ...global.chats,
+      fullInfoById: omit(global.chats.fullInfoById, [peerId]),
+    },
+  };
+});
+
 addActionHandler('loadTopChats', (): ActionReturnType => {
   runThrottledForLoadTopChats(() => {
-    loadChats('active');
-    loadChats('archived');
+    loadChats('active', undefined, true);
+    loadChats('archived', undefined, true);
   });
 });
 
@@ -599,7 +667,7 @@ addActionHandler('requestSavedDialogUpdate', async (global, actions, payload): P
 
   if (result.messages.length) {
     global = updateChatLastMessageId(global, chatId, result.messages[0].id, 'saved');
-    global = updateChatListIds(global, 'saved', [chatId]);
+    global = addChatListIds(global, 'saved', [chatId]);
 
     setGlobal(global);
   } else {
@@ -620,42 +688,54 @@ addActionHandler('requestSavedDialogUpdate', async (global, actions, payload): P
 });
 
 addActionHandler('updateChatMutedState', (global, actions, payload): ActionReturnType => {
-  const { chatId, muteUntil = 0 } = payload;
+  const { chatId, mutedUntil } = payload;
+
+  if (selectIsCurrentUserFrozen(global)) {
+    actions.openFrozenAccountModal({ tabId: getCurrentTabId() });
+    return;
+  }
+
   const chat = selectChat(global, chatId);
   if (!chat) {
     return;
   }
 
-  const isMuted = payload.isMuted ?? muteUntil > 0;
+  void callApi('updateChatNotifySettings', { chat, settings: { mutedUntil } });
+});
 
-  global = updateChat(global, chatId, { isMuted });
-  setGlobal(global);
-  void callApi('updateChatMutedState', { chat, isMuted, muteUntil });
+addActionHandler('updateChatSilentPosting', (global, actions, payload): ActionReturnType => {
+  const { chatId, isEnabled } = payload;
+
+  const chat = selectChat(global, chatId);
+  if (!chat) {
+    return;
+  }
+
+  void callApi('updateChatNotifySettings', { chat, settings: { isSilentPosting: isEnabled } });
 });
 
 addActionHandler('updateTopicMutedState', (global, actions, payload): ActionReturnType => {
-  const { chatId, topicId, muteUntil = 0 } = payload;
+  const {
+    chatId, topicId, mutedUntil,
+  } = payload;
   const chat = selectChat(global, chatId);
   if (!chat) {
     return;
   }
 
-  const isMuted = payload.isMuted ?? muteUntil > 0;
-
-  global = updateTopic(global, chatId, topicId, { isMuted });
-  setGlobal(global);
   void callApi('updateTopicMutedState', {
-    chat, topicId, isMuted, muteUntil,
+    chat, topicId, mutedUntil,
   });
 });
 
 addActionHandler('createChannel', async (global, actions, payload): Promise<void> => {
   const {
-    title, about, photo, memberIds, tabId = getCurrentTabId(),
+    title, about, photo, memberIds, discussionChannelId, tabId = getCurrentTabId(),
   } = payload;
+  const isChannel = 'isChannel' in payload ? payload.isChannel : undefined;
+  const isSuperGroup = 'isSuperGroup' in payload ? payload.isSuperGroup : undefined;
 
-  const users = (memberIds as string[])
-    .map((id) => selectUser(global, id))
+  const users = memberIds?.map((id) => selectUser(global, id))
     .filter(Boolean);
 
   global = updateTabState(global, {
@@ -668,7 +748,13 @@ addActionHandler('createChannel', async (global, actions, payload): Promise<void
   let createdChannel: ApiChat | undefined;
   let missingInvitedUsers: ApiMissingInvitedUser[] | undefined;
   try {
-    const result = await callApi('createChannel', { title, about, users });
+    const result = await callApi('createChannel', {
+      title,
+      about,
+      users,
+      isBroadcast: isChannel,
+      isMegagroup: isSuperGroup,
+    });
     createdChannel = result?.channel;
     missingInvitedUsers = result?.missingUsers;
   } catch (error) {
@@ -704,6 +790,13 @@ addActionHandler('createChannel', async (global, actions, payload): Promise<void
     },
   }, tabId);
   setGlobal(global);
+  if (discussionChannelId && channelId) {
+    actions.linkDiscussionGroup({
+      channelId: discussionChannelId,
+      chatId: channelId,
+      tabId,
+    });
+  }
   actions.openChat({ id: channelId, shouldReplaceHistory: true, tabId });
 
   if (missingInvitedUsers) {
@@ -718,7 +811,7 @@ addActionHandler('createChannel', async (global, actions, payload): Promise<void
 });
 
 addActionHandler('joinChannel', async (global, actions, payload): Promise<void> => {
-  const { chatId, tabId = getCurrentTabId() } = payload!;
+  const { chatId, tabId = getCurrentTabId() } = payload;
   const chat = selectChat(global, chatId);
   if (!chat) {
     return;
@@ -742,7 +835,9 @@ addActionHandler('joinChannel', async (global, actions, payload): Promise<void> 
 });
 
 addActionHandler('deleteChatUser', (global, actions, payload): ActionReturnType => {
-  const { chatId, userId, tabId = getCurrentTabId() } = payload;
+  const {
+    chatId, userId, shouldRevokeHistory, tabId = getCurrentTabId(),
+  } = payload;
   const chat = selectChat(global, chatId);
   const user = selectUser(global, userId);
   if (!chat || !user) {
@@ -756,11 +851,11 @@ addActionHandler('deleteChatUser', (global, actions, payload): ActionReturnType 
     actions.openChat({ id: undefined, tabId });
   }
 
-  void callApi('deleteChatUser', { chat, user });
+  void callApi('deleteChatUser', { chat, user, shouldRevokeHistory });
 });
 
 addActionHandler('deleteChat', (global, actions, payload): ActionReturnType => {
-  const { chatId, tabId = getCurrentTabId() } = payload!;
+  const { chatId, tabId = getCurrentTabId() } = payload;
   const chat = selectChat(global, chatId);
   if (!chat) {
     return;
@@ -777,7 +872,7 @@ addActionHandler('deleteChat', (global, actions, payload): ActionReturnType => {
 });
 
 addActionHandler('leaveChannel', async (global, actions, payload): Promise<void> => {
-  const { chatId, tabId = getCurrentTabId() } = payload!;
+  const { chatId, tabId = getCurrentTabId() } = payload;
   const chat = selectChat(global, chatId);
   if (!chat) {
     return;
@@ -799,8 +894,6 @@ addActionHandler('leaveChannel', async (global, actions, payload): Promise<void>
     global = deleteChatMessages(global, chatId, localMessageIds);
     setGlobal(global);
   }
-
-  actions.loadFullChat({ chatId, force: true });
 });
 
 addActionHandler('deleteChannel', (global, actions, payload): ActionReturnType => {
@@ -827,7 +920,7 @@ addActionHandler('createGroupChat', async (global, actions, payload): Promise<vo
   const {
     title, memberIds, photo, tabId = getCurrentTabId(),
   } = payload;
-  const users = (memberIds as string[])
+  const users = (memberIds)
     .map((id) => selectUser(global, id))
     .filter(Boolean);
 
@@ -893,7 +986,12 @@ addActionHandler('createGroupChat', async (global, actions, payload): Promise<vo
 });
 
 addActionHandler('toggleChatPinned', (global, actions, payload): ActionReturnType => {
-  const { id, folderId, tabId = getCurrentTabId() } = payload!;
+  const { id, folderId, tabId = getCurrentTabId() } = payload;
+
+  if (selectIsCurrentUserFrozen(global)) {
+    actions.openFrozenAccountModal({ tabId });
+    return;
+  }
   const chat = selectChat(global, id);
   if (!chat) {
     return;
@@ -940,7 +1038,13 @@ addActionHandler('toggleChatPinned', (global, actions, payload): ActionReturnTyp
 });
 
 addActionHandler('toggleChatArchived', (global, actions, payload): ActionReturnType => {
-  const { id } = payload!;
+  const { id } = payload;
+
+  if (selectIsCurrentUserFrozen(global)) {
+    actions.openFrozenAccountModal({ tabId: getCurrentTabId() });
+    return;
+  }
+
   const chat = selectChat(global, id);
   if (chat) {
     void callApi('toggleChatArchived', {
@@ -951,7 +1055,13 @@ addActionHandler('toggleChatArchived', (global, actions, payload): ActionReturnT
 });
 
 addActionHandler('toggleSavedDialogPinned', (global, actions, payload): ActionReturnType => {
-  const { id, tabId = getCurrentTabId() } = payload!;
+  const { id, tabId = getCurrentTabId() } = payload;
+
+  if (selectIsCurrentUserFrozen(global)) {
+    actions.openFrozenAccountModal({ tabId });
+    return;
+  }
+
   const chat = selectChat(global, id);
   if (!chat) {
     return;
@@ -1006,6 +1116,24 @@ addActionHandler('loadRecommendedChatFolders', async (global): Promise<void> => 
   }
 });
 
+addActionHandler('toggleDialogFilterTags', async (global, actions, payload): Promise<void> => {
+  const { isEnabled } = payload;
+
+  const result = await callApi('toggleDialogFilterTags', isEnabled);
+
+  if (result) {
+    global = getGlobal();
+    global = {
+      ...global,
+      chatFolders: {
+        ...global.chatFolders,
+        areTagsEnabled: isEnabled,
+      },
+    };
+    setGlobal(global);
+  }
+});
+
 addActionHandler('editChatFolders', (global, actions, payload): ActionReturnType => {
   const {
     chatId, idsToRemove, idsToAdd, tabId = getCurrentTabId(),
@@ -1013,16 +1141,16 @@ addActionHandler('editChatFolders', (global, actions, payload): ActionReturnType
   const limit = selectCurrentLimit(global, 'dialogFiltersChats');
 
   const isLimitReached = idsToAdd
-    .some((id) => selectChatFolder(global, id)!.includedChatIds.length >= limit);
+    .some((id) => selectChatFolder(global, id).includedChatIds.length >= limit);
   if (isLimitReached) {
     actions.openLimitReachedModal({ limit: 'dialogFiltersChats', tabId });
     return;
   }
 
-  idsToRemove.forEach(async (id) => {
+  idsToRemove.forEach((id) => {
     const folder = selectChatFolder(global, id);
     if (folder) {
-      await callApi('editChatFolder', {
+      callApi('editChatFolder', {
         id,
         folderUpdate: {
           ...folder,
@@ -1033,10 +1161,10 @@ addActionHandler('editChatFolders', (global, actions, payload): ActionReturnType
     }
   });
 
-  idsToAdd.forEach(async (id) => {
+  idsToAdd.forEach((id) => {
     const folder = selectChatFolder(global, id);
     if (folder) {
-      await callApi('editChatFolder', {
+      callApi('editChatFolder', {
         id,
         folderUpdate: {
           ...folder,
@@ -1048,7 +1176,7 @@ addActionHandler('editChatFolders', (global, actions, payload): ActionReturnType
 });
 
 addActionHandler('editChatFolder', (global, actions, payload): ActionReturnType => {
-  const { id, folderUpdate } = payload!;
+  const { id, folderUpdate } = payload;
   const folder = selectChatFolder(global, id);
 
   if (folder) {
@@ -1065,7 +1193,7 @@ addActionHandler('editChatFolder', (global, actions, payload): ActionReturnType 
 });
 
 addActionHandler('addChatFolder', async (global, actions, payload): Promise<void> => {
-  const { folder, tabId = getCurrentTabId() } = payload!;
+  const { folder, tabId = getCurrentTabId() } = payload;
   const { orderedIds, byId } = global.chatFolders;
 
   const limit = selectCurrentLimit(global, 'dialogFilters');
@@ -1099,7 +1227,7 @@ addActionHandler('addChatFolder', async (global, actions, payload): Promise<void
     folder: folderUpdate,
   });
 
-  actions.requestNextSettingsScreen({
+  actions.requestNextFoldersAction({
     foldersAction: {
       type: 'setFolderId',
       payload: maxId + 1,
@@ -1127,7 +1255,7 @@ addActionHandler('addChatFolder', async (global, actions, payload): Promise<void
 });
 
 addActionHandler('sortChatFolders', async (global, actions, payload): Promise<void> => {
-  const { folderIds } = payload!;
+  const { folderIds } = payload;
 
   const result = await callApi('sortChatFolders', folderIds);
   if (result) {
@@ -1152,22 +1280,79 @@ addActionHandler('deleteChatFolder', async (global, actions, payload): Promise<v
   }
 });
 
-addActionHandler('toggleChatUnread', (global, actions, payload): ActionReturnType => {
+addActionHandler('markChatUnread', (global, actions, payload): ActionReturnType => {
   const { id } = payload;
+
+  if (selectIsCurrentUserFrozen(global)) {
+    actions.openFrozenAccountModal({ tabId: getCurrentTabId() });
+    return;
+  }
   const chat = selectChat(global, id);
-  if (chat) {
-    if (chat.unreadCount) {
-      void callApi('markMessageListRead', { chat, threadId: MAIN_THREAD_ID });
-    } else {
-      void callApi('toggleDialogUnread', {
-        chat,
-        hasUnreadMark: !chat.hasUnreadMark,
-      });
+  if (!chat) return;
+  void callApi('toggleDialogUnread', {
+    chat,
+    hasUnreadMark: !chat.hasUnreadMark,
+  });
+});
+
+addActionHandler('markChatMessagesRead', async (global, actions, payload): Promise<void> => {
+  if (selectIsCurrentUserFrozen(global)) return;
+  const { id } = payload;
+
+  if (selectIsCurrentUserFrozen(global)) {
+    actions.openFrozenAccountModal({ tabId: getCurrentTabId() });
+    return;
+  }
+
+  const chat = selectChat(global, id);
+  if (!chat) return;
+  if (!chat.isForum) {
+    await callApi('markMessageListRead', { chat, threadId: MAIN_THREAD_ID });
+    actions.readAllMentions({ chatId: id });
+    actions.readAllReactions({ chatId: id });
+    if (chat.hasUnreadMark) {
+      actions.markChatRead({ id });
+    }
+    return;
+  }
+
+  let hasMoreTopics = true;
+  let lastTopic: ApiTopic | undefined;
+  let processedCount = 0;
+
+  while (hasMoreTopics) {
+    const result = await callApi('fetchTopics', {
+      chat, offsetDate: lastTopic?.date, offsetTopicId: lastTopic?.id, offsetId: lastTopic?.lastMessageId, limit: 100,
+    });
+
+    if (!result?.topics?.length) return;
+
+    result.topics.forEach((topic) => {
+      if (!topic.unreadCount && !topic.unreadMentionsCount && !topic.unreadReactionsCount) return;
+      actions.markTopicRead({ chatId: id, topicId: topic.id });
+    });
+
+    lastTopic = result.topics[result.topics.length - 1];
+    processedCount += result.topics.length;
+    if (result.count <= processedCount) {
+      hasMoreTopics = false;
     }
   }
 });
 
+addActionHandler('markChatRead', (global, actions, payload): ActionReturnType => {
+  const { id } = payload;
+  const chat = selectChat(global, id);
+  if (!chat) return;
+
+  callApi('toggleDialogUnread', {
+    chat,
+    hasUnreadMark: !chat.hasUnreadMark,
+  });
+});
+
 addActionHandler('markTopicRead', (global, actions, payload): ActionReturnType => {
+  if (selectIsCurrentUserFrozen(global)) return;
   const { chatId, topicId } = payload;
   const chat = selectChat(global, chatId);
   if (!chat) return;
@@ -1182,6 +1367,8 @@ addActionHandler('markTopicRead', (global, actions, payload): ActionReturnType =
     threadId: topicId,
     maxId: lastTopicMessageId,
   });
+  actions.readAllMentions({ chatId, threadId: topicId });
+  actions.readAllReactions({ chatId, threadId: topicId });
 
   global = getGlobal();
   global = updateTopic(global, chatId, topicId, {
@@ -1193,21 +1380,55 @@ addActionHandler('markTopicRead', (global, actions, payload): ActionReturnType =
   setGlobal(global);
 });
 
-addActionHandler('openChatByInvite', async (global, actions, payload): Promise<void> => {
-  const { hash, tabId = getCurrentTabId() } = payload!;
+addActionHandler('checkChatInvite', async (global, actions, payload): Promise<void> => {
+  const { hash, tabId = getCurrentTabId() } = payload;
 
-  const result = await callApi('openChatByInvite', hash);
+  const result = await callApi('checkChatInvite', hash);
   if (!result) {
     return;
   }
 
-  actions.openChat({ id: result.chatId, tabId });
+  global = getGlobal();
+
+  if (result.users) {
+    global = addUsers(global, buildCollectionByKey(result.users, 'id'));
+  }
+
+  if (result.chat) {
+    global = addChats(global, buildCollectionByKey([result.chat], 'id'));
+    setGlobal(global);
+    actions.openChat({ id: result.chat.id, tabId });
+    return;
+  }
+
+  if (result.invite.subscriptionFormId) {
+    global = updateTabState(global, {
+      starsPayment: {
+        inputInvoice: {
+          type: 'chatInviteSubscription',
+          hash,
+        },
+        subscriptionInfo: result.invite,
+        status: 'pending',
+      },
+    }, tabId);
+    setGlobal(global);
+    return;
+  }
+
+  global = updateTabState(global, {
+    chatInviteModal: {
+      hash,
+      inviteInfo: result.invite,
+    },
+  }, tabId);
+  setGlobal(global);
 });
 
 addActionHandler('openChatByPhoneNumber', async (global, actions, payload): Promise<void> => {
   const {
     phoneNumber, startAttach, attach, text, tabId = getCurrentTabId(),
-  } = payload!;
+  } = payload;
 
   // Open temporary empty chat to make the click response feel faster
   actions.openChat({ id: TMP_CHAT_ID, tabId });
@@ -1237,27 +1458,26 @@ addActionHandler('openChatByPhoneNumber', async (global, actions, payload): Prom
 addActionHandler('openTelegramLink', async (global, actions, payload): Promise<void> => {
   const {
     url,
+    shouldIgnoreCache,
+    linkContext,
     tabId = getCurrentTabId(),
   } = payload;
 
   const {
     openChatByPhoneNumber,
-    openChatByInvite,
+    checkChatInvite,
     openStickerSet,
     openChatWithDraft,
     joinVoiceChatByLink,
-    focusMessage,
     openInvoice,
-    processAttachBotParameters,
     checkChatlistInvite,
     openChatByUsername: openChatByUsernameAction,
     openStoryViewerByUsername,
-    processBoostParameters,
     checkGiftCode,
   } = actions;
 
   if (isDeepLink(url)) {
-    const isProcessed = processDeepLink(url);
+    const isProcessed = processDeepLink(url, linkContext);
     if (isProcessed || url.match(RE_TG_LINK)) {
       return;
     }
@@ -1283,11 +1503,7 @@ addActionHandler('openTelegramLink', async (global, actions, payload): Promise<v
     hash = part2;
   }
 
-  const hasStartAttach = params.hasOwnProperty('startattach');
-  const hasStartApp = params.hasOwnProperty('startapp');
-  const choose = parseChooseParameter(params.choose);
   const storyId = part2 === 's' && (Number(part3) || undefined);
-  const hasBoost = params.hasOwnProperty('boost');
 
   if (part1.match(/^\+([0-9]+)(\?|$)/)) {
     openChatByPhoneNumber({
@@ -1315,7 +1531,7 @@ addActionHandler('openTelegramLink', async (global, actions, payload): Promise<v
   }
 
   if (hash) {
-    openChatByInvite({ hash, tabId });
+    checkChatInvite({ hash, tabId });
     return;
   }
 
@@ -1324,6 +1540,7 @@ addActionHandler('openTelegramLink', async (global, actions, payload): Promise<v
       stickerSetInfo: {
         shortName: part2,
       },
+      shouldIgnoreCache,
       tabId,
     });
     return;
@@ -1361,30 +1578,6 @@ addActionHandler('openTelegramLink', async (global, actions, payload): Promise<v
       inviteHash: params.voicechat || params.livestream,
       tabId,
     });
-  } else if (part1 === 'boost') {
-    const username = part2;
-    const id = params.c;
-
-    const isPrivate = !username && Boolean(id);
-
-    processBoostParameters({
-      usernameOrId: username || id,
-      isPrivate,
-      tabId,
-    });
-  } else if (hasBoost) {
-    const isPrivate = part1 === 'c' && Boolean(chatOrChannelPostId);
-    processBoostParameters({
-      usernameOrId: chatOrChannelPostId || part1,
-      isPrivate,
-      tabId,
-    });
-  } else if (part1 === 'c' && chatOrChannelPostId && messageId) {
-    focusMessage({
-      chatId: toChannelId(chatOrChannelPostId),
-      messageId,
-      tabId,
-    });
   } else if (part1.startsWith('$')) {
     openInvoice({
       type: 'slug',
@@ -1397,13 +1590,6 @@ addActionHandler('openTelegramLink', async (global, actions, payload): Promise<v
       slug: part2,
       tabId,
     });
-  } else if ((hasStartAttach && choose) || (!part2 && hasStartApp)) {
-    processAttachBotParameters({
-      username: part1,
-      filter: choose,
-      startParam: params.startattach || params.startapp,
-      tabId,
-    });
   } else if (shouldTryOpenChat) {
     openChatByUsernameAction({
       username: part1,
@@ -1414,6 +1600,7 @@ addActionHandler('openTelegramLink', async (global, actions, payload): Promise<v
       startAttach: params.startattach,
       attach: params.attach,
       startApp: params.startapp,
+      mode: params.mode,
       originalParts: [part1, part2, part3],
       tabId,
     });
@@ -1430,16 +1617,15 @@ addActionHandler('processBoostParameters', async (global, actions, payload): Pro
   let chat: ApiChat | undefined;
 
   if (isPrivate) {
-    const chatId = toChannelId(usernameOrId);
-    chat = selectChat(global, chatId);
+    chat = selectChat(global, usernameOrId);
     if (!chat) {
-      actions.showNotification({ message: 'Chat does not exist', tabId });
+      actions.showNotification({ message: { key: 'PrivateChannelInaccessible' }, tabId });
       return;
     }
   } else {
     chat = await fetchChatByUsername(global, usernameOrId);
     if (!chat) {
-      actions.showNotification({ message: 'User does not exist', tabId });
+      actions.showNotification({ message: { key: 'NoUsernameFound' }, tabId });
       return;
     }
   }
@@ -1455,8 +1641,8 @@ addActionHandler('processBoostParameters', async (global, actions, payload): Pro
   });
 });
 
-addActionHandler('acceptInviteConfirmation', async (global, actions, payload): Promise<void> => {
-  const { hash, tabId = getCurrentTabId() } = payload!;
+addActionHandler('acceptChatInvite', async (global, actions, payload): Promise<void> => {
+  const { hash, tabId = getCurrentTabId() } = payload;
   const result = await callApi('importChatInvite', { hash });
   if (!result) {
     return;
@@ -1467,32 +1653,47 @@ addActionHandler('acceptInviteConfirmation', async (global, actions, payload): P
 
 addActionHandler('openChatByUsername', async (global, actions, payload): Promise<void> => {
   const {
-    username, messageId, commentId, startParam, startAttach, attach, threadId, originalParts, startApp, text,
+    username, messageId, commentId, startParam, startAttach, attach, threadId, originalParts,
+    startApp, shouldStartMainApp, mode, isDirect,
+    text, onChatChanged, choose, ref, timestamp, linkContext,
     tabId = getCurrentTabId(),
-  } = payload!;
+  } = payload;
 
   const chat = selectCurrentChat(global, tabId);
   const webAppName = originalParts?.[1];
   const isWebApp = webAppName && !Number(webAppName) && !originalParts?.[2];
 
   if (!commentId) {
-    if (startAttach === undefined && messageId && !startParam
+    if (startAttach === undefined && messageId && !startParam && !ref
       && chat?.usernames?.some((c) => c.username === username)) {
       actions.focusMessage({
-        chatId: chat.id, threadId, messageId, tabId,
+        chatId: chat.id, threadId, messageId, timestamp, tabId,
       });
       return;
     }
-    if (startApp !== undefined && !webAppName) {
+
+    if (startAttach !== undefined && choose) {
+      actions.processAttachBotParameters({
+        username,
+        filter: choose,
+        startParam: startAttach || startApp,
+        tabId,
+      });
+      return;
+    }
+
+    if ((startApp !== undefined && !webAppName) || shouldStartMainApp) {
       const theme = extractCurrentThemeParams();
       const chatByUsername = await fetchChatByUsername(global, username);
       global = getGlobal();
       const user = chatByUsername && selectUser(global, chatByUsername.id);
-      if (!chatByUsername || !chat || !user?.hasMainMiniApp) return;
+      if (!chatByUsername || !user?.hasMainMiniApp) return;
       actions.requestMainWebView({
         botId: chatByUsername.id,
-        peerId: chat.id,
+        peerId: chat?.id || chatByUsername.id,
         theme,
+        startParam: startApp,
+        mode,
         tabId,
       });
       return;
@@ -1504,11 +1705,19 @@ addActionHandler('openChatByUsername', async (global, actions, payload): Promise
           threadId,
           channelPostId: messageId,
           startParam,
+          ref,
           startAttach,
           attach,
           text,
+          timestamp,
+          linkContext,
+          isDirect,
         }, tabId,
       );
+      if (onChatChanged) {
+        // @ts-ignore
+        actions[onChatChanged.action](onChatChanged.payload);
+      }
       return;
     }
   }
@@ -1522,6 +1731,14 @@ addActionHandler('openChatByUsername', async (global, actions, payload): Promise
       tabId,
       focusMessageId: commentId,
     });
+    if (timestamp) {
+      actions.openMediaFromTimestamp({
+        chatId: usernameChat.id,
+        messageId: commentId,
+        timestamp,
+        tabId,
+      });
+    }
     return;
   }
 
@@ -1539,6 +1756,7 @@ addActionHandler('openChatByUsername', async (global, actions, payload): Promise
       botId: chatByUsername.id,
       tabId,
       startApp,
+      mode,
       theme,
     });
     return;
@@ -1553,13 +1771,75 @@ addActionHandler('openChatByUsername', async (global, actions, payload): Promise
     tabId,
     focusMessageId: commentId,
   });
+
+  if (timestamp) {
+    actions.openMediaFromTimestamp({
+      chatId: chatByUsername.id,
+      messageId: commentId || messageId,
+      timestamp,
+      tabId,
+    });
+  }
+
+  if (onChatChanged) {
+    // @ts-ignore
+    actions[onChatChanged.action](onChatChanged.payload);
+  }
+});
+
+addActionHandler('openPrivateChannel', (global, actions, payload): ActionReturnType => {
+  const {
+    id, commentId, messageId, threadId, timestamp, linkContext, tabId = getCurrentTabId(),
+  } = payload;
+  const chat = selectChat(global, id);
+  if (!chat) {
+    actions.showNotification({
+      message: {
+        key: 'PrivateChannelInaccessible',
+      },
+      tabId,
+    });
+    return;
+  }
+
+  if (!commentId && !messageId && !threadId) {
+    actions.openChat({ id, tabId });
+    return;
+  }
+
+  if (timestamp) {
+    actions.openMediaFromTimestamp({
+      chatId: id,
+      messageId: commentId || messageId!,
+      timestamp,
+      tabId,
+    });
+  }
+
+  if (commentId && messageId) {
+    actions.openThread({
+      isComments: true,
+      originChannelId: id,
+      originMessageId: messageId,
+      tabId,
+      focusMessageId: commentId,
+    });
+    return;
+  }
+
+  openChatWithParams(global, actions, chat, {
+    messageId,
+    threadId,
+    timestamp,
+    linkContext,
+  }, tabId);
 });
 
 addActionHandler('togglePreHistoryHidden', async (global, actions, payload): Promise<void> => {
   const {
     chatId, isEnabled,
     tabId = getCurrentTabId(),
-  } = payload!;
+  } = payload;
 
   const chat = await ensureIsSuperGroup(global, actions, chatId, tabId);
   if (!chat) {
@@ -1574,7 +1854,7 @@ addActionHandler('togglePreHistoryHidden', async (global, actions, payload): Pro
 });
 
 addActionHandler('updateChatDefaultBannedRights', (global, actions, payload): ActionReturnType => {
-  const { chatId, bannedRights } = payload!;
+  const { chatId, bannedRights } = payload;
   const chat = selectChat(global, chatId);
 
   if (!chat) {
@@ -1588,7 +1868,7 @@ addActionHandler('updateChatMemberBannedRights', async (global, actions, payload
   const {
     chatId, userId, bannedRights,
     tabId = getCurrentTabId(),
-  } = payload!;
+  } = payload;
 
   const user = selectUser(global, userId);
 
@@ -1600,7 +1880,11 @@ addActionHandler('updateChatMemberBannedRights', async (global, actions, payload
 
   if (!chat) return;
 
-  await callApi('updateChatMemberBannedRights', { chat, user, bannedRights });
+  const result = await callApi('updateChatMemberBannedRights', { chat, user, bannedRights });
+
+  if (!result) {
+    return;
+  }
 
   global = getGlobal();
 
@@ -1629,14 +1913,20 @@ addActionHandler('updateChatMemberBannedRights', async (global, actions, payload
       kickedMembers: kickedMembers.filter((m) => m.userId !== userId),
     }),
   });
+  if (isBanned) {
+    global = updateChat(global, chat.id, { membersCount: Math.max(0, (chat.membersCount || 0) - 1) });
+  }
+
   setGlobal(global);
 });
 
 addActionHandler('updateChatAdmin', async (global, actions, payload): Promise<void> => {
+  if (selectIsCurrentUserFrozen(global)) return;
+
   const {
     chatId, userId, adminRights, customTitle,
     tabId = getCurrentTabId(),
-  } = payload!;
+  } = payload;
 
   const user = selectUser(global, userId);
   if (!user) {
@@ -1791,6 +2081,7 @@ addActionHandler('loadGroupsForDiscussion', async (global): Promise<void> => {
 });
 
 addActionHandler('linkDiscussionGroup', async (global, actions, payload): Promise<void> => {
+  if (selectIsCurrentUserFrozen(global)) return;
   const { channelId, chatId, tabId = getCurrentTabId() } = payload || {};
 
   const channel = selectChat(global, channelId);
@@ -1812,7 +2103,7 @@ addActionHandler('linkDiscussionGroup', async (global, actions, payload): Promis
     fullInfo = fullChat.fullInfo;
   }
 
-  if (fullInfo!.isPreHistoryHidden) {
+  if (fullInfo.isPreHistoryHidden) {
     global = getGlobal();
     global = updateChatFullInfo(global, chat.id, { isPreHistoryHidden: false });
     setGlobal(global);
@@ -1872,17 +2163,18 @@ addActionHandler('resetOpenChatWithDraft', (global, actions, payload): ActionRet
 });
 
 addActionHandler('loadMoreMembers', async (global, actions, payload): Promise<void> => {
-  const { tabId = getCurrentTabId() } = payload || {};
-  const { chatId } = selectCurrentMessageList(global, tabId) || {};
-  const chat = chatId ? selectChat(global, chatId) : undefined;
-  if (!chat || isChatBasicGroup(chat)) {
+  const { chatId } = payload || {};
+
+  if (selectIsCurrentUserFrozen(global)) return;
+  const chat = selectChat(global, chatId);
+  if (!chat || isChatBasicGroup(chat) || isChatMonoforum(chat)) {
     return;
   }
 
   const offset = selectChatFullInfo(global, chat.id)?.members?.length;
   if (offset !== undefined && chat.membersCount !== undefined && offset >= chat.membersCount) return;
 
-  const result = await callApi('fetchMembers', chat.id, chat.accessHash!, 'recent', offset);
+  const result = await callApi('fetchMembers', { chat, offset });
   if (!result) {
     return;
   }
@@ -1920,11 +2212,42 @@ addActionHandler('addChatMembers', async (global, actions, payload): Promise<voi
 });
 
 addActionHandler('deleteChatMember', async (global, actions, payload): Promise<void> => {
-  const { chatId, userId } = payload;
+  const { chatId, userId, tabId = getCurrentTabId() } = payload;
   const chat = selectChat(global, chatId);
   const user = selectUser(global, userId);
 
   if (!chat || !user) {
+    return;
+  }
+
+  if (isChatSuperGroup(chat) || isChatChannel(chat)) {
+    actions.updateChatMemberBannedRights({
+      chatId,
+      userId,
+      bannedRights: {
+        viewMessages: true,
+        sendMessages: true,
+        sendMedia: true,
+        sendStickers: true,
+        sendGifs: true,
+        sendGames: true,
+        sendInline: true,
+        embedLinks: true,
+        sendPolls: true,
+        changeInfo: true,
+        inviteUsers: true,
+        pinMessages: true,
+        manageTopics: true,
+        sendPhotos: true,
+        sendVideos: true,
+        sendRoundvideos: true,
+        sendAudios: true,
+        sendVoices: true,
+        sendDocs: true,
+        sendPlain: true,
+      },
+      tabId,
+    });
     return;
   }
 
@@ -1977,21 +2300,6 @@ addActionHandler('fetchChat', (global, actions, payload): ActionReturnType => {
       void callApi('fetchChat', { type: 'user', user });
     }
   }
-});
-
-addActionHandler('loadChatSettings', async (global, actions, payload): Promise<void> => {
-  const { chatId } = payload;
-  const chat = selectChat(global, chatId);
-  if (!chat) return;
-
-  const result = await callApi('fetchChatSettings', chat);
-  if (!result) return;
-
-  const { settings } = result;
-
-  global = getGlobal();
-  global = updateChat(global, chat.id, { settings });
-  setGlobal(global);
 });
 
 addActionHandler('toggleJoinToSend', async (global, actions, payload): Promise<void> => {
@@ -2075,7 +2383,11 @@ addActionHandler('processAttachBotParameters', async (global, actions, payload):
 });
 
 addActionHandler('loadTopics', async (global, actions, payload): Promise<void> => {
+  if (selectIsCurrentUserFrozen(global)) return;
   const { chatId, force } = payload;
+  if (selectIsCurrentUserFrozen(global)) {
+    return;
+  }
   const chat = selectChat(global, chatId);
   if (!chat) return;
 
@@ -2152,7 +2464,7 @@ addActionHandler('toggleForum', async (global, actions, payload): Promise<void> 
   try {
     result = await callApi('toggleForum', { chat, isEnabled });
   } catch (error) {
-    if ((error as ApiError).message.startsWith('A wait of')) {
+    if ((error as ApiError).message === 'FLOOD') {
       actions.showNotification({ message: langProvider.oldTranslate('FloodWait'), tabId });
     } else {
       actions.showDialog({ data: { ...(error as ApiError), hasErrorKey: true }, tabId });
@@ -2267,7 +2579,7 @@ addActionHandler('toggleTopicPinned', (global, actions, payload): ActionReturnTy
     chatId, topicId, isPinned, tabId = getCurrentTabId(),
   } = payload;
 
-  const { topicsPinnedLimit } = global.appConfig || {};
+  const { topicsPinnedLimit } = global.appConfig;
   const chat = selectChat(global, chatId);
   const topics = selectTopics(global, chatId);
   if (!chat || !topics || !topicsPinnedLimit) return;
@@ -2310,18 +2622,54 @@ addActionHandler('joinChatlistInvite', async (global, actions, payload): Promise
   const { invite, peerIds, tabId = getCurrentTabId() } = payload;
 
   const peers = peerIds.map((peerId) => selectChat(global, peerId)).filter(Boolean);
-  const notJoinedCount = peers.filter((peer) => peer.isNotJoined).length;
+  const currentNotJoinedCount = peers.filter((peer) => peer.isNotJoined).length;
 
-  const folder = 'folderId' in invite ? selectChatFolder(global, invite.folderId) : undefined;
-  const folderTitle = 'title' in invite ? invite.title : folder?.title;
+  const existingFolder = 'folderId' in invite ? selectChatFolder(global, invite.folderId) : undefined;
+  const folderTitle = ('title' in invite ? invite.title : existingFolder?.title)!;
 
   try {
     const result = await callApi('joinChatlistInvite', { slug: invite.slug, peers });
     if (!result) return;
 
+    if (existingFolder) {
+      actions.showNotification({
+        title: {
+          key: 'FolderLinkNotificationUpdatedTitle',
+          variables: {
+            title: folderTitle.text,
+          },
+        },
+        message: {
+          key: 'FolderLinkNotificationUpdatedSubtitle',
+          variables: {
+            count: currentNotJoinedCount,
+          },
+          options: {
+            pluralValue: currentNotJoinedCount,
+          },
+        },
+        tabId,
+      });
+
+      return;
+    }
+
     actions.showNotification({
-      title: langProvider.oldTranslate(folder ? 'FolderLinkUpdatedTitle' : 'FolderLinkAddedTitle', folderTitle),
-      message: langProvider.oldTranslate('FolderLinkAddedSubtitle', notJoinedCount, 'i'),
+      title: {
+        key: 'FolderLinkNotificationAddedTitle',
+        variables: {
+          title: folderTitle.text,
+        },
+      },
+      message: {
+        key: 'FolderLinkNotificationAddedSubtitle',
+        variables: {
+          count: currentNotJoinedCount,
+        },
+        options: {
+          pluralValue: currentNotJoinedCount,
+        },
+      },
       tabId,
     });
   } catch (error) {
@@ -2343,10 +2691,24 @@ addActionHandler('leaveChatlist', async (global, actions, payload): Promise<void
   const result = await callApi('leaveChatlist', { folderId, peers });
 
   if (!result) return;
+  if (!folder) return;
 
   actions.showNotification({
-    title: langProvider.oldTranslate('FolderLinkDeletedTitle', folder.title),
-    message: langProvider.oldTranslate('FolderLinkDeletedSubtitle', peers.length, 'i'),
+    title: {
+      key: 'FolderLinkNotificationDeletedTitle',
+      variables: {
+        title: folder.title.text,
+      },
+    },
+    message: {
+      key: 'FolderLinkNotificationDeletedSubtitle',
+      variables: {
+        count: peers.length,
+      },
+      options: {
+        pluralValue: peers.length,
+      },
+    },
     tabId,
   });
 });
@@ -2398,7 +2760,7 @@ addActionHandler('createChatlistInvite', async (global, actions, payload): Promi
   } catch (error) {
     if (CHATLIST_LIMIT_ERROR_LIST.has((error as ApiError).message)) {
       actions.openLimitReachedModal({ limit: 'chatlistInvites', tabId });
-      actions.requestNextSettingsScreen({ screen: SettingsScreens.Folders, tabId });
+      actions.openSettingsScreen({ screen: SettingsScreens.Folders, tabId });
     } else {
       actions.showDialog({ data: { ...(error as ApiError), hasErrorKey: true }, tabId });
     }
@@ -2530,13 +2892,14 @@ addActionHandler('openDeleteChatFolderModal', async (global, actions, payload): 
   if (!folder) return;
 
   if (folder.isChatList && (!folder.hasMyInvites || isConfirmedForChatlist)) {
+    const currentIds = getOrderedIds(folderId);
     const suggestions = await callApi('fetchLeaveChatlistSuggestions', { folderId });
     global = getGlobal();
     global = updateTabState(global, {
       chatlistModal: {
         removal: {
           folderId,
-          suggestedPeerIds: suggestions,
+          suggestedPeerIds: unique([...(suggestions || []), ...(currentIds || [])]),
         },
       },
     }, tabId);
@@ -2593,6 +2956,8 @@ addActionHandler('setViewForumAsMessages', (global, actions, payload): ActionRet
 });
 
 addActionHandler('loadChannelRecommendations', async (global, actions, payload): Promise<void> => {
+  if (selectIsCurrentUserFrozen(global)) return;
+
   const { chatId } = payload;
   const chat = chatId ? selectChat(global, chatId) : undefined;
 
@@ -2618,7 +2983,35 @@ addActionHandler('loadChannelRecommendations', async (global, actions, payload):
   const chatsById = buildCollectionByKey(similarChannels, 'id');
 
   global = getGlobal();
-  global = addSimilarChannels(global, chatId || GLOBAL_SUGGESTED_CHANNELS_ID, Object.keys(chatsById), count);
+  global = replaceSimilarChannels(global, chatId || GLOBAL_SUGGESTED_CHANNELS_ID, Object.keys(chatsById), count);
+  setGlobal(global);
+});
+
+addActionHandler('loadBotRecommendations', async (global, actions, payload): Promise<void> => {
+  if (selectIsCurrentUserFrozen(global)) return;
+
+  const { userId } = payload;
+  const user = selectChat(global, userId);
+
+  if (!user) {
+    return;
+  }
+
+  const result = await callApi('fetchBotsRecommendations', {
+    user,
+  });
+
+  if (!result) {
+    return;
+  }
+
+  const { similarBots, count } = result;
+
+  const users = buildCollectionByKey(similarBots, 'id');
+
+  global = getGlobal();
+  global = addUsers(global, users);
+  global = addSimilarBots(global, userId, Object.keys(users), count);
   setGlobal(global);
 });
 
@@ -2631,6 +3024,40 @@ addActionHandler('toggleChannelRecommendations', (global, actions, payload): Act
   }
 
   global = toggleSimilarChannels(global, chatId);
+  setGlobal(global);
+});
+
+addActionHandler('updatePaidMessagesPrice', async (global, actions, payload): Promise<void> => {
+  const { chatId, paidMessagesStars, tabId = getCurrentTabId() } = payload;
+  const chat = chatId ? selectChat(global, chatId) : undefined;
+  if (!chat) return;
+
+  global = updateManagementProgress(global, ManagementProgress.InProgress, tabId);
+  setGlobal(global);
+
+  const result = await callApi('updatePaidMessagesPrice', {
+    chat,
+    paidMessagesStars,
+  });
+
+  if (!result) return;
+
+  global = getGlobal();
+  global = updateManagementProgress(global, ManagementProgress.Complete, tabId);
+  global = updateChat(global, chatId, { paidMessagesStars });
+  setGlobal(global);
+});
+
+addActionHandler('toggleAutoTranslation', async (global, actions, payload): Promise<void> => {
+  const { chatId, isEnabled } = payload;
+  const chat = selectChat(global, chatId);
+  if (!chat) return;
+
+  const result = await callApi('toggleAutoTranslation', { chat, isEnabled });
+  if (!result) return;
+
+  global = getGlobal();
+  global = updateChat(global, chatId, { hasAutoTranslation: isEnabled || undefined });
   setGlobal(global);
 });
 
@@ -2689,31 +3116,33 @@ addActionHandler('requestCollectibleInfo', async (global, actions, payload): Pro
 async function loadChats(
   listType: ChatListType,
   isFullDraftSync?: boolean,
+  shouldIgnorePagination?: boolean,
 ) {
-  // eslint-disable-next-line eslint-multitab-tt/no-immediate-global
   let global = getGlobal();
   let lastLocalServiceMessageId = selectLastServiceNotification(global)?.id;
 
-  const params = selectChatListLoadingParameters(global, listType);
+  const params = !shouldIgnorePagination ? selectChatListLoadingParameters(global, listType) : {};
   const offsetPeer = params.nextOffsetPeerId ? selectPeer(global, params.nextOffsetPeerId) : undefined;
   const offsetDate = params.nextOffsetDate;
   const offsetId = params.nextOffsetId;
 
-  const isFirstBatch = !offsetPeer && !offsetDate && !offsetId;
+  const isFirstBatch = !shouldIgnorePagination && !offsetPeer && !offsetDate && !offsetId;
+  const shouldReplaceStaleState = listType === 'active' && isFirstBatch;
+  const isAccountFreeze = selectIsCurrentUserFrozen(global);
 
   const result = listType === 'saved' ? await callApi('fetchSavedChats', {
     limit: CHAT_LIST_LOAD_SLICE,
     offsetDate,
     offsetId,
     offsetPeer,
-    withPinned: isFirstBatch,
+    withPinned: isFirstBatch && !isAccountFreeze,
   }) : await callApi('fetchChats', {
     limit: CHAT_LIST_LOAD_SLICE,
     offsetDate,
     offsetId,
     offsetPeer,
     archived: listType === 'archived',
-    withPinned: isFirstBatch,
+    withPinned: isFirstBatch && !isAccountFreeze,
     lastLocalServiceMessageId,
   });
 
@@ -2732,33 +3161,43 @@ async function loadChats(
   global = updateChats(global, newChats);
   if (isFirstBatch) {
     global = replaceChatListIds(global, listType, chatIds);
-    global = replaceUserStatuses(global, result.userStatusesById);
   } else {
-    global = updateChatListIds(global, listType, chatIds);
+    global = addChatListIds(global, listType, chatIds);
+  }
+
+  if (shouldReplaceStaleState) {
+    global = replaceUserStatuses(global, result.userStatusesById);
+    global = replaceNotifyExceptions(global, result.notifyExceptionById);
+  } else {
     global = addUserStatuses(global, result.userStatusesById);
+    global = addNotifyExceptions(global, result.notifyExceptionById);
   }
 
   global = updateChatListSecondaryInfo(global, listType, result);
-  global = addMessages(global, result.messages);
+  global = replaceMessages(global, result.messages);
   global = updateChatsLastMessageId(global, result.lastMessageByChatId, listType);
 
-  global = replaceChatListLoadingParameters(
-    global, listType, result.nextOffsetId, result.nextOffsetPeerId, result.nextOffsetDate,
-  );
+  if (!shouldIgnorePagination) {
+    global = replaceChatListLoadingParameters(
+      global, listType, result.nextOffsetId, result.nextOffsetPeerId, result.nextOffsetDate,
+    );
+  }
 
-  const idsToUpdateDraft = isFullDraftSync ? result.chatIds : Object.keys(result.draftsById);
-  idsToUpdateDraft.forEach((chatId) => {
-    const draft = result.draftsById[chatId];
-    const thread = selectThread(global, chatId, MAIN_THREAD_ID);
+  if (listType === 'active' || listType === 'archived') {
+    const idsToUpdateDraft = isFullDraftSync ? result.chatIds : Object.keys(result.draftsById);
+    idsToUpdateDraft.forEach((chatId) => {
+      const draft = result.draftsById[chatId];
+      const thread = selectThread(global, chatId, MAIN_THREAD_ID);
 
-    if (!draft && !thread) return;
+      if (!draft && !thread) return;
 
-    if (!selectDraft(global, chatId, MAIN_THREAD_ID)?.isLocal) {
-      global = replaceThreadParam(
-        global, chatId, MAIN_THREAD_ID, 'draft', draft,
-      );
-    }
-  });
+      if (!selectDraft(global, chatId, MAIN_THREAD_ID)?.isLocal) {
+        global = replaceThreadParam(
+          global, chatId, MAIN_THREAD_ID, 'draft', draft,
+        );
+      }
+    });
+  }
 
   if ((chatIds.length === 0 || chatIds.length === result.totalChatCount) && !global.chats.isFullyLoaded[listType]) {
     global = {
@@ -2779,6 +3218,7 @@ async function loadChats(
 export async function loadFullChat<T extends GlobalState>(
   global: T, actions: RequiredGlobalActions, chat: ApiChat,
 ) {
+  if (selectIsCurrentUserFrozen(global)) return undefined;
   const result = await callApi('fetchFullChat', chat);
   if (!result) {
     return undefined;
@@ -2862,14 +3302,15 @@ export async function migrateChat<T extends GlobalState>(
 export async function fetchChatByUsername<T extends GlobalState>(
   global: T,
   username: string,
+  referrer?: string,
 ) {
   global = getGlobal();
-  const localChat = selectChatByUsername(global, username);
+  const localChat = !referrer ? selectChatByUsername(global, username) : undefined;
   if (localChat && !localChat.isMin) {
     return localChat;
   }
 
-  const { chat, user } = await callApi('getChatByUsername', username) || {};
+  const { chat, user } = await callApi('getChatByUsername', username, referrer) || {};
   if (!chat) {
     return undefined;
   }
@@ -2962,16 +3403,20 @@ async function openChatByUsername<T extends GlobalState>(
     threadId?: ThreadId;
     channelPostId?: number;
     startParam?: string;
+    ref?: string;
     startAttach?: string;
     attach?: string;
     text?: string;
+    timestamp?: number;
+    linkContext?: LinkContext;
+    isDirect?: boolean;
   },
   ...[tabId = getCurrentTabId()]: TabArgs<T>
 ) {
   const {
-    username, threadId, channelPostId, startParam, startAttach, attach, text,
+    username, threadId, channelPostId, startParam, ref, startAttach, attach, text, timestamp,
+    linkContext, isDirect,
   } = params;
-  global = getGlobal();
   const currentChat = selectCurrentChat(global, tabId);
 
   // Attach in the current chat
@@ -2990,14 +3435,29 @@ async function openChatByUsername<T extends GlobalState>(
     return;
   }
 
-  const isCurrentChat = currentChat?.usernames?.some((c) => c.username === username);
+  const localChat = selectChatByUsername(global, username);
+  const localDirectChat = isDirect && localChat?.linkedMonoforumId && !localChat.isMonoforum
+    ? selectChat(global, localChat.linkedMonoforumId) : undefined;
+
+  const isCurrentChat = !isDirect
+    ? currentChat?.usernames?.some((c) => c.username === username)
+    : localDirectChat?.id === currentChat?.id;
 
   if (!isCurrentChat) {
     // Open temporary empty chat to make the click response feel faster
     actions.openChat({ id: TMP_CHAT_ID, tabId });
   }
 
-  const chat = await fetchChatByUsername(global, username);
+  const starRefStartPrefixes = global.appConfig.starRefStartPrefixes;
+  let referrer = ref;
+  if (startParam && starRefStartPrefixes?.length) {
+    const prefix = starRefStartPrefixes.find((p) => startParam.startsWith(p));
+    if (prefix) {
+      referrer = startParam.slice(prefix.length);
+    }
+  }
+
+  const chat = await fetchChatByUsername(global, username, referrer);
   if (!chat) {
     if (!isCurrentChat) {
       actions.openPreviousChat({ tabId });
@@ -3007,15 +3467,77 @@ async function openChatByUsername<T extends GlobalState>(
     return;
   }
 
-  if (channelPostId) {
-    actions.focusMessage({
-      chatId: chat.id, threadId, messageId: channelPostId, tabId,
-    });
+  const monoforumChat = isDirect && !chat.isMonoforum && chat.linkedMonoforumId
+    ? selectChat(global, chat.linkedMonoforumId) : undefined;
+
+  const targetChat = (isDirect && monoforumChat) || chat;
+
+  openChatWithParams(global, actions, targetChat, {
+    isCurrentChat,
+    threadId,
+    messageId: channelPostId,
+    startParam,
+    referrer,
+    startAttach,
+    attach,
+    text,
+    timestamp,
+    linkContext,
+  }, tabId);
+}
+
+async function openChatWithParams<T extends GlobalState>(
+  global: T,
+  actions: RequiredGlobalActions,
+  chat: ApiChat,
+  params: {
+    isCurrentChat?: boolean;
+    threadId?: ThreadId;
+    messageId?: number;
+    startParam?: string;
+    referrer?: string;
+    startAttach?: string;
+    attach?: string;
+    text?: string;
+    timestamp?: number;
+    linkContext?: LinkContext;
+  },
+  ...[tabId = getCurrentTabId()]: TabArgs<T>
+) {
+  const {
+    isCurrentChat, threadId, messageId, startParam, referrer, startAttach, attach, text, timestamp,
+    linkContext,
+  } = params;
+
+  if (messageId) {
+    let isTopicProcessed = false;
+    // In forums, link to a topic start message should open the topic
+    if (chat.isForum && !threadId) {
+      let topic = selectTopics(global, chat.id)?.[messageId];
+      if (!topic) {
+        const topicResult = await callApi('fetchTopicById', { chat, topicId: messageId });
+        topic = topicResult?.topic;
+      }
+
+      if (topic) {
+        actions.openThread({
+          chatId: chat.id, threadId: topic.id, tabId,
+        });
+        isTopicProcessed = true;
+      }
+    }
+
+    if (!isTopicProcessed) {
+      actions.focusMessage({
+        chatId: chat.id, threadId, messageId, timestamp, tabId,
+        replyMessageId: linkContext?.messageId,
+      });
+    }
   } else if (!isCurrentChat) {
     actions.openThread({ chatId: chat.id, threadId: threadId ?? MAIN_THREAD_ID, tabId });
   }
 
-  if (startParam) {
+  if (startParam && !referrer) {
     actions.startBot({ botId: chat.id, param: startParam });
   }
 
@@ -3026,6 +3548,12 @@ async function openChatByUsername<T extends GlobalState>(
 
   if (text) {
     actions.openChatWithDraft({ chatId: chat.id, text: { text }, tabId });
+  }
+
+  if (messageId && timestamp) {
+    actions.openMediaFromTimestamp({
+      chatId: chat.id, threadId, messageId, timestamp, tabId,
+    });
   }
 }
 

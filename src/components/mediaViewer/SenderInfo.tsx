@@ -1,17 +1,19 @@
 import type { FC } from '../../lib/teact/teact';
-import React, { useMemo } from '../../lib/teact/teact';
+import { useMemo } from '../../lib/teact/teact';
 import { getActions, withGlobal } from '../../global';
 
 import type { ApiChat, ApiPeer } from '../../api/types';
 import type { MediaViewerItem } from './helpers/getViewableMedia';
 
 import {
-  getSenderTitle, isChatChannel, isChatGroup, isUserId,
+  isChatChannel, isChatGroup,
 } from '../../global/helpers';
+import { getPeerTitle } from '../../global/helpers/peers';
 import {
   selectSender,
 } from '../../global/selectors';
 import { formatMediaDateTime } from '../../util/dates/dateFormat';
+import { isUserId } from '../../util/entities/ids';
 import renderText from '../common/helpers/renderText';
 
 import useAppLayout from '../../hooks/useAppLayout';
@@ -71,13 +73,15 @@ const SenderInfo: FC<OwnProps & StateProps> = ({
     const profilePhotos = item.type === 'avatar' ? item.profilePhotos : undefined;
     const avatar = profilePhotos?.photos[item.mediaIndex!];
     const isFallbackAvatar = avatar?.id === profilePhotos?.fallbackPhoto?.id;
+    const isPersonalAvatar = avatar?.id === profilePhotos?.personalPhoto?.id;
     const date = item.type === 'message' ? item.message.date : avatar?.date;
     if (!date) return undefined;
 
     const formattedDate = formatMediaDateTime(lang, date * 1000, true);
     const count = profilePhotos?.count
       && (profilePhotos.count + (profilePhotos?.fallbackPhoto ? 1 : 0));
-    const countText = count && lang('Of', [item.mediaIndex! + 1, count]);
+    const currentIndex = item.mediaIndex! + 1 + (profilePhotos?.personalPhoto ? -1 : 0);
+    const countText = count && lang('Of', [currentIndex, count]);
 
     const parts: string[] = [];
     if (avatar) {
@@ -85,13 +89,16 @@ const SenderInfo: FC<OwnProps & StateProps> = ({
       const isChannel = chat && isChatChannel(chat);
       const isGroup = chat && isChatGroup(chat);
       parts.push(lang(
-        isFallbackAvatar ? 'lng_mediaview_profile_public_photo'
-          : isChannel ? 'lng_mediaview_channel_photo'
-            : isGroup ? 'lng_mediaview_group_photo' : 'lng_mediaview_profile_photo',
+        isPersonalAvatar ? 'lng_mediaview_profile_photo_by_you'
+          : isFallbackAvatar ? 'lng_mediaview_profile_public_photo'
+            : isChannel ? 'lng_mediaview_channel_photo'
+              : isGroup ? 'lng_mediaview_group_photo' : 'lng_mediaview_profile_photo',
       ));
     }
 
-    if (countText) parts.push(countText);
+    if (countText && !isPersonalAvatar && !isFallbackAvatar) {
+      parts.push(countText);
+    }
 
     parts.push(formattedDate);
 
@@ -102,7 +109,7 @@ const SenderInfo: FC<OwnProps & StateProps> = ({
     return undefined;
   }
 
-  const senderTitle = getSenderTitle(lang, owner);
+  const senderTitle = getPeerTitle(lang, owner);
 
   return (
     <div className="SenderInfo" onClick={handleFocusMessage}>
@@ -120,7 +127,7 @@ const SenderInfo: FC<OwnProps & StateProps> = ({
 };
 
 export default withGlobal<OwnProps>(
-  (global, { item }): StateProps => {
+  (global, { item }): Complete<StateProps> => {
     const message = item?.type === 'message' ? item.message : undefined;
     const messageSender = message && selectSender(global, message);
 

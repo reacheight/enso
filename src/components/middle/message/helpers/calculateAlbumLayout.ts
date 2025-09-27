@@ -1,4 +1,3 @@
-/* eslint-disable no-bitwise */
 // Based on
 // https://github.com/telegramdesktop/tdesktop/blob/dev/Telegram/SourceFiles/ui/grouped_layout.cpp
 // https://github.com/overtake/TelegramSwift/blob/master/Telegram-Mac/GroupedLayout.swift#L83
@@ -8,7 +7,7 @@ import type { IAlbum } from '../../../../types';
 
 import { getMessageContent } from '../../../../global/helpers';
 import { clamp } from '../../../../util/math';
-import { getAvailableWidth, REM } from '../../../common/helpers/mediaDimensions';
+import { getAvailableWidth } from '../../../common/helpers/mediaDimensions';
 import { calculateMediaDimensions } from './mediaDimensions';
 
 export const AlbumRectPart = {
@@ -107,7 +106,6 @@ function calculateContainerSize(layout: IMediaLayout[]) {
 
 export function calculateAlbumLayout(
   isOwn: boolean,
-  asForwarded: boolean,
   noAvatars: boolean,
   album: IAlbum,
   isMobile?: boolean,
@@ -118,7 +116,7 @@ export function calculateAlbumLayout(
   const averageRatio = getAverageRatio(ratios);
   const albumCount = ratios.length;
   const forceCalc = ratios.some((ratio) => ratio > 2);
-  const maxWidth = getAvailableWidth(isOwn, asForwarded, false, noAvatars, isMobile) - (asForwarded ? 2.5 : 0) * REM;
+  const maxWidth = getAvailableWidth(isOwn, false, noAvatars, isMobile);
   const maxHeight = maxWidth;
 
   let layout;

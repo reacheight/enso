@@ -1,8 +1,8 @@
-import type { ApiMessage, ApiUpdateChat } from '../../../api/types';
+import type { ApiChat, ApiMessage, ApiUpdateChat } from '../../../api/types';
 import type { ActionReturnType } from '../../types';
 import { MAIN_THREAD_ID } from '../../../api/types';
 
-import { ARCHIVED_FOLDER_ID, MAX_ACTIVE_PINNED_CHATS } from '../../../config';
+import { ARCHIVED_FOLDER_ID, MAX_ACTIVE_PINNED_CHATS, SERVICE_NOTIFICATIONS_USER_ID } from '../../../config';
 import { buildCollectionByKey, omit } from '../../../util/iteratees';
 import { isLocalMessageId } from '../../../util/keys/messageKey';
 import { closeMessageNotifications, notifyAboutMessage } from '../../../util/notifications';
@@ -11,6 +11,7 @@ import {
   addActionHandler, getGlobal, setGlobal,
 } from '../../index';
 import {
+  addChatListIds,
   addUnreadMentions,
   deleteChatMessages,
   deletePeerPhoto,
@@ -21,7 +22,6 @@ import {
   replaceThreadParam,
   updateChat,
   updateChatFullInfo,
-  updateChatListIds,
   updateChatListType,
   updatePeerStoriesHidden,
   updateTopic,
@@ -43,6 +43,10 @@ import {
 } from '../../selectors';
 
 const TYPING_STATUS_CLEAR_DELAY = 6000; // 6 seconds
+const INVALIDATE_FULL_CHAT_FIELDS = new Set<keyof ApiChat>([
+  'boostLevel', 'isForum', 'isLinkedInDiscussion', 'fakeType', 'restrictionReasons', 'isJoinToSend', 'isJoinRequest',
+  'type',
+]);
 
 addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
   switch (update['@type']) {
@@ -67,8 +71,8 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
       setGlobal(global);
 
       const updatedChat = selectChat(global, update.id);
-      if (!update.noTopChatsRequest && updatedChat && !selectIsChatListed(global, update.id)
-          && !updatedChat.isNotJoined) {
+      if (!update.noTopChatsRequest && !selectIsChatListed(global, update.id)
+        && !updatedChat?.isNotJoined) {
         // Reload top chats to update chat listing
         actions.loadTopChats();
       }
@@ -93,6 +97,15 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
         }
       });
 
+      if (localChat) {
+        const chatUpdate = update.chat;
+        const changedFields = (Object.keys(chatUpdate) as (keyof ApiChat)[])
+          .filter((key) => localChat[key] !== chatUpdate[key]);
+        if (changedFields.some((key) => INVALIDATE_FULL_CHAT_FIELDS.has(key))) {
+          actions.invalidateFullInfo({ peerId: update.id });
+        }
+      }
+
       return undefined;
     }
 
@@ -114,7 +127,7 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
       }
 
       global = getGlobal();
-      global = updateChatListIds(global, listType, [update.id]);
+      global = addChatListIds(global, listType, [update.id]);
       setGlobal(global);
 
       return undefined;
@@ -125,8 +138,10 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
       const chat = selectChat(global, update.id);
       if (chat && isChatChannel(chat)) {
         const chatMessages = selectChatMessages(global, update.id);
-        const localMessageIds = Object.keys(chatMessages).map(Number).filter(isLocalMessageId);
-        global = deleteChatMessages(global, chat.id, localMessageIds);
+        if (chatMessages) {
+          const localMessageIds = Object.keys(chatMessages).map(Number).filter(isLocalMessageId);
+          global = deleteChatMessages(global, chat.id, localMessageIds);
+        }
       }
 
       return global;
@@ -156,9 +171,12 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
     case 'newMessage': {
       const { message } = update;
 
-      if (message.senderId === global.currentUserId && !message.isFromScheduled) {
+      const isOur = message.senderId ? message.senderId === global.currentUserId : message.isOutgoing;
+      if (isOur && !message.isFromScheduled) {
         return undefined;
       }
+
+      const isLocal = isLocalMessageId(message.id!);
 
       const chat = selectChat(global, update.chatId);
       if (!chat) {
@@ -167,19 +185,21 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
 
       const hasMention = Boolean(update.message.id && update.message.hasUnreadMention);
 
-      global = updateChat(global, update.chatId, {
-        unreadCount: chat.unreadCount ? chat.unreadCount + 1 : 1,
-      });
-
-      if (hasMention) {
-        global = addUnreadMentions(global, update.chatId, chat, [update.message.id!], true);
-      }
-
-      const topic = chat.isForum ? selectTopicFromMessage(global, message as ApiMessage) : undefined;
-      if (topic) {
-        global = updateTopic(global, update.chatId, topic.id, {
-          unreadCount: topic.unreadCount ? topic.unreadCount + 1 : 1,
+      if (!isLocal || chat.id === SERVICE_NOTIFICATIONS_USER_ID) {
+        global = updateChat(global, update.chatId, {
+          unreadCount: chat.unreadCount ? chat.unreadCount + 1 : 1,
         });
+
+        if (hasMention) {
+          global = addUnreadMentions(global, update.chatId, chat, [update.message.id!], true);
+        }
+
+        const topic = chat.isForum ? selectTopicFromMessage(global, message as ApiMessage) : undefined;
+        if (topic) {
+          global = updateTopic(global, update.chatId, topic.id, {
+            unreadCount: topic.unreadCount ? topic.unreadCount + 1 : 1,
+          });
+        }
       }
 
       setGlobal(global);
@@ -201,7 +221,7 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
         const chat = selectChat(global, chatId);
 
         if (messageUpdate.reactions && chat?.unreadReactionsCount
-            && !checkIfHasUnreadReactions(global, messageUpdate.reactions)) {
+          && !checkIfHasUnreadReactions(global, messageUpdate.reactions)) {
           global = updateUnreadReactions(global, chatId, {
             unreadReactionsCount: Math.max(chat.unreadReactionsCount - 1, 0) || undefined,
             unreadReactions: chat.unreadReactions?.filter((i) => i !== id),
@@ -223,6 +243,10 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
     case 'updatePinnedChatIds': {
       const { ids, folderId } = update;
       const listType = folderId === ARCHIVED_FOLDER_ID ? 'archived' : 'active';
+      if (!ids) {
+        actions.loadPinnedDialogs({ listType });
+        return global;
+      }
 
       return {
         ...global,
@@ -432,16 +456,6 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
       global = replaceThreadParam(global, chatId, threadId || MAIN_THREAD_ID, 'draft', draft);
       global = updateChat(global, chatId, { draftDate: draft?.date });
       return global;
-    }
-
-    case 'showInvite': {
-      const { data } = update;
-
-      Object.values(global.byTabId).forEach(({ id: tabId }) => {
-        actions.showDialog({ data, tabId });
-      });
-
-      return undefined;
     }
 
     case 'updatePendingJoinRequests': {

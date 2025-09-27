@@ -1,12 +1,11 @@
-import type { FC } from '../../lib/teact/teact';
-import React, { memo, useEffect, useRef } from '../../lib/teact/teact';
+import type { FC, TeactNode } from '../../lib/teact/teact';
+import { memo, useEffect, useRef } from '../../lib/teact/teact';
 
 import type { MenuItemContextAction } from './ListItem';
 
-import { ALL_FOLDER_ID } from '../../config';
 import animateHorizontalScroll from '../../util/animateHorizontalScroll';
+import { IS_ANDROID, IS_IOS } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
-import { IS_ANDROID, IS_IOS } from '../../util/windowEnvironment';
 
 import useHorizontalScroll from '../../hooks/useHorizontalScroll';
 import useOldLang from '../../hooks/useOldLang';
@@ -18,7 +17,7 @@ import './TabList.scss';
 
 export type TabWithProperties = {
   id?: number;
-  title: string;
+  title: TeactNode;
   badgeCount?: number;
   isBlocked?: boolean;
   isBadgeActive?: boolean;
@@ -27,9 +26,9 @@ export type TabWithProperties = {
 
 type OwnProps = {
   tabs: readonly TabWithProperties[];
-  areFolders?: boolean;
   activeTab: number;
   className?: string;
+  tabClassName?: string;
   onSwitchTab: (index: number) => void;
   contextRootElementSelector?: string;
 };
@@ -39,11 +38,10 @@ const TAB_SCROLL_THRESHOLD_PX = 16;
 const SCROLL_DURATION = IS_IOS ? 450 : IS_ANDROID ? 400 : 300;
 
 const TabList: FC<OwnProps> = ({
-  tabs, areFolders, activeTab, onSwitchTab,
-  contextRootElementSelector, className,
+  tabs, activeTab, onSwitchTab,
+  contextRootElementSelector, className, tabClassName,
 }) => {
-  // eslint-disable-next-line no-null/no-null
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>();
   const previousActiveTab = usePreviousDeprecated(activeTab);
 
   useHorizontalScroll(containerRef, undefined, true);
@@ -82,9 +80,8 @@ const TabList: FC<OwnProps> = ({
     >
       {tabs.map((tab, i) => (
         <Tab
-          key={tab.id ?? tab.title}
-          // TODO Remove dependency on usage context
-          title={(!areFolders || tab.id === ALL_FOLDER_ID) ? lang(tab.title) : tab.title}
+          key={tab.id}
+          title={tab.title}
           isActive={i === activeTab}
           isBlocked={tab.isBlocked}
           badgeCount={tab.badgeCount}
@@ -94,6 +91,7 @@ const TabList: FC<OwnProps> = ({
           clickArg={i}
           contextActions={tab.contextActions}
           contextRootElementSelector={contextRootElementSelector}
+          className={tabClassName}
         />
       ))}
     </div>

@@ -1,7 +1,15 @@
-import type { ApiPrivacySettings } from '../../types';
 import type {
-  ApiGeoPoint, ApiMessage, ApiReaction, ApiReactionCount, ApiSticker, ApiStoryForwardInfo, MediaContent,
+  ApiDocument,
+  ApiGeoPoint,
+  ApiMessage,
+  ApiPhoto,
+  ApiReaction,
+  ApiReactionCount,
+  ApiSticker,
+  ApiStoryForwardInfo,
+  MediaContent,
 } from './messages';
+import type { ApiPrivacySettings } from './settings';
 
 export interface ApiStory {
   '@type'?: 'story';
@@ -63,6 +71,10 @@ export type ApiPeerStories = {
   isArchiveFullyLoaded?: boolean;
   lastUpdatedAt?: number;
   lastReadId?: number;
+  idsByAlbumId?: Record<number, {
+    ids: number[];
+    isFullyLoaded?: boolean;
+  }>; // Story IDs grouped by album ID with loading state
 };
 
 export type ApiMessageStoryData = {
@@ -162,5 +174,26 @@ export type ApiMediaAreaUrl = {
   url: string;
 };
 
+export type ApiMediaAreaWeather = {
+  type: 'weather';
+  coordinates: ApiMediaAreaCoordinates;
+  emoji: string;
+  temperatureC: number;
+  color: number;
+};
+
+export type ApiMediaAreaUniqueGift = {
+  type: 'uniqueGift';
+  coordinates: ApiMediaAreaCoordinates;
+  slug: string;
+};
+
 export type ApiMediaArea = ApiMediaAreaVenue | ApiMediaAreaGeoPoint | ApiMediaAreaSuggestedReaction
-| ApiMediaAreaChannelPost | ApiMediaAreaUrl;
+  | ApiMediaAreaChannelPost | ApiMediaAreaUrl | ApiMediaAreaWeather | ApiMediaAreaUniqueGift;
+
+export type ApiStoryAlbum = {
+  albumId: number;
+  title: string;
+  iconPhoto?: ApiPhoto;
+  iconVideo?: ApiDocument;
+};

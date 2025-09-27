@@ -1,4 +1,4 @@
-import type { ApiMessage } from '../../../../api/types';
+import type { ApiMessage, StatefulMediaContent } from '../../../../api/types';
 import type { IconName } from '../../../../types/icons';
 import { ApiMediaFormat } from '../../../../api/types';
 
@@ -7,12 +7,13 @@ import {
   getMessageHtmlId,
   getMessagePhoto,
   getMessageText,
-  getMessageWebPagePhoto,
-  getMessageWebPageVideo,
   getPhotoMediaHash,
+  getWebPagePhoto,
+  getWebPageVideo,
   hasMediaLocalBlobUrl,
 } from '../../../../global/helpers';
 import { getMessageTextWithSpoilers } from '../../../../global/helpers/messageSummary';
+import { IS_SAFARI } from '../../../../util/browser/windowEnvironment';
 import {
   CLIPBOARD_ITEM_SUPPORTED,
   copyHtmlToClipboard,
@@ -20,8 +21,8 @@ import {
   copyTextToClipboard,
 } from '../../../../util/clipboard';
 import getMessageIdsForSelectedText from '../../../../util/getMessageIdsForSelectedText';
+import { getTranslationFn } from '../../../../util/localization';
 import * as mediaLoader from '../../../../util/mediaLoader';
-import { IS_SAFARI } from '../../../../util/windowEnvironment';
 import { renderMessageText } from '../../../common/helpers/renderMessageText';
 
 type ICopyOptions = {
@@ -32,6 +33,7 @@ type ICopyOptions = {
 
 export function getMessageCopyOptions(
   message: ApiMessage,
+  statefulContent: StatefulMediaContent | undefined,
   href?: string,
   canCopy?: boolean,
   afterEffect?: () => void,
@@ -39,12 +41,13 @@ export function getMessageCopyOptions(
   onCopyMessages?: (messageIds: number[]) => void,
   onCopyNumber?: () => void,
 ): ICopyOptions {
+  const { webPage } = statefulContent || {};
   const options: ICopyOptions = [];
   const text = getMessageText(message);
   const photo = getMessagePhoto(message)
-    || (!getMessageWebPageVideo(message) ? getMessageWebPagePhoto(message) : undefined);
+    || (!getWebPageVideo(webPage) ? getWebPagePhoto(webPage) : undefined);
   const contact = getMessageContact(message);
-  const mediaHash = photo ? getPhotoMediaHash(photo, 'inline') : undefined;
+  const mediaHash = photo ? getPhotoMediaHash(photo, 'full') : undefined;
   const canImageBeCopied = canCopy && photo && (mediaHash || hasMediaLocalBlobUrl(photo))
     && CLIPBOARD_ITEM_SUPPORTED && !IS_SAFARI;
   const selection = window.getSelection();
@@ -54,7 +57,7 @@ export function getMessageCopyOptions(
       label: 'lng_context_copy_image',
       icon: 'copy-media',
       handler: () => {
-        Promise.resolve(mediaHash ? mediaLoader.fetch(mediaHash, ApiMediaFormat.BlobUrl) : photo!.blobUrl)
+        Promise.resolve(mediaHash ? mediaLoader.fetch(mediaHash, ApiMediaFormat.BlobUrl) : photo.blobUrl)
           .then(copyImageToClipboard);
 
         afterEffect?.();
@@ -93,8 +96,13 @@ export function getMessageCopyOptions(
         } else {
           const clipboardText = renderMessageText(
             { message, shouldRenderAsHtml: true },
-          );
-          if (clipboardText) copyHtmlToClipboard(clipboardText.join(''), getMessageTextWithSpoilers(message)!);
+          ) as string[];
+          if (clipboardText) {
+            copyHtmlToClipboard(
+              clipboardText.join(''),
+              getMessageTextWithSpoilers(getTranslationFn(), message, statefulContent)!,
+            );
+          }
         }
 
         afterEffect?.();
@@ -126,7 +134,7 @@ export function getMessageCopyOptions(
 }
 function checkMessageHasSelection(message: ApiMessage): boolean {
   const selection = window.getSelection();
-  const selectionParentNode = (selection?.anchorNode?.parentNode as HTMLElement);
+  const selectionParentNode = selection?.anchorNode?.parentNode as HTMLElement;
   const selectedMessageElement = selectionParentNode?.closest<HTMLDivElement>('.Message.message-list-item');
   return getMessageHtmlId(message.id) === selectedMessageElement?.id;
 }

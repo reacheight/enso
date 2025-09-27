@@ -7,7 +7,7 @@ import type {
 import { LOTTIE_STICKER_MIME_TYPE, VIDEO_STICKER_MIME_TYPE } from '../../../config';
 import { compact } from '../../../util/iteratees';
 import localDb from '../localDb';
-import { buildApiThumbnailFromCached, buildApiThumbnailFromPath } from './common';
+import { buildApiPhotoPreviewSizes, buildApiThumbnailFromCached, buildApiThumbnailFromPath } from './common';
 
 export function buildStickerFromDocument(document: GramJs.TypeDocument,
   isNoPremium?: boolean, isPremium?: boolean): ApiSticker | undefined {
@@ -53,7 +53,6 @@ export function buildStickerFromDocument(document: GramJs.TypeDocument,
     (s): s is GramJs.PhotoCachedSize => s instanceof GramJs.PhotoCachedSize,
   );
 
-  // eslint-disable-next-line no-restricted-globals
   if (mimeType === VIDEO_STICKER_MIME_TYPE && !(self as any).isWebmSupported && !cachedThumb) {
     const staticThumb = document.thumbs && document.thumbs.find(
       (s): s is GramJs.PhotoSize => s instanceof GramJs.PhotoSize,
@@ -73,11 +72,12 @@ export function buildStickerFromDocument(document: GramJs.TypeDocument,
   ) : pathThumb && sizeAttribute ? (
     buildApiThumbnailFromPath(pathThumb, sizeAttribute)
   ) : undefined;
+  const previewPhotoSizes = document.thumbs && buildApiPhotoPreviewSizes(document.thumbs);
 
   const { w: width, h: height } = cachedThumb as GramJs.PhotoCachedSize || sizeAttribute || {};
 
   const hasEffect = !isNoPremium && videoThumbs && compact(videoThumbs
-    ?.filter((thumb) => thumb instanceof GramJs.VideoSize) as GramJs.VideoSize[])
+    ?.filter((thumb) => thumb instanceof GramJs.VideoSize))
     .some(({ type }) => type === 'f');
 
   return {
@@ -94,6 +94,7 @@ export function buildStickerFromDocument(document: GramJs.TypeDocument,
     hasEffect,
     isFree,
     shouldUseTextColor,
+    previewPhotoSizes,
   };
 }
 

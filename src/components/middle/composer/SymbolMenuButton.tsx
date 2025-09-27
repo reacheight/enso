@@ -1,5 +1,5 @@
 import type { FC } from '../../../lib/teact/teact';
-import React, { memo, useRef, useState } from '../../../lib/teact/teact';
+import { memo, useRef, useState } from '../../../lib/teact/teact';
 import { getActions } from '../../../global';
 
 import type { ApiSticker, ApiVideo } from '../../../api/types';
@@ -11,6 +11,7 @@ import buildClassName from '../../../util/buildClassName';
 import useFlag from '../../../hooks/useFlag';
 import useLastCallback from '../../../hooks/useLastCallback';
 
+import Icon from '../../common/icons/Icon';
 import Button from '../../ui/Button';
 import ResponsiveHoverButton from '../../ui/ResponsiveHoverButton';
 import Spinner from '../../ui/Spinner';
@@ -84,14 +85,13 @@ const SymbolMenuButton: FC<OwnProps> = ({
     addRecentCustomEmoji,
   } = getActions();
 
-  // eslint-disable-next-line no-null/no-null
-  const triggerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>();
 
   const [isSymbolMenuLoaded, onSymbolMenuLoadingComplete] = useFlag();
   const [contextMenuAnchor, setContextMenuAnchor] = useState<IAnchorPosition | undefined>(undefined);
 
   const symbolMenuButtonClassName = buildClassName(
-    'mobile-symbol-menu-button',
+    'composer-action-button mobile-symbol-menu-button',
     !isReady && 'not-ready',
     isSymbolMenuLoaded
       ? (isSymbolMenuOpen && 'menu-opened')
@@ -150,20 +150,20 @@ const SymbolMenuButton: FC<OwnProps> = ({
           onClick={isSymbolMenuOpen ? closeSymbolMenu : handleSymbolMenuOpen}
           ariaLabel="Choose emoji, sticker or GIF"
         >
-          <i className="icon icon-smile" />
-          <i className="icon icon-keyboard" />
+          <Icon name="smile" />
+          <Icon name="keyboard" />
           {isSymbolMenuOpen && !isSymbolMenuLoaded && <Spinner color="gray" />}
         </Button>
       ) : (
         <ResponsiveHoverButton
-          className={buildClassName('symbol-menu-button', isSymbolMenuOpen && 'activated')}
+          className={buildClassName('composer-action-button symbol-menu-button', isSymbolMenuOpen && 'activated')}
           round
           color="translucent"
           onActivate={handleActivateSymbolMenu}
           ariaLabel="Choose emoji, sticker or GIF"
         >
           <div ref={triggerRef} className="symbol-menu-trigger" />
-          <i className="icon icon-smile" />
+          <Icon name="smile" />
         </ResponsiveHoverButton>
       )}
 

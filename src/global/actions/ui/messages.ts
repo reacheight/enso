@@ -1,11 +1,10 @@
 import type { ApiMessage } from '../../../api/types';
 import type {
   ActionReturnType,
-  ActiveDownloads,
   GlobalState,
 } from '../../types';
 import { MAIN_THREAD_ID } from '../../../api/types';
-import { FocusDirection } from '../../../types';
+import { type ActiveDownloads, FocusDirection } from '../../../types';
 
 import {
   ANIMATION_END_DELAY,
@@ -14,26 +13,25 @@ import {
   SERVICE_NOTIFICATIONS_USER_ID,
 } from '../../../config';
 import { cancelScrollBlockingAnimation, isAnimatingScroll } from '../../../util/animateScroll';
+import { IS_TOUCH_ENV } from '../../../util/browser/windowEnvironment';
 import { copyHtmlToClipboard } from '../../../util/clipboard';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import { compact, findLast } from '../../../util/iteratees';
-import * as langProvider from '../../../util/oldLangProvider';
-import { oldTranslate } from '../../../util/oldLangProvider';
+import { getTranslationFn } from '../../../util/localization';
 import parseHtmlAsFormattedText from '../../../util/parseHtmlAsFormattedText';
 import { getServerTime } from '../../../util/serverTime';
-import { IS_TOUCH_ENV } from '../../../util/windowEnvironment';
 import versionNotification from '../../../versionNotification.txt';
 import {
   getIsSavedDialog,
   getMediaFilename,
   getMediaFormat,
   getMediaHash,
-  getMessageDownloadableMedia,
-  getSenderTitle,
+  getMessageStatefulContent,
   isChatChannel,
-  isJoinedChannelMessage,
 } from '../../helpers';
 import { getMessageSummaryText } from '../../helpers/messageSummary';
+import { addTabStateResetterAction } from '../../helpers/meta';
+import { getPeerTitle } from '../../helpers/peers';
 import { renderMessageSummaryHtml } from '../../helpers/renderMessageSummaryHtml';
 import { addActionHandler, getGlobal, setGlobal } from '../../index';
 import {
@@ -50,8 +48,10 @@ import {
 import { updateTabState } from '../../reducers/tabs';
 import {
   selectAllowedMessageActionsSlow,
+  selectCanForwardMessage,
   selectChat,
   selectChatLastMessageId,
+  selectChatMessage,
   selectChatMessages,
   selectChatScheduledMessages,
   selectCurrentChat,
@@ -70,6 +70,8 @@ import {
   selectThreadInfo,
   selectViewportIds,
 } from '../../selectors';
+import { selectMessageDownloadableMedia } from '../../selectors/media';
+import { getPeerStarsForMessage } from '../api/messages';
 
 import { getIsMobile } from '../../../hooks/useAppLayout';
 
@@ -185,7 +187,7 @@ addActionHandler('replyToNextMessage', (global, actions, payload): ActionReturnT
 
 addActionHandler('openAudioPlayer', (global, actions, payload): ActionReturnType => {
   const {
-    chatId, threadId, messageId, origin, volume, playbackRate, isMuted,
+    chatId, threadId, messageId, origin, volume, playbackRate, isMuted, timestamp,
     tabId = getCurrentTabId(),
   } = payload;
 
@@ -195,6 +197,7 @@ addActionHandler('openAudioPlayer', (global, actions, payload): ActionReturnType
       chatId,
       threadId,
       messageId,
+      timestamp,
       origin: origin ?? tabState.audioPlayer.origin,
       volume: volume ?? tabState.audioPlayer.volume,
       playbackRate: playbackRate || tabState.audioPlayer.playbackRate || global.audioPlayer.lastPlaybackRate,
@@ -343,13 +346,6 @@ addActionHandler('focusLastMessage', (global, actions, payload): ActionReturnTyp
       lastMessageId = pinnedMessageIds[pinnedMessageIds.length - 1];
     } else {
       lastMessageId = selectChatLastMessageId(global, chatId);
-
-      const chatMessages = selectChatMessages(global, chatId);
-      // Workaround for scroll to local message 'you joined this channel'
-      const lastChatMessage = Object.values(chatMessages).reverse()[0];
-      if (lastMessageId && isJoinedChannelMessage(lastChatMessage) && lastChatMessage.id > lastMessageId) {
-        lastMessageId = lastChatMessage.id;
-      }
     }
   } else if (isSavedDialog) {
     lastMessageId = selectChatLastMessageId(global, String(threadId), 'saved');
@@ -409,17 +405,22 @@ addActionHandler('focusNextReply', (global, actions, payload): ActionReturnType 
 addActionHandler('focusMessage', (global, actions, payload): ActionReturnType => {
   const {
     chatId, threadId = MAIN_THREAD_ID, messageListType = 'thread', noHighlight, groupedId, groupedChatId,
-    replyMessageId, isResizingContainer, shouldReplaceHistory, noForumTopicPanel, quote, scrollTargetPosition,
-    tabId = getCurrentTabId(),
+    replyMessageId, isResizingContainer, shouldReplaceHistory, noForumTopicPanel, quote, quoteOffset,
+    scrollTargetPosition, timestamp, tabId = getCurrentTabId(),
   } = payload;
 
   let { messageId } = payload;
 
   const chat = selectChat(global, chatId);
   if (!chat) {
-    actions.showNotification({ message: oldTranslate('Conversation.ErrorInaccessibleMessage'), tabId });
+    actions.showNotification({ message: { key: 'ErrorFocusInaccessibleMessage' }, tabId });
     return undefined;
   }
+
+  const onMessageReady = timestamp
+    ? () => actions.openMediaFromTimestamp({
+      chatId, threadId, messageId, timestamp, tabId,
+    }) : undefined;
 
   if (groupedId !== undefined) {
     const ids = selectForwardedMessageIdsByGroupId(global, groupedChatId!, groupedId);
@@ -454,6 +455,7 @@ addActionHandler('focusMessage', (global, actions, payload): ActionReturnType =>
     noHighlight,
     isResizingContainer,
     quote,
+    quoteOffset,
     scrollTargetPosition,
   }, tabId);
   global = updateFocusDirection(global, undefined, tabId);
@@ -478,6 +480,7 @@ addActionHandler('focusMessage', (global, actions, payload): ActionReturnType =>
       noForumTopicPanel,
       tabId,
     });
+    onMessageReady?.();
     return undefined;
   }
 
@@ -509,6 +512,7 @@ addActionHandler('focusMessage', (global, actions, payload): ActionReturnType =>
     threadId,
     tabId,
     shouldForceRender: true,
+    onLoaded: onMessageReady,
   });
   return undefined;
 });
@@ -522,13 +526,14 @@ addActionHandler('setShouldPreventComposerAnimation', (global, actions, payload)
 
 addActionHandler('openReplyMenu', (global, actions, payload): ActionReturnType => {
   const {
-    fromChatId, messageId, quoteText, tabId = getCurrentTabId(),
+    fromChatId, messageId, quoteText, quoteOffset, tabId = getCurrentTabId(),
   } = payload;
   return updateTabState(global, {
     replyingMessage: {
       fromChatId,
       messageId,
       quoteText,
+      quoteOffset,
     },
     isShareMessageModalShown: true,
   }, tabId);
@@ -610,7 +615,16 @@ addActionHandler('openForwardMenuForSelectedMessages', (global, actions, payload
 
   const { chatId: fromChatId, messageIds } = tabState.selectedMessages;
 
-  actions.openForwardMenu({ fromChatId, messageIds, tabId });
+  const forwardableMessageIds = messageIds.filter((id) => {
+    const message = selectChatMessage(global, fromChatId, id);
+    return message && selectCanForwardMessage(global, message);
+  });
+
+  if (!forwardableMessageIds.length) {
+    return;
+  }
+
+  actions.openForwardMenu({ fromChatId, messageIds: forwardableMessageIds, tabId });
 });
 
 addActionHandler('cancelMediaDownload', (global, actions, payload): ActionReturnType => {
@@ -664,7 +678,7 @@ addActionHandler('downloadSelectedMessages', (global, actions, payload): ActionR
   const messages = messageIds.map((id) => chatMessages[id])
     .filter((message) => selectAllowedMessageActionsSlow(global, message, threadId).canDownload);
   messages.forEach((message) => {
-    const media = getMessageDownloadableMedia(message);
+    const media = selectMessageDownloadableMedia(global, message);
     if (!media) return;
     actions.downloadMedia({ media, originMessage: message, tabId });
   });
@@ -704,8 +718,9 @@ addActionHandler('toggleMessageSelection', (global, actions, payload): ActionRet
   if (global.shouldShowContextMenuHint) {
     actions.disableContextMenuHint();
     actions.showNotification({
-      // eslint-disable-next-line max-len
-      message: `To **edit** or **reply**, close this menu. Then ${IS_TOUCH_ENV ? 'long tap' : 'right click'} on a message.`,
+      message: {
+        key: IS_TOUCH_ENV ? 'ContextMenuHintTouch' : 'ContextMenuHintMouse',
+      },
       tabId,
     });
   }
@@ -747,6 +762,22 @@ addActionHandler('closePollModal', (global, actions, payload): ActionReturnType 
     },
   }, tabId);
 });
+
+addActionHandler('openTodoListModal', (global, actions, payload): ActionReturnType => {
+  const {
+    chatId, messageId, forNewTask, tabId = getCurrentTabId(),
+  } = payload;
+
+  return updateTabState(global, {
+    todoListModal: {
+      chatId,
+      messageId,
+      forNewTask,
+    },
+  }, tabId);
+});
+
+addTabStateResetterAction('closeTodoListModal', 'todoListModal');
 
 addActionHandler('checkVersionNotification', (global, actions): ActionReturnType => {
   if (RELEASE_DATETIME && Date.now() > Number(RELEASE_DATETIME) + VERSION_NOTIFICATION_DURATION) {
@@ -928,6 +959,13 @@ addActionHandler('closeReportAdModal', (global, actions, payload): ActionReturnT
   }, tabId);
 });
 
+addActionHandler('closeReportModal', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+  return updateTabState(global, {
+    reportModal: undefined,
+  }, tabId);
+});
+
 addActionHandler('openPreviousReportAdModal', (global, actions, payload): ActionReturnType => {
   const { tabId = getCurrentTabId() } = payload || {};
   const reportAdModal = selectTabState(global, tabId).reportAdModal;
@@ -948,9 +986,71 @@ addActionHandler('openPreviousReportAdModal', (global, actions, payload): Action
   }, tabId);
 });
 
+addActionHandler('openPreviousReportModal', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+  const reportModal = selectTabState(global, tabId).reportModal;
+  if (!reportModal) {
+    return undefined;
+  }
+
+  if (reportModal.sections.length === 1) {
+    actions.closeReportModal({ tabId });
+    return undefined;
+  }
+
+  return updateTabState(global, {
+    reportModal: {
+      ...reportModal,
+      sections: reportModal.sections.slice(0, -1),
+    },
+  }, tabId);
+});
+
+addActionHandler('openPaidReactionModal', (global, actions, payload): ActionReturnType => {
+  const { chatId, messageId, tabId = getCurrentTabId() } = payload;
+  return updateTabState(global, {
+    paidReactionModal: { chatId, messageId },
+  }, tabId);
+});
+
+addActionHandler('closePaidReactionModal', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+  return updateTabState(global, {
+    paidReactionModal: undefined,
+  }, tabId);
+});
+
+addActionHandler('openSuggestMessageModal', (global, actions, payload): ActionReturnType => {
+  const { chatId, messageId, tabId = getCurrentTabId() } = payload;
+  return updateTabState(global, {
+    suggestMessageModal: { chatId, messageId },
+  }, tabId);
+});
+
+addActionHandler('closeSuggestMessageModal', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+  return updateTabState(global, {
+    suggestMessageModal: undefined,
+  }, tabId);
+});
+
+addActionHandler('openSuggestedPostApprovalModal', (global, actions, payload): ActionReturnType => {
+  const { chatId, messageId, tabId = getCurrentTabId() } = payload;
+  return updateTabState(global, {
+    suggestedPostApprovalModal: { chatId, messageId },
+  }, tabId);
+});
+
+addActionHandler('closeSuggestedPostApprovalModal', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+  return updateTabState(global, {
+    suggestedPostApprovalModal: undefined,
+  }, tabId);
+});
+
 function copyTextForMessages(global: GlobalState, chatId: string, messageIds: number[]) {
   const { type: messageListType, threadId } = selectCurrentMessageList(global) || {};
-  const lang = langProvider.oldTranslate;
+  const lang = getTranslationFn();
 
   const chat = selectChat(global, chatId);
 
@@ -970,13 +1070,14 @@ function copyTextForMessages(global: GlobalState, chatId: string, messageIds: nu
 
   messages.forEach((message) => {
     const sender = isChatChannel(chat) ? chat : selectSender(global, message);
-    const senderTitle = `> ${sender ? getSenderTitle(lang, sender) : message.forwardInfo?.hiddenUserName || ''}:`;
+    const senderTitle = `> ${sender ? getPeerTitle(lang, sender) : message.forwardInfo?.hiddenUserName || ''}:`;
+    const statefulContent = getMessageStatefulContent(global, message);
 
     resultHtml.push(senderTitle);
     resultHtml.push(`${renderMessageSummaryHtml(lang, message)}\n`);
 
     resultText.push(senderTitle);
-    resultText.push(`${getMessageSummaryText(lang, message, false, 0, true)}\n`);
+    resultText.push(`${getMessageSummaryText(lang, message, statefulContent, false, 0, true)}\n`);
   });
 
   copyHtmlToClipboard(resultHtml.join('\n'), resultText.join('\n'));
@@ -984,17 +1085,16 @@ function copyTextForMessages(global: GlobalState, chatId: string, messageIds: nu
 
 addActionHandler('openDeleteMessageModal', (global, actions, payload): ActionReturnType => {
   const {
-    message, isSchedule, album,
+    chatId, messageIds, isSchedule,
     tabId = getCurrentTabId(),
   } = payload;
 
   global = getGlobal();
-
   global = updateTabState(global, {
     deleteMessageModal: {
+      chatId,
+      messageIds,
       isSchedule,
-      album,
-      message,
     },
   }, tabId);
   setGlobal(global);
@@ -1006,4 +1106,78 @@ addActionHandler('closeDeleteMessageModal', (global, actions, payload): ActionRe
   return updateTabState(global, {
     deleteMessageModal: undefined,
   }, tabId);
+});
+
+addActionHandler('openAboutAdsModal', (global, actions, payload): ActionReturnType => {
+  const {
+    randomId, additionalInfo, canReport, sponsorInfo, tabId = getCurrentTabId(),
+  } = payload || {};
+
+  return updateTabState(global, {
+    aboutAdsModal: {
+      randomId,
+      canReport,
+      additionalInfo,
+      sponsorInfo,
+    },
+  }, tabId);
+});
+
+addActionHandler('closeAboutAdsModal', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+
+  return updateTabState(global, {
+    aboutAdsModal: undefined,
+  }, tabId);
+});
+
+addActionHandler('closePreparedInlineMessageModal', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+
+  return updateTabState(global, {
+    preparedMessageModal: undefined,
+  }, tabId);
+});
+
+addActionHandler('closeSharePreparedMessageModal', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+
+  return updateTabState(global, {
+    sharePreparedMessageModal: undefined,
+  }, tabId);
+});
+
+addActionHandler('updateSharePreparedMessageModalSendArgs', async (global, actions, payload): Promise<void> => {
+  const { args, tabId = getCurrentTabId() } = payload || {};
+  const tabState = selectTabState(global, tabId);
+
+  if (!tabState.sharePreparedMessageModal) {
+    return;
+  }
+
+  if (!args) {
+    global = updateTabState(global, {
+      sharePreparedMessageModal: {
+        ...tabState.sharePreparedMessageModal,
+        pendingSendArgs: undefined,
+      },
+    }, tabId);
+    setGlobal(global);
+    return;
+  }
+
+  const starsForSendMessage = await getPeerStarsForMessage(global, args.peerId);
+
+  global = getGlobal();
+  global = updateTabState(global, {
+    sharePreparedMessageModal: {
+      ...tabState.sharePreparedMessageModal,
+      pendingSendArgs: {
+        peerId: args.peerId,
+        threadId: args.threadId,
+        starsForSendMessage,
+      },
+    },
+  }, tabId);
+  setGlobal(global);
 });

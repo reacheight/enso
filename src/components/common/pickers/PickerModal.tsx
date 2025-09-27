@@ -1,4 +1,4 @@
-import React, { memo } from '../../../lib/teact/teact';
+import { memo } from '../../../lib/teact/teact';
 
 import buildClassName from '../../../util/buildClassName';
 
@@ -28,11 +28,11 @@ const PickerModal = ({
   ...modalProps
 }: OwnProps) => {
   const lang = useOldLang();
-  const hasOnClickHandler = Boolean(onConfirm || modalProps.onClose);
+  const hasButton = Boolean(confirmButtonText || onConfirm);
 
   return (
     <Modal
-      // eslint-disable-next-line react/jsx-props-no-spreading
+
       {...modalProps}
       isSlim
       className={buildClassName(
@@ -44,13 +44,12 @@ const PickerModal = ({
       headerClassName={buildClassName(styles.header, modalProps.headerClassName)}
     >
       {modalProps.children}
-      {hasOnClickHandler && (
+      {hasButton && (
         <div className={styles.buttonWrapper}>
           <Button
             withPremiumGradient={withPremiumGradient}
             onClick={onConfirm || modalProps.onClose}
             color="primary"
-            size="smaller"
             disabled={isConfirmDisabled}
           >
             {confirmButtonText || lang('Confirm')}

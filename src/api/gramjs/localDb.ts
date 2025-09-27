@@ -1,14 +1,10 @@
 import BigInt from 'big-integer';
-import { constructors } from '../../lib/gramjs/tl';
+import { Api as GramJs } from '../../lib/gramjs';
 
-import type { Api as GramJs } from '../../lib/gramjs';
-
-import { DATA_BROADCAST_CHANNEL_NAME, DEBUG } from '../../config';
+import { DEBUG } from '../../config';
+import { DATA_BROADCAST_CHANNEL_NAME } from '../../util/multiaccount';
 import { throttle } from '../../util/schedulers';
 import { omitVirtualClassFields } from './apiBuilders/helpers';
-
-// eslint-disable-next-line no-restricted-globals
-const IS_MULTITAB_SUPPORTED = 'BroadcastChannel' in self;
 
 export type StoryRepairInfo = {
   type: 'story';
@@ -38,7 +34,7 @@ export interface LocalDb {
   channelPtsById: Record<string, number>;
 }
 
-const channel = IS_MULTITAB_SUPPORTED ? new BroadcastChannel(DATA_BROADCAST_CHANNEL_NAME) : undefined;
+const channel = new BroadcastChannel(DATA_BROADCAST_CHANNEL_NAME);
 
 let batchedUpdates: {
   name: string;
@@ -46,7 +42,7 @@ let batchedUpdates: {
   value: any;
 }[] = [];
 const throttledLocalDbUpdate = throttle(() => {
-  channel!.postMessage({
+  channel.postMessage({
     type: 'localDbUpdate',
     batchedUpdates,
   });
@@ -82,7 +78,7 @@ function convertToVirtualClass(value: any): any {
   const path = value.className.split('.');
   const VirtualClass = path.reduce((acc: any, field: string) => {
     return acc[field];
-  }, constructors);
+  }, GramJs);
 
   const valueOmited = omitVirtualClassFields(value);
   const valueConverted = Object.keys(valueOmited).reduce((acc, key) => {
@@ -111,9 +107,7 @@ function createLocalDbInitial(initial?: LocalDb): LocalDb {
         return acc2;
       }, {} as Record<string, any>);
 
-      acc[key] = IS_MULTITAB_SUPPORTED
-        ? createProxy(key, convertedValue)
-        : convertedValue;
+      acc[key] = createProxy(key, convertedValue);
       return acc;
     }, {} as LocalDb) as LocalDb;
 }

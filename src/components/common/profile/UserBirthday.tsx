@@ -1,4 +1,4 @@
-import React, {
+import {
   memo, useEffect, useMemo, useRef,
 } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
@@ -10,17 +10,17 @@ import {
 import { requestMeasure } from '../../../lib/fasterdom/fasterdom';
 import { getStickerMediaHash } from '../../../global/helpers';
 import { selectIsPremiumPurchaseBlocked } from '../../../global/selectors';
+import { IS_OFFSET_PATH_SUPPORTED } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
 import { formatDateToString } from '../../../util/dates/dateFormat';
 import { buildCollectionByKey } from '../../../util/iteratees';
 import * as mediaLoader from '../../../util/mediaLoader';
-import { IS_OFFSET_PATH_SUPPORTED } from '../../../util/windowEnvironment';
 import renderText from '../helpers/renderText';
 
 import useTimeout from '../../../hooks/schedulers/useTimeout';
 import useFlag from '../../../hooks/useFlag';
+import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
-import useOldLang from '../../../hooks/useOldLang';
 
 import ListItem from '../../ui/ListItem';
 import StickerView from '../StickerView';
@@ -53,13 +53,12 @@ const UserBirthday = ({
   animatedEmojiEffects,
   isInSettings,
 }: OwnProps & StateProps) => {
-  const { openPremiumGiftModal, requestConfetti } = getActions();
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLDivElement>(null);
+  const { openGiftModal, requestConfetti } = getActions();
+  const ref = useRef<HTMLDivElement>();
   const animationPlayedRef = useRef(false);
   const [isPlayingAnimation, playAnimation, stopAnimation] = useFlag();
 
-  const lang = useOldLang();
+  const lang = useLang();
 
   const {
     formattedDate,
@@ -140,19 +139,29 @@ const UserBirthday = ({
     }
   }, [isInSettings, isPlayingAnimation]);
 
-  const valueKey = `ProfileBirthday${isToday ? 'Today' : ''}Value${age ? 'Year' : ''}`;
+  const value = useMemo(() => {
+    if (age) {
+      return lang(
+        `ProfileBirthday${isToday ? 'Today' : ''}ValueYear`,
+        { date: formattedDate, age },
+        { pluralValue: age },
+      );
+    }
+
+    return lang(`ProfileBirthday${isToday ? 'Today' : ''}Value`, { date: formattedDate });
+  }, [age, formattedDate, isToday, lang]);
 
   const canGiftPremium = isToday && !user.isPremium && !user.isSelf && !isPremiumPurchaseBlocked;
 
-  const handleOpenPremiumGiftModal = useLastCallback(() => {
-    openPremiumGiftModal({ forUserIds: [user.id] });
+  const handleOpenGiftModal = useLastCallback(() => {
+    openGiftModal({ forUserId: user.id });
   });
 
   const handleClick = useLastCallback(() => {
     if (!isToday) return;
 
     if (canGiftPremium && animationPlayedRef.current) {
-      handleOpenPremiumGiftModal();
+      handleOpenGiftModal();
       return;
     }
 
@@ -173,10 +182,10 @@ const UserBirthday = ({
         ripple={!isStatic}
         onClick={handleClick}
         isStatic={isStatic}
-        onSecondaryIconClick={handleOpenPremiumGiftModal}
+        onSecondaryIconClick={handleOpenGiftModal}
       >
         <div className="title" dir={lang.isRtl ? 'rtl' : undefined}>
-          {renderText(lang(valueKey, [formattedDate, age], undefined, age))}
+          {renderText(value)}
         </div>
         <span className="subtitle">{lang(isToday ? 'ProfileBirthdayToday' : 'ProfileBirthday')}</span>
       </ListItem>
@@ -209,7 +218,7 @@ const UserBirthday = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     const { birthdayNumbers, animatedEmojiEffects } = global;
     return {
       birthdayNumbers,

@@ -1,21 +1,19 @@
-import type { ActionReturnType } from '../../types';
-
-import { areDeepEqual } from '../../../util/areDeepEqual';
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import { callApi } from '../../../api/gramjs';
 import { addActionHandler, getGlobal, setGlobal } from '../../index';
 import {
   updateChannelMonetizationStatistics,
   updateMessageStatistics,
-  updateMonetizationInfo,
   updateStatistics,
   updateStatisticsGraph,
   updateStoryStatistics,
+  updateVerifyMonetizationModal,
 } from '../../reducers';
 import {
   selectChat,
   selectChatFullInfo,
   selectChatMessages,
+  selectPeer,
   selectPeerStory,
   selectTabState,
 } from '../../selectors';
@@ -40,20 +38,39 @@ addActionHandler('loadStatistics', async (global, actions, payload): Promise<voi
   global = getGlobal();
   global = updateStatistics(global, chatId, stats, tabId);
   setGlobal(global);
+
+  if (stats.type === 'channel') {
+    const messageInteractions = stats.recentPosts.filter((post) => post.type === 'message');
+    const storyInteractions = stats.recentPosts.filter((post) => post.type === 'story');
+
+    if (messageInteractions.length > 0) {
+      actions.loadMessagesById({
+        chatId,
+        messageIds: messageInteractions.map((interaction) => interaction.msgId),
+      });
+    }
+
+    if (storyInteractions.length > 0) {
+      actions.loadPeerStoriesByIds({
+        peerId: chatId,
+        storyIds: storyInteractions.map((interaction) => interaction.storyId),
+      });
+    }
+  }
 });
 
 addActionHandler('loadChannelMonetizationStatistics', async (global, actions, payload): Promise<void> => {
   const {
-    chatId, tabId = getCurrentTabId(),
+    peerId, tabId = getCurrentTabId(),
   } = payload;
-  const chat = selectChat(global, chatId);
-  const fullInfo = selectChatFullInfo(global, chatId);
-  if (!chat || !fullInfo) {
+  const peer = selectPeer(global, peerId);
+  const chatFullInfo = selectChatFullInfo(global, peerId);
+  if (!peer) {
     return;
   }
 
-  const dcId = fullInfo.statisticsDcId;
-  const stats = await callApi('fetchChannelMonetizationStatistics', { chat, dcId });
+  const dcId = chatFullInfo?.statisticsDcId;
+  const stats = await callApi('fetchChannelMonetizationStatistics', { peer, dcId });
 
   if (!stats) {
     return;
@@ -123,17 +140,11 @@ addActionHandler('loadMessagePublicForwards', async (global, actions, payload): 
     count,
   } = publicForwards || {};
 
-  // Api returns the last element from the previous page as the first element
-  const shouldOmitFirstElement = stats.publicForwardsData?.length && forwards?.length
-    && areDeepEqual(stats.publicForwardsData[stats.publicForwardsData.length - 1], forwards[0]);
-
   global = getGlobal();
   global = updateMessageStatistics(global, {
     ...stats,
     publicForwards: count || forwards?.length,
-    publicForwardsData: (stats.publicForwardsData || []).concat(
-      shouldOmitFirstElement ? forwards.slice(1) : (forwards || []),
-    ),
+    publicForwardsData: (stats.publicForwardsData || []).concat((forwards || [])),
     nextOffset,
   }, tabId);
   setGlobal(global);
@@ -228,40 +239,40 @@ addActionHandler('loadStoryPublicForwards', async (global, actions, payload): Pr
   setGlobal(global);
 });
 
-addActionHandler('loadMonetizationRevenueWithdrawalUrl', async (global, actions, payload): Promise<void> => {
+addActionHandler('processMonetizationRevenueWithdrawalUrl', async (global, actions, payload): Promise<void> => {
   const {
-    chatId, currentPassword, onSuccess, tabId = getCurrentTabId(),
+    peerId, currentPassword, tabId = getCurrentTabId(),
   } = payload;
 
-  global = updateMonetizationInfo(global, { isLoading: true, error: undefined });
+  global = updateVerifyMonetizationModal(global, {
+    isLoading: true,
+  }, tabId);
   setGlobal(global);
 
-  const chat = selectChat(global, chatId);
-  if (!chat) {
+  const peer = selectPeer(global, peerId);
+  if (!peer) {
     return;
   }
 
-  const result = await callApi('loadMonetizationRevenueWithdrawalUrl', { chat, currentPassword });
+  const result = await callApi('fetchMonetizationRevenueWithdrawalUrl', { peer, currentPassword });
 
   if (!result) {
     return;
   }
 
   global = getGlobal();
-  global = updateMonetizationInfo(global, { isLoading: false });
+  global = updateVerifyMonetizationModal(global, {
+    isLoading: false,
+    errorKey: 'error' in result ? result.messageKey : undefined,
+  }, tabId);
   setGlobal(global);
 
-  if (result) {
-    onSuccess();
+  if ('url' in result) {
     actions.openUrl({
       url: result.url,
-      shouldSkipModal: true,
       tabId,
       ignoreDeepLinks: true,
     });
+    actions.closeMonetizationVerificationModal({ tabId });
   }
-});
-
-addActionHandler('clearMonetizationInfo', (global): ActionReturnType => {
-  return updateMonetizationInfo(global, { error: undefined });
 });

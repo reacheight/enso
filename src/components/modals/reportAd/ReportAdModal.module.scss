@@ -2,20 +2,26 @@
   overflow-x: hidden;
 }
 
+.root {
+  :global(.modal-dialog) {
+    max-width: 23rem;
+  }
+}
+
 .modalTitle {
   display: flex;
   flex-direction: column;
 }
 
 .optionText {
-  width: 100%;
   overflow: hidden;
+  width: 100%;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .option {
-  margin-bottom: 0.25rem !important;
+  margin-bottom: 0rem !important;
 }
 
 .optionButton {
@@ -23,15 +29,15 @@
 }
 
 .sectionTitle {
-  color: var(--color-primary);
   padding-inline: 1rem;
+  color: var(--color-primary);
 }
 
 .description {
   margin-top: 0.75rem;
   margin-bottom: 0;
-  color: var(--color-text-secondary);
   padding-inline: 1rem;
+  color: var(--color-text-secondary);
 }
 
 .title {
@@ -48,7 +54,7 @@
 }
 
 .transition {
+  overflow: hidden;
   /* stylelint-disable-next-line plugin/no-low-performance-animation-properties */
   transition: height 0.25s ease-in-out;
-  overflow: hidden;
 }

@@ -1,7 +1,7 @@
-import React, { memo } from '../../../lib/teact/teact';
+import { memo } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
-import type { PrivacyVisibility } from '../../../types';
+import type { PrivacyVisibility } from '../../../api/types';
 
 import { selectIsCurrentUserPremium, selectShouldHideReadMarks } from '../../../global/selectors';
 import renderText from '../../common/helpers/renderText';
@@ -74,7 +74,7 @@ const SettingsPrivacyLastSeen = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     return {
       isCurrentUserPremium: selectIsCurrentUserPremium(global),
       shouldHideReadMarks: Boolean(selectShouldHideReadMarks(global)),

@@ -1,4 +1,4 @@
-import React, {
+import {
   memo, useEffect, useMemo, useState,
 } from '../../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../../global';
@@ -6,10 +6,10 @@ import { getActions, getGlobal, withGlobal } from '../../../global';
 import type { ApiChatMember } from '../../../api/types';
 
 import {
-  filterUsersByName,
   isUserBot,
   sortUserIds,
 } from '../../../global/helpers';
+import { filterPeersByQuery } from '../../../global/helpers/peers';
 import { selectChatFullInfo } from '../../../global/selectors';
 import { unique } from '../../../util/iteratees';
 import sortChatIds from '../../common/helpers/sortChatIds';
@@ -22,7 +22,7 @@ import PickerModal from '../../common/pickers/PickerModal';
 
 type OwnProps = {
   isOpen?: boolean;
-  // eslint-disable-next-line react/no-unused-prop-types
+
   giveawayChatId?: string;
   selectionLimit: number;
   initialSelectedIds: string[];
@@ -74,9 +74,10 @@ const GiveawayUserPickerModal = ({
 
   const displayedMemberIds = useMemo(() => {
     const usersById = getGlobal().users.byId;
-    const filteredContactIds = memberIds ? filterUsersByName(memberIds, usersById, searchQuery) : [];
+    const filteredUserIds = memberIds
+      ? filterPeersByQuery({ ids: memberIds, query: searchQuery, type: 'user' }) : [];
 
-    return sortChatIds(unique(filteredContactIds).filter((userId) => {
+    return sortChatIds(unique(filteredUserIds).filter((userId) => {
       const user = usersById[userId];
       if (!user) {
         return true;
@@ -130,10 +131,13 @@ const GiveawayUserPickerModal = ({
   );
 };
 
-export default memo(withGlobal<OwnProps>((global, { giveawayChatId }): StateProps => {
+export default memo(withGlobal<OwnProps>((global, { giveawayChatId }): Complete<StateProps> => {
   const chatFullInfo = giveawayChatId ? selectChatFullInfo(global, giveawayChatId) : undefined;
   if (!chatFullInfo) {
-    return {};
+    return {
+      members: undefined,
+      adminMembersById: undefined,
+    };
   }
 
   return {

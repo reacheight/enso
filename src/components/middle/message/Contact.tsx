@@ -1,5 +1,4 @@
 import type { FC } from '../../../lib/teact/teact';
-import React from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiContact, ApiCountryCode, ApiUser } from '../../../api/types';
@@ -67,7 +66,7 @@ const Contact: FC<OwnProps & StateProps> = ({
       className={styles.root}
     >
       <div className={styles.infoContainer} onClick={handleClick}>
-        <Avatar size="large" peer={user} text={getContactName(contact)} />
+        <Avatar size="medium" peer={user} text={getContactName(contact)} />
         <div className={styles.info}>
           <div className={styles.name}>
             {user ? getUserFullName(user) : getContactName(contact)}
@@ -85,6 +84,7 @@ const Contact: FC<OwnProps & StateProps> = ({
               isText
               color="translucent"
               ripple
+              size="tiny"
               onClick={handleOpenChat}
               className={styles.button}
             >
@@ -95,6 +95,7 @@ const Contact: FC<OwnProps & StateProps> = ({
                 isText
                 color="translucent"
                 ripple
+                size="tiny"
                 onClick={handleAddContact}
                 className={styles.button}
               >
@@ -124,7 +125,7 @@ function getContactName(contact: ApiContact) {
   return '';
 }
 
-export default withGlobal<OwnProps>((global, { contact }): StateProps => {
+export default withGlobal<OwnProps>((global, { contact }): Complete<StateProps> => {
   const {
     countryList: { phoneCodes: phoneCodeList },
   } = global;

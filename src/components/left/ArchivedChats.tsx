@@ -1,10 +1,9 @@
 import type { FC } from '../../lib/teact/teact';
-import React, { memo } from '../../lib/teact/teact';
+import { memo } from '../../lib/teact/teact';
 import { getActions } from '../../global';
 
 import type { GlobalState } from '../../global/types';
 import type { FolderEditDispatch } from '../../hooks/reducers/useFoldersReducer';
-import type { LeftColumnContent, SettingsScreens } from '../../types';
 
 import { ANIMATION_END_DELAY } from '../../config';
 import buildClassName from '../../util/buildClassName';
@@ -17,6 +16,7 @@ import useOldLang from '../../hooks/useOldLang';
 import useShowTransitionDeprecated from '../../hooks/useShowTransitionDeprecated';
 import useLeftHeaderButtonRtlForumTransition from './main/hooks/useLeftHeaderButtonRtlForumTransition';
 
+import Icon from '../common/icons/Icon';
 import StoryRibbon from '../story/StoryRibbon';
 import StoryToggler from '../story/StoryToggler';
 import Button from '../ui/Button';
@@ -34,9 +34,7 @@ export type OwnProps = {
   isStoryRibbonShown?: boolean;
   onReset: () => void;
   onTopicSearch: NoneToVoidFunction;
-  onSettingsScreenSelect: (screen: SettingsScreens) => void;
   foldersDispatch: FolderEditDispatch;
-  onLeftColumnContentChange: (content: LeftColumnContent) => void;
 };
 
 const ArchivedChats: FC<OwnProps> = ({
@@ -46,8 +44,6 @@ const ArchivedChats: FC<OwnProps> = ({
   isStoryRibbonShown,
   onReset,
   onTopicSearch,
-  onSettingsScreenSelect,
-  onLeftColumnContentChange,
   foldersDispatch,
 }) => {
   const { updateArchiveSettings } = getActions();
@@ -70,7 +66,7 @@ const ArchivedChats: FC<OwnProps> = ({
   const {
     shouldRender: shouldRenderTitle,
     transitionClassNames: titleClassNames,
-  } = useShowTransitionDeprecated(!isForumPanelOpen);
+  } = useShowTransitionDeprecated(!isForumPanelOpen, undefined, undefined, false);
 
   const {
     shouldRenderForumPanel, handleForumPanelAnimationEnd,
@@ -103,7 +99,7 @@ const ArchivedChats: FC<OwnProps> = ({
           )}
           onTransitionEnd={handleDropdownMenuTransitionEnd}
         >
-          <i className="icon icon-arrow-left" />
+          <Icon name="arrow-left" />
         </Button>
         {shouldRenderTitle && <h3 className={titleClassNames}>{lang('ArchivedChats')}</h3>}
         <div className="story-toggler-wrapper">
@@ -135,8 +131,7 @@ const ArchivedChats: FC<OwnProps> = ({
           folderType="archived"
           isActive={isActive}
           isForumPanelOpen={isForumPanelVisible}
-          onSettingsScreenSelect={onSettingsScreenSelect}
-          onLeftColumnContentChange={onLeftColumnContentChange}
+          isMainList
           foldersDispatch={foldersDispatch}
           archiveSettings={archiveSettings}
         />

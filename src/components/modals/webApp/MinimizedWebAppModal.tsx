@@ -1,13 +1,13 @@
-import React, {
+import {
   memo, useMemo,
   useRef,
 } from '../../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../../global';
 
 import type { ApiUser } from '../../../api/types';
-import type { WebApp } from '../../../global/types';
+import type { WebApp } from '../../../types/webapp';
 
-import { selectTabState, selectUser } from '../../../global/selectors';
+import { selectActiveWebApp, selectTabState, selectUser } from '../../../global/selectors';
 import buildClassName from '../../../util/buildClassName';
 import { unique } from '../../../util/iteratees';
 
@@ -37,8 +37,7 @@ const MinimizedWebAppModal = ({
 
   const oldLang = useOldLang();
   const lang = useLang();
-  // eslint-disable-next-line no-null/no-null
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLDivElement>();
 
   const openedWebAppsValues = useMemo(() => {
     return openedWebApps && Object.values(openedWebApps);
@@ -61,19 +60,22 @@ const MinimizedWebAppModal = ({
   });
 
   const handleExpandClick = useLastCallback(() => {
-    changeWebAppModalState();
+    changeWebAppModalState({ state: 'maximized' });
   });
 
   if (!isMinimizedState) return undefined;
 
   function renderTitle() {
-    const activeTabName = activeTabBot?.firstName;
+    const activeTabName = peers.length > 0 && peers[0]?.firstName;
     const title = openedTabsCount && activeTabName && openedTabsCount > 1
-      ? `${lang('MiniAppsMoreTabs',
+      ? lang('MiniAppsMoreTabs',
         {
           botName: activeTabName,
           count: openedTabsCount - 1,
-        })}`
+        },
+        {
+          pluralValue: openedTabsCount - 1,
+        })
       : activeTabName;
 
     return (
@@ -119,11 +121,11 @@ const MinimizedWebAppModal = ({
 };
 
 export default memo(withGlobal(
-  (global): StateProps => {
+  (global): Complete<StateProps> => {
     const tabState = selectTabState(global);
     const webApps = tabState.webApps;
 
-    const { botId } = webApps?.activeWebApp || {};
+    const { botId } = selectActiveWebApp(global) || {};
     const { modalState, openedWebApps } = webApps || {};
     const isMinimizedState = modalState === 'minimized';
     const activeTabBot = botId ? selectUser(global, botId) : undefined;

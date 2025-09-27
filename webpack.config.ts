@@ -1,7 +1,8 @@
 import 'webpack-dev-server';
+import 'dotenv/config';
 
+import WatchFilePlugin from '@mytonwallet/webpack-watch-file-plugin';
 import StatoscopeWebpackPlugin from '@statoscope/webpack-plugin';
-import dotenv from 'dotenv';
 import { GitRevisionPlugin } from 'git-revision-webpack-plugin';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import MiniCssExtractPlugin from 'mini-css-extract-plugin';
@@ -15,17 +16,14 @@ import {
   ProvidePlugin,
 } from 'webpack';
 
-import { PRODUCTION_URL } from './src/config';
-import { version as appVersion } from './package.json';
+import { PRODUCTION_URL } from './src/config.ts';
+import { version as appVersion } from './package.json' with { type: 'json' };
 
 const {
   HEAD,
   APP_ENV = 'production',
   APP_MOCKED_CLIENT = '',
-  IS_PACKAGED_ELECTRON,
 } = process.env;
-
-dotenv.config();
 
 const DEFAULT_APP_TITLE = `Telegram${APP_ENV !== 'production' ? ' Beta' : ''}`;
 
@@ -34,20 +32,18 @@ process.env.BASE_URL = process.env.BASE_URL || PRODUCTION_URL;
 
 const {
   BASE_URL,
-  ELECTRON_HOST_URL = 'https://telegram-a-host',
   APP_TITLE = DEFAULT_APP_TITLE,
 } = process.env;
 
 const CSP = `
   default-src 'self';
-  connect-src 'self' wss://*.web.telegram.org blob: http: https: ${APP_ENV === 'development' ? 'wss:' : ''};
+  connect-src 'self' wss://*.web.telegram.org blob: http: https: ${APP_ENV === 'development' ? 'wss: ipc:' : ''};
   script-src 'self' 'wasm-unsafe-eval' https://t.me/_websync_ https://telegram.me/_websync_;
   style-src 'self' 'unsafe-inline';
-  img-src 'self' data: blob: https://ss3.4sqi.net/img/categories_v2/
-  ${IS_PACKAGED_ELECTRON ? `${BASE_URL}/` : ''};
-  media-src 'self' blob: data: ${IS_PACKAGED_ELECTRON ? [`${BASE_URL}/`, ELECTRON_HOST_URL].join(' ') : ''};
+  img-src 'self' data: blob: https://ss3.4sqi.net/img/categories_v2/;
+  media-src 'self' blob: data:;
   object-src 'none';
-  frame-src http: https:;
+  frame-src http: https: mytonwallet-tc:;
   base-uri 'none';
   form-action 'none';`
   .replace(/\s+/g, ' ').trim();
@@ -66,6 +62,9 @@ export default function createConfig(
       host: '0.0.0.0',
       allowedHosts: 'all',
       hot: false,
+      client: {
+        overlay: false,
+      },
       static: [
         {
           directory: path.resolve(__dirname, 'public'),
@@ -75,9 +74,6 @@ export default function createConfig(
         },
         {
           directory: path.resolve(__dirname, 'node_modules/opus-recorder/dist'),
-        },
-        {
-          directory: path.resolve(__dirname, 'src/lib/webp'),
         },
         {
           directory: path.resolve(__dirname, 'src/lib/rlottie'),
@@ -164,7 +160,11 @@ export default function createConfig(
     },
 
     resolve: {
-      extensions: ['.js', '.ts', '.tsx'],
+      extensions: ['.js', '.cjs', '.mjs', '.ts', '.tsx'],
+      alias: {
+        '@teact$': path.resolve(__dirname, './src/lib/teact/teact.ts'),
+        '@teact': path.resolve(__dirname, './src/lib/teact'),
+      },
       fallback: {
         path: require.resolve('path-browserify'),
         os: require.resolve('os-browserify/browser'),
@@ -180,10 +180,12 @@ export default function createConfig(
         /highlight\.js[\\/]lib[\\/]languages/,
         /^((?!\.js\.js).)*$/,
       ),
-      ...(APP_MOCKED_CLIENT === '1' ? [new NormalModuleReplacementPlugin(
-        /src[\\/]lib[\\/]gramjs[\\/]client[\\/]TelegramClient\.js/,
-        './MockClient.ts',
-      )] : []),
+      ...(APP_MOCKED_CLIENT === '1'
+        ? [new NormalModuleReplacementPlugin(
+          /src[\\/]lib[\\/]gramjs[\\/]client[\\/]TelegramClient\.js/,
+          './MockClient.ts',
+        )]
+        : []),
       new HtmlWebpackPlugin({
         appTitle: APP_TITLE,
         appleIcon: APP_ENV === 'production' ? 'apple-touch-icon' : 'apple-touch-icon-dev',
@@ -209,8 +211,6 @@ export default function createConfig(
         TELEGRAM_API_HASH: undefined,
         // eslint-disable-next-line no-null/no-null
         TEST_SESSION: null,
-        IS_PACKAGED_ELECTRON: false,
-        ELECTRON_HOST_URL,
         BASE_URL,
       }),
       // Updates each dev re-build to provide current git branch or commit hash
@@ -218,8 +218,8 @@ export default function createConfig(
         APP_VERSION: JSON.stringify(appVersion),
         APP_REVISION: DefinePlugin.runtimeValue(() => {
           const { branch, commit } = getGitMetadata();
-          const shouldDisplayCommit = APP_ENV === 'staging' || !branch || branch === 'HEAD';
-          return JSON.stringify(shouldDisplayCommit ? commit : branch);
+          const shouldDisplayOnlyCommit = APP_ENV === 'staging' || !branch || branch === 'HEAD';
+          return JSON.stringify(shouldDisplayOnlyCommit ? commit : `${branch}#${commit}`);
         }, mode === 'development' ? true : []),
       }),
       new ProvidePlugin({
@@ -232,12 +232,30 @@ export default function createConfig(
         saveReportTo: path.resolve('./public/statoscope-report.html'),
         saveStatsTo: path.resolve('./public/build-stats.json'),
         normalizeStats: true,
-        open: 'file',
-        extensions: [new WebpackContextExtension()], // eslint-disable-line @typescript-eslint/no-use-before-define
+        open: false,
+        extensions: [new WebpackContextExtension()],
+      }),
+      new WatchFilePlugin({
+        rules: [
+          {
+            files: 'src/assets/localization/fallback.strings',
+            action: 'npm run lang:ts',
+          },
+          {
+            files: 'src/lib/gramjs/tl/static/**/*',
+            action: 'npm run gramjs:tl',
+            sharedAction: true,
+          },
+          {
+            files: 'src/assets/font-icons/*.svg',
+            action: 'npm run icons:build',
+            sharedAction: true,
+          },
+        ],
       }),
     ],
 
-    devtool: APP_ENV === 'production' && IS_PACKAGED_ELECTRON ? undefined : 'source-map',
+    devtool: 'source-map',
 
     optimization: {
       splitChunks: {

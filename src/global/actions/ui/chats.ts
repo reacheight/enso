@@ -3,7 +3,6 @@ import { MAIN_THREAD_ID } from '../../../api/types';
 
 import { getCurrentTabId } from '../../../util/establishMultitabRole';
 import { createMessageHashUrl } from '../../../util/routing';
-import { IS_ELECTRON } from '../../../util/windowEnvironment';
 import { addActionHandler, setGlobal } from '../../index';
 import {
   closeMiddleSearch,
@@ -38,6 +37,11 @@ addActionHandler('processOpenChatOrThread', (global, actions, payload): ActionRe
   }
   actions.hideEffectInComposer({ tabId });
 
+  actions.closeStoryViewer({ tabId });
+  actions.closeStarsBalanceModal({ tabId });
+  actions.closeStarsTransactionModal({ tabId });
+  actions.closeGiftInfoModal({ tabId });
+
   if (!currentMessageList || (
     currentMessageList.chatId !== chatId
     || currentMessageList.threadId !== threadId
@@ -58,6 +62,7 @@ addActionHandler('processOpenChatOrThread', (global, actions, payload): ActionRe
 
     global = updateTabState(global, {
       isStatisticsShown: false,
+      monetizationStatistics: undefined,
       boostStatistics: undefined,
       contentToBeScheduled: undefined,
       ...(chatId !== selectTabState(global, tabId).forwardMessages.toChatId && {
@@ -87,11 +92,7 @@ addActionHandler('openChatInNewTab', (global, actions, payload): ActionReturnTyp
 
   const hashUrl = createMessageHashUrl(chatId, 'thread', threadId);
 
-  if (IS_ELECTRON) {
-    window.electron!.openNewWindow(hashUrl);
-  } else {
-    window.open(hashUrl, '_blank');
-  }
+  window.open(hashUrl, '_blank');
 });
 
 addActionHandler('openPreviousChat', (global, actions, payload): ActionReturnType => {
@@ -198,4 +199,11 @@ addActionHandler('closeChatlistModal', (global, actions, payload): ActionReturnT
 addActionHandler('requestChatTranslation', (global, actions, payload): ActionReturnType => {
   const { chatId, toLanguageCode, tabId = getCurrentTabId() } = payload;
   return updateRequestedChatTranslation(global, chatId, toLanguageCode, tabId);
+});
+
+addActionHandler('closeChatInviteModal', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+  return updateTabState(global, {
+    chatInviteModal: undefined,
+  }, tabId);
 });
