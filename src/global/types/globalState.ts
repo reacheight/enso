@@ -466,6 +466,11 @@ export type GlobalState = {
     balance: ApiTonAmount;
     history: StarsTransactionHistory;
   };
+
+  workspaces: {
+    isCreatorOpen: boolean;
+    editingWorkspaceId?: string;
+  };
 };
 
 export type RequiredGlobalState = GlobalState & { _: never };
