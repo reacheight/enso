@@ -59,6 +59,7 @@ import SearchInput from '../../ui/SearchInput';
 import SavedTagButton from '../message/reactions/SavedTagButton';
 import MiddleSearchResult from './MiddleSearchResult';
 
+import reactionStyles from '../message/reactions/ReactionButton.module.scss';
 import styles from './MiddleSearch.module.scss';
 
 export type OwnProps = {
@@ -551,10 +552,55 @@ const MiddleSearch: FC<OwnProps & StateProps> = ({
     return undefined;
   }
 
+  const popularDomains = useMemo(() => [
+    'youtube.com',
+    'youtu.be',
+  ], []);
+
+  const handleDomainClick = useLastCallback((domain: string) => {
+    if (query === domain) {
+      setQuery('');
+    } else {
+      setQuery(domain);
+      shouldCancelSearchRef.current = false;
+    }
+    focusInput();
+  });
+
   function renderDropdown() {
     return (
       <div className={buildClassName(styles.dropdown, !hasResultsDropdown && styles.dropdownHidden)}>
         {!isMobile && <div className={styles.separator} />}
+        
+        {!isHashtagQuery && (
+          <div
+            className={buildClassName(
+              styles.domainButtons,
+              !isMobile && styles.wrap,
+              'no-scrollbar',
+            )}
+          >
+            {popularDomains.map((domain) => {
+              const isChosen = query === domain;
+              return (
+                <Button
+                  key={domain}
+                  className={buildClassName(
+                    reactionStyles.root,
+                    styles.domainButton,
+                    isChosen && reactionStyles.chosen,
+                  )}
+                  size="tiny"
+                  onClick={() => handleDomainClick(domain)}
+                >
+                  {domain}
+                </Button>
+              );
+            })}
+          </div>
+        )}
+        
+        <div className={styles.separator} />
         {hasSavedTags && !isHashtagQuery && (
           <div
             className={buildClassName(
