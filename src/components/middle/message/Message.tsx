@@ -588,7 +588,7 @@ const Message: FC<OwnProps & StateProps> = ({
   );
   const canForward = isChannel && !isScheduled && message.isForwardingAllowed
     && !isChatProtected;
-  const canMarkAsRead = isChatWithSelf && !isOwn;
+  const canMarkAsRead = isChatWithSelf;
   const canFocus = Boolean(isPinnedList
     || (forwardInfo
       && (forwardInfo.isChannelPost || isChatWithSelf || isRepliesChat || isAnonymousForwards)
@@ -1744,7 +1744,7 @@ const Message: FC<OwnProps & StateProps> = ({
                   color="translucent-white"
                   round
                   size="tiny"
-                  ariaLabel="Mark as read"
+                  ariaLabel="Done"
                   onClick={handleMarkAsRead}
                 >
                   <Icon name="check" />
