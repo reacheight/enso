@@ -49,6 +49,7 @@ import useKeyboardListNavigation from '../../../hooks/useKeyboardListNavigation'
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
+import { useLocalStorage } from '../../../hooks/useStorage';
 
 import Avatar from '../../common/Avatar';
 import Icon from '../../common/icons/Icon';
@@ -147,6 +148,14 @@ const MiddleSearch: FC<OwnProps & StateProps> = ({
   const [isFocused, markFocused, markBlurred] = useFlag();
   const [isViewAsList, setIsViewAsList] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+
+  const [customTerms, setCustomTerms] = useLocalStorage<string[]>({
+    key: 'search_custom_terms',
+    initValue: [],
+  });
+  const [isAddingDomain, setIsAddingDomain] = useState(false);
+  const [newDomainValue, setNewDomainValue] = useState('');
+  const newDomainInputRef = useRef<HTMLInputElement>();
 
   const handleClickOutside = useLastCallback((event: MouseEvent) => {
     if (maybeLongPressActiveRef.current) return;
@@ -340,6 +349,12 @@ const MiddleSearch: FC<OwnProps & StateProps> = ({
   useEffect(() => {
     setIsLoading(Boolean(fetchingQuery));
   }, [fetchingQuery]);
+
+  useEffect(() => {
+    if (isAddingDomain && newDomainInputRef.current) {
+      newDomainInputRef.current.focus();
+    }
+  }, [isAddingDomain]);
 
   useEffect(() => {
     if (!foundIds?.length) return;
@@ -552,10 +567,15 @@ const MiddleSearch: FC<OwnProps & StateProps> = ({
     return undefined;
   }
 
-  const popularDomains = useMemo(() => [
+  const presavedDomains = useMemo(() => [
     'youtube.com',
     'youtu.be',
   ], []);
+
+  const allDomains = useMemo(() => [
+    ...presavedDomains,
+    ...customTerms,
+  ], [presavedDomains, customTerms]);
 
   const handleDomainClick = useLastCallback((domain: string) => {
     if (query === domain) {
@@ -565,6 +585,41 @@ const MiddleSearch: FC<OwnProps & StateProps> = ({
       shouldCancelSearchRef.current = false;
     }
     focusInput();
+  });
+
+  const handleAddDomainClick = useLastCallback(() => {
+    setIsAddingDomain(true);
+  });
+
+  const handleSaveDomain = useLastCallback(() => {
+    const trimmedValue = newDomainValue.trim();
+    if (trimmedValue && !allDomains.includes(trimmedValue)) {
+      setCustomTerms([...customTerms, trimmedValue]);
+    }
+    setNewDomainValue('');
+    setIsAddingDomain(false);
+  });
+
+  const handleCancelAddDomain = useLastCallback(() => {
+    setNewDomainValue('');
+    setIsAddingDomain(false);
+  });
+
+  const handleRemoveDomain = useLastCallback((domain: string) => {
+    setCustomTerms(customTerms.filter((d: string) => d !== domain));
+    if (query === domain) {
+      setQuery('');
+    }
+  });
+
+  const handleNewDomainKeyDown = useLastCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveDomain();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelAddDomain();
+    }
   });
 
   function renderDropdown() {
@@ -580,23 +635,59 @@ const MiddleSearch: FC<OwnProps & StateProps> = ({
               'no-scrollbar',
             )}
           >
-            {popularDomains.map((domain) => {
+            {allDomains.map((domain) => {
               const isChosen = query === domain;
+              const isCustom = customTerms.includes(domain);
               return (
-                <Button
-                  key={domain}
-                  className={buildClassName(
-                    reactionStyles.root,
-                    styles.domainButton,
-                    isChosen && reactionStyles.chosen,
+                <div key={domain} className={styles.domainButtonWrapper}>
+                  <Button
+                    className={buildClassName(
+                      reactionStyles.root,
+                      styles.domainButton,
+                      isChosen && reactionStyles.chosen,
+                    )}
+                    size="tiny"
+                    onClick={() => handleDomainClick(domain)}
+                  >
+                    {domain}
+                  </Button>
+                  {isCustom && (
+                    <button
+                      className={styles.removeDomainButton}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveDomain(domain);
+                      }}
+                      aria-label="Remove"
+                    >
+                      <Icon name="close" />
+                    </button>
                   )}
-                  size="tiny"
-                  onClick={() => handleDomainClick(domain)}
-                >
-                  {domain}
-                </Button>
+                </div>
               );
             })}
+            {isAddingDomain ? (
+              <input
+                ref={newDomainInputRef}
+                type="text"
+                className={styles.newDomainInput}
+                value={newDomainValue}
+                placeholder="Enter search term..."
+                onChange={(e) => setNewDomainValue(e.target.value)}
+                onKeyDown={handleNewDomainKeyDown}
+                onBlur={() => {
+                  setTimeout(handleCancelAddDomain, 100);
+                }}
+              />
+            ) : (
+              <Button
+                className={buildClassName(reactionStyles.root, styles.addDomainButton)}
+                size="tiny"
+                onClick={handleAddDomainClick}
+              >
+                <Icon name="add" />
+              </Button>
+            )}
           </div>
         )}
         

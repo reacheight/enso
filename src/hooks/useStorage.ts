@@ -28,7 +28,7 @@ type UseLocalStorageProps<T> = {
   initValue: T;
 };
 
-function useLocalStorage<T>({ key, initValue }: UseLocalStorageProps<T>):
+export function useLocalStorage<T>({ key, initValue }: UseLocalStorageProps<T>):
 [value: T, setValue: (val: T) => void] {
   const eventName = `update_storage_${key}`;
 
