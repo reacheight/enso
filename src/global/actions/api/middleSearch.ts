@@ -155,7 +155,7 @@ addActionHandler('performMiddleSearch', async (global, actions, payload): Promis
     nextOffsetRate,
     nextOffsetPeerId,
     query: query || '',
-  }, tabId);
+  }, savedTag, tabId);
   setGlobal(global);
 });
 

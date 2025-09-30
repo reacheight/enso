@@ -165,9 +165,9 @@ const MiddleSearch: FC<OwnProps & StateProps> = ({
   });
   useClickOutside([ref], handleClickOutside);
 
-  const hasResultsContainer = Boolean((query && foundIds) || isHashtagQuery);
+  const hasResultsContainer = Boolean(((query || savedTag) && foundIds) || isHashtagQuery);
   const isOnlyHash = isHashtagQuery && !query;
-  const areResultsEmpty = Boolean(query && foundIds && !foundIds.length && !isLoading && !isOnlyHash);
+  const areResultsEmpty = Boolean((query || savedTag) && foundIds && !foundIds.length && !isLoading && !isOnlyHash);
   const hasResultsPlaceholder = areResultsEmpty || isOnlyHash;
   const isNonFocusedDropdownForced = searchType === 'myChats' || searchType === 'channels';
   const hasResultsDropdown = isActive && (isViewAsList || !isMobile) && (isFocused || isNonFocusedDropdownForced)
@@ -335,16 +335,19 @@ const MiddleSearch: FC<OwnProps & StateProps> = ({
 
     if (!newQuery) {
       setIsLoading(false);
-      resetMiddleSearch();
-      shouldCancelSearchRef.current = true;
+
+      if (!savedTag) {
+        resetMiddleSearch();
+        shouldCancelSearchRef.current = true;
+      }
     }
   });
 
   useEffect(() => {
-    if (query) {
+    if (query || savedTag) {
       handleSearch();
     }
-  }, [query]);
+  }, [query, savedTag]);
 
   useEffect(() => {
     setIsLoading(Boolean(fetchingQuery));
@@ -482,6 +485,7 @@ const MiddleSearch: FC<OwnProps & StateProps> = ({
       return;
     }
 
+    shouldCancelSearchRef.current = false;
     updateSearchParams({ savedTag: tag });
   });
 
@@ -579,10 +583,9 @@ const MiddleSearch: FC<OwnProps & StateProps> = ({
 
   const handleDomainClick = useLastCallback((domain: string) => {
     if (query === domain) {
-      setQuery('');
+      handleQueryChange('');
     } else {
-      setQuery(domain);
-      shouldCancelSearchRef.current = false;
+      handleQueryChange(domain);
     }
     focusInput();
   });
@@ -738,7 +741,7 @@ const MiddleSearch: FC<OwnProps & StateProps> = ({
           >
             {areResultsEmpty && (
               <span key="nothing" className={styles.placeholder}>
-                {oldLang('NoResultFoundFor', query)}
+                {query ? oldLang('NoResultFoundFor', query) : oldLang('NoResult')}
               </span>
             )}
             {isOnlyHash && (

@@ -1,4 +1,4 @@
-import type { ApiMessage, ApiMessageSearchType } from '../../api/types';
+import type { ApiMessage, ApiMessageSearchType, ApiReaction } from '../../api/types';
 import type {
   ChatMediaSearchParams,
   ChatMediaSearchSegment,
@@ -14,7 +14,7 @@ import { getCurrentTabId } from '../../util/establishMultitabRole';
 import {
   areSortedArraysEqual, areSortedArraysIntersecting, omit, unique,
 } from '../../util/iteratees';
-import { buildChatThreadKey, isMediaLoadableInViewer } from '../helpers';
+import { buildChatThreadKey, isMediaLoadableInViewer, isSameReaction } from '../helpers';
 import { selectTabState } from '../selectors';
 import { selectChatMediaSearch } from '../selectors/middleSearch';
 import { updateTabState } from './tabs';
@@ -113,12 +113,16 @@ export function updateMiddleSearchResults<T extends GlobalState>(
   chatId: string,
   threadId: ThreadId,
   update: MiddleSearchResults,
+  currentSavedTag?: ApiReaction,
   ...[tabId = getCurrentTabId()]: TabArgs<T>
 ): T {
   const chatThreadKey = buildChatThreadKey(chatId, threadId);
-  const { results } = selectTabState(global, tabId).middleSearch.byChatThreadKey[chatThreadKey] || {};
+  const searchParams = selectTabState(global, tabId).middleSearch.byChatThreadKey[chatThreadKey];
+  const results = searchParams?.results;
+  const prevSavedTag = searchParams?.savedTag;
   const prevQuery = (results?.query) || '';
-  if (update.query !== prevQuery) {
+  const hasTagChanged = !isSameReaction(currentSavedTag, prevSavedTag);
+  if (update.query !== prevQuery || hasTagChanged) {
     return replaceMiddleSearchResults(global, chatId, threadId, update, tabId);
   }
 
