@@ -1741,7 +1741,7 @@ const Message: FC<OwnProps & StateProps> = ({
               {canMarkAsRead && (
                 <Button
                   className="message-action-button"
-                  color="translucent-white"
+                  color="translucent-primary"
                   round
                   size="tiny"
                   ariaLabel="Done"

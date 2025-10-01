@@ -205,6 +205,22 @@
     }
   }
 
+  &.translucent-primary {
+    --ripple-color: rgba(255, 255, 255, 0.08);
+
+    color: var(--color-primary);
+    background-color: transparent;
+
+    @include active-styles() {
+      color: var(--color-primary);
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+
+    @include no-ripple-styles() {
+      background-color: rgba(255, 255, 255, 0.16);
+    }
+  }
+
   &.translucent-white {
     --ripple-color: rgba(255, 255, 255, 0.08);
 
