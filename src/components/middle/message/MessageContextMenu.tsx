@@ -134,6 +134,7 @@ type OwnProps = {
   onSendPaidReaction?: NoneToVoidFunction;
   onShowPaidReactionModal?: NoneToVoidFunction;
   onReactionPickerOpen?: (position: IAnchorPosition) => void;
+  onMoveToBottom?: NoneToVoidFunction;
   userFullName?: string;
   canGift?: boolean;
 };
@@ -228,6 +229,7 @@ const MessageContextMenu: FC<OwnProps> = ({
   onTranslate,
   onShowOriginal,
   onSelectLanguage,
+  onMoveToBottom,
   userFullName,
   canGift,
 }) => {
@@ -406,6 +408,14 @@ const MessageContextMenu: FC<OwnProps> = ({
         )}
         dir={oldLang.isRtl ? 'rtl' : undefined}
       >
+        {isInSavedMessages && !canSendNow && (
+          <>
+            <MenuItem icon="arrow-down" onClick={onMoveToBottom}>
+              Move to bottom
+            </MenuItem>
+            <MenuSeparator />
+          </>
+        )}
         {shouldShowGiftButton
           && (
             <MenuItem icon="gift" onClick={handleGiftClick}>

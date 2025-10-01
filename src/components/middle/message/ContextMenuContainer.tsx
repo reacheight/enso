@@ -274,6 +274,8 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
     reportMessages,
     openTodoListModal,
     showNotification,
+    forwardToSavedMessages,
+    deleteMessages,
   } = getActions();
 
   const oldLang = useOldLang();
@@ -485,6 +487,21 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
   const handleUnpin = useLastCallback(() => {
     pinMessage({ chatId: message.chatId, messageId: message.id, isUnpin: true });
     closeMenu();
+  });
+
+  const handleMoveToBottom = useLastCallback(() => {
+    closeMenu();
+    const messageIds = album?.messages ? album.messages.map(({ id }) => id) : [message.id];
+    
+    openForwardMenu({ fromChatId: message.chatId, messageIds });
+    forwardToSavedMessages();
+    
+    setTimeout(() => {
+      deleteMessages({
+        messageIds,
+        shouldDeleteForAll: false,
+      });
+    }, 100);
   });
 
   const handleForward = useLastCallback(() => {
@@ -764,6 +781,7 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
         onTranslate={handleTranslate}
         onShowOriginal={handleShowOriginal}
         onSelectLanguage={handleSelectLanguage}
+        onMoveToBottom={handleMoveToBottom}
         userFullName={userFullName}
         canGift={canGift}
       />
