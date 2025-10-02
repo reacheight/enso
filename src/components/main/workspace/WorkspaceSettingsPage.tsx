@@ -77,7 +77,7 @@ const WorkspaceSettingsPage: FC<OwnProps> = ({
     setSavedWorkspaces(savedWorkspaces.filter(w => w.id !== workspaceId));
     setCurrentWorkspaceId('0');
     onBack();
-  }, [workspaceId, setSavedWorkspaces, setCurrentWorkspaceId, onBack]);
+  }, [workspaceId, savedWorkspaces, setSavedWorkspaces, setCurrentWorkspaceId, onBack]);
 
   return (
     <div className={styles.container}>
@@ -94,7 +94,13 @@ const WorkspaceSettingsPage: FC<OwnProps> = ({
             className={styles.input}
           />
           {workspaceId && (
-            <button onClick={handleDeleteWorkspace} className={styles.deleteButton} aria-label="Delete workspace" title="Delete workspace">
+            <button
+              type="button"
+              onClick={handleDeleteWorkspace}
+              className={styles.deleteButton}
+              aria-label="Delete workspace"
+              title="Delete workspace"
+            >
               <i className="icon icon-delete" />
             </button>
           )}
