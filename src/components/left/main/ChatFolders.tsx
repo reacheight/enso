@@ -135,7 +135,7 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
     } satisfies ApiChatFolder;
   }, [orderedFolderIds, lang]);
 
-  const { currentWorkspaceId, savedWorkspaces } = useWorkspaceStorage();
+  const { currentWorkspaceId, savedWorkspaces, excludeOtherWorkspaces } = useWorkspaceStorage();
   const everythingWorkspace = { id: '0', name: 'Everything', foldersIds: [] } satisfies Workspace;
   const currentWorkspace = savedWorkspaces.find((workspace) => workspace.id === currentWorkspaceId) || everythingWorkspace;
 
@@ -147,6 +147,10 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
         if (id === ALL_FOLDER_ID && currentWorkspaceId === everythingWorkspace.id) {
           return allChatsFolder;
         }
+        
+        if (currentWorkspaceId === everythingWorkspace.id && excludeOtherWorkspaces && savedWorkspaces.some(w => w.foldersIds.includes(id))) {
+          return null;
+        }
 
         const folder = chatFoldersById[id] || allChatsFolder;
         if (folder && (currentWorkspaceId === everythingWorkspace.id || currentWorkspace.foldersIds.includes(id))) {
@@ -156,7 +160,7 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
         return null;
       })
       .filter(Boolean);
-  }, [chatFoldersById, allChatsFolder, orderedFolderIds, currentWorkspaceId, currentWorkspace.foldersIds]);
+  }, [chatFoldersById, allChatsFolder, orderedFolderIds, currentWorkspaceId, currentWorkspace.foldersIds, excludeOtherWorkspaces]);
 
   const allChatsFolderIndex = displayedFolders?.findIndex((folder) => folder.id === ALL_FOLDER_ID);
   const isInAllChatsFolder = allChatsFolderIndex === activeChatFolder;

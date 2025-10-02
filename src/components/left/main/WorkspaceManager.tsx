@@ -11,10 +11,17 @@ import './WorkspaceManager.scss';
 import buildClassName from '../../../util/buildClassName';
 import Icon from '../../common/icons/Icon';
 import MenuSeparator from '../../ui/MenuSeparator';
+import Switcher from '../../ui/Switcher';
 
 const WorkspaceManager: FC = () => {
   const { openWorkspaceCreator, openWorkspaceEditor, setActiveChatFolder } = getActions();
-  const { savedWorkspaces, currentWorkspaceId, setCurrentWorkspaceId } = useWorkspaceStorage();
+  const {
+    savedWorkspaces,
+    currentWorkspaceId,
+    setCurrentWorkspaceId,
+    excludeOtherWorkspaces,
+    setExcludeOtherWorkspaces,
+  } = useWorkspaceStorage();
 
   const everythingWorkspace: Workspace = { id: '0', name: 'Everything', foldersIds: [] };
   const selectedWorkspace = savedWorkspaces.find(workspace => workspace.id === currentWorkspaceId) || everythingWorkspace;
@@ -27,6 +34,11 @@ const WorkspaceManager: FC = () => {
   const handleCreateWorkspace = useCallback(() => {
     openWorkspaceCreator();
   }, [openWorkspaceCreator]);
+
+  const handleSwitcherChange = useCallback((e) => {
+    e.stopPropagation();
+    setExcludeOtherWorkspaces(!excludeOtherWorkspaces);
+  }, [excludeOtherWorkspaces, setExcludeOtherWorkspaces]);
 
   const renderTrigger = useCallback(({ onTrigger, isOpen }: { onTrigger: () => void; isOpen?: boolean }) => (
     <div
@@ -49,7 +61,7 @@ const WorkspaceManager: FC = () => {
         <MenuItem
           key={workspace.id}
           onClick={() => handleWorkspaceSelect(workspace)}
-          className="WorkspaceManager-item"
+          className="WorkspaceManager-workspace"
         >
           {workspace.name}
           {workspace.id === currentWorkspaceId && <Icon name="check" />}
@@ -68,6 +80,18 @@ const WorkspaceManager: FC = () => {
           onClick={() => openWorkspaceEditor({ workspaceId: selectedWorkspace.id })}
         >
           Workspace settings
+        </MenuItem>
+      )}
+      {selectedWorkspace.id === everythingWorkspace.id && savedWorkspaces.length > 0 && (
+        <MenuItem
+          className="WorkspaceManager-excludeOther"
+          onClick={handleSwitcherChange}
+        >
+          <Switcher
+            checked={excludeOtherWorkspaces}
+            label="Exclude folders from other workspaces"
+          />
+          Exclude others
         </MenuItem>
       )}
     </DropdownMenu>

@@ -28,12 +28,10 @@
     }
   }
 
-  &-item {
+  &-workspace {
     display: flex;
     justify-content: space-between;
     
-    cursor: pointer;
-
     &.compact {
       padding-inline: 0.5rem;
     }
@@ -44,17 +42,13 @@
     }
   }
 
-  .MenuItem {
-    .icon {
-      margin-right: 1rem;
-      font-size: 1.5rem;
-      color: var(--color-text-secondary);
-    }
+  &-excludeOther {
+    display: flex;
+    align-items: center;
 
-    .icon-check {
-      margin-left: auto;
-      font-size: 1.25rem;
-      color: var(--color-primary);
+    .Switcher {
+      transform: scale(0.75);
+      margin-inline: 0rem 0.9rem;
     }
   }
 }
