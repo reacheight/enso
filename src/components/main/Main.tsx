@@ -89,6 +89,7 @@ import GiveawayModal from './premium/GiveawayModal.async';
 import PremiumMainModal from './premium/PremiumMainModal.async';
 import StarsGiftingPickerModal from './premium/StarsGiftingPickerModal.async';
 import SafeLinkModal from './SafeLinkModal.async';
+import WorkspaceModal from './workspace/WorkspaceModal';
 import ConfettiContainer from './visualEffects/ConfettiContainer';
 import SnapEffectContainer from './visualEffects/SnapEffectContainer';
 import WaveContainer from './visualEffects/WaveContainer';
@@ -145,6 +146,8 @@ type StateProps = {
   isSynced?: boolean;
   isAccountFrozen?: boolean;
   isAppConfigLoaded?: boolean;
+  isWorkspaceCreatorOpen?: boolean;
+  editingWorkspaceId?: string;
 };
 
 const APP_OUTDATED_TIMEOUT_MS = 5 * 60 * 1000; // 5 min
@@ -199,6 +202,8 @@ const Main = ({
   currentUserId,
   isAccountFrozen,
   isAppConfigLoaded,
+  isWorkspaceCreatorOpen,
+  editingWorkspaceId,
 }: OwnProps & StateProps) => {
   const {
     initMain,
@@ -600,6 +605,10 @@ const Main = ({
       <DeleteFolderDialog folder={deleteFolderDialog} />
       <ReactionPicker isOpen={isReactionPickerOpen} />
       <DeleteMessageModal isOpen={isDeleteMessageModalOpen} />
+      <WorkspaceModal 
+        isOpen={Boolean(isWorkspaceCreatorOpen)} 
+        workspaceId={editingWorkspaceId}
+      />
     </div>
   );
 };
@@ -692,6 +701,8 @@ export default memo(withGlobal<OwnProps>(
       isSynced: global.isSynced,
       isAccountFrozen,
       isAppConfigLoaded: global.isAppConfigLoaded,
+      isWorkspaceCreatorOpen: global.workspaces.isCreatorOpen,
+      editingWorkspaceId: global.workspaces.editingWorkspaceId,
     };
   },
 )(Main));
