@@ -31,7 +31,7 @@ import useHistoryBack from '../../../hooks/useHistoryBack';
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useShowTransition from '../../../hooks/useShowTransition';
-import { useStorage } from '../../../hooks/useStorage';
+import { useWorkspaceStorage } from '../../../hooks/useWorkspaceStorage';
 
 import StoryRibbon from '../../story/StoryRibbon';
 import TabList from '../../ui/TabList';
@@ -135,7 +135,7 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
     } satisfies ApiChatFolder;
   }, [orderedFolderIds, lang]);
 
-  const { currentWorkspaceId, savedWorkspaces } = useStorage();
+  const { currentWorkspaceId, savedWorkspaces } = useWorkspaceStorage();
   const everythingWorkspace = { id: '0', name: 'Everything', foldersIds: [] } satisfies Workspace;
   const currentWorkspace = savedWorkspaces.find((workspace) => workspace.id === currentWorkspaceId) || everythingWorkspace;
 

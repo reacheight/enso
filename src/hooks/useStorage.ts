@@ -1,28 +1,5 @@
 import { useCallback, useEffect, useState } from '../lib/teact/teact';
 
-import type { Workspace } from '../types';
-
-export function useStorage() {
-  const [savedWorkspaces, setSavedWorkspaces] = useLocalStorage<Workspace[]>({
-    key: "workspaces",
-    initValue: [],
-  });
-  const [
-    currentWorkspaceId,
-    setCurrentWorkspaceId,
-  ] = useLocalStorage<string>({
-    key: "currentWorkspaceId",
-    initValue: "0",
-  });
-
-  return {
-    savedWorkspaces,
-    setSavedWorkspaces,
-    currentWorkspaceId,
-    setCurrentWorkspaceId,
-  };
-}
-
 type UseLocalStorageProps<T> = {
   key: string;
   initValue: T;

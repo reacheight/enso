@@ -2,7 +2,7 @@ import type { FC } from '../../../lib/teact/teact';
 import React, { memo, useCallback } from '../../../lib/teact/teact';
 import { getActions } from '../../../global';
 import { Workspace } from '../../../types';
-import { useStorage } from '../../../hooks/useStorage';
+import { useWorkspaceStorage } from '../../../hooks/useWorkspaceStorage';
 
 import DropdownMenu from '../../ui/DropdownMenu';
 import MenuItem from '../../ui/MenuItem';
@@ -14,7 +14,7 @@ import MenuSeparator from '../../ui/MenuSeparator';
 
 const WorkspaceManager: FC = () => {
   const { openWorkspaceCreator, openWorkspaceEditor, setActiveChatFolder } = getActions();
-  const { savedWorkspaces, currentWorkspaceId, setCurrentWorkspaceId } = useStorage();
+  const { savedWorkspaces, currentWorkspaceId, setCurrentWorkspaceId } = useWorkspaceStorage();
 
   const everythingWorkspace: Workspace = { id: '0', name: 'Everything', foldersIds: [] };
   const selectedWorkspace = savedWorkspaces.find(workspace => workspace.id === currentWorkspaceId) || everythingWorkspace;

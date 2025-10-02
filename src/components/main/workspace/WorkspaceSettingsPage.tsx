@@ -3,7 +3,7 @@ import { useState, useCallback, useEffect } from '../../../lib/teact/teact';
 import { getGlobal, getActions } from '../../../global';
 import styles from './WorkspaceSettingsPage.module.scss';
 
-import { useStorage } from '../../../hooks/useStorage';
+import { useWorkspaceStorage } from '../../../hooks/useWorkspaceStorage';
 import { Workspace } from '../../../types';
 
 interface OwnProps {
@@ -23,7 +23,7 @@ const WorkspaceSettingsPage: FC<OwnProps> = ({
 
   const [workspaceName, setWorkspaceName] = useState('');
   const [selectedFolderIds, setSelectedFolderIds] = useState<number[]>([]);
-  const { savedWorkspaces, setSavedWorkspaces, setCurrentWorkspaceId } = useStorage();
+  const { savedWorkspaces, setSavedWorkspaces, setCurrentWorkspaceId } = useWorkspaceStorage();
 
   useEffect(() => {
     if (workspaceId) {
