@@ -1,4 +1,8 @@
 .WorkspaceModal {
+  .modal-dialog {
+    max-width: 26.25rem;
+  }
+
   .workspace-form {
     padding: 1rem;
     display: flex;
