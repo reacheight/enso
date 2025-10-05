@@ -292,6 +292,14 @@ function unsafeMigrateCache(cached: GlobalState, initialState: GlobalState) {
     cached.messages.playbackByChatId = initialState.messages.playbackByChatId;
   }
 
+  if (!cached.focusList) {
+    cached.focusList = initialState.focusList;
+  }
+
+  if (cached.lastIsFocusListShown === undefined) {
+    cached.lastIsFocusListShown = initialState.lastIsFocusListShown;
+  }
+
   if (cached.cacheVersion < 2) {
     if (untypedCached.settings.themes.dark) {
       untypedCached.settings.themes.dark.patternColor = (initialState as any).settings.themes.dark!.patternColor;
@@ -420,8 +428,10 @@ function reduceGlobal<T extends GlobalState>(global: T) {
       'savedReactionTags',
       'timezones',
       'availableEffectById',
+      'focusList',
     ]),
     lastIsChatInfoShown: !getIsMobile() ? global.lastIsChatInfoShown : undefined,
+    lastIsFocusListShown: !getIsMobile() ? global.lastIsFocusListShown : undefined,
     customEmojis: reduceCustomEmojis(global),
     users: reduceUsers(global),
     chats: reduceChats(global),

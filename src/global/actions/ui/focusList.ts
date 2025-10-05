@@ -9,6 +9,7 @@ addActionHandler('toggleFocusList', (global, actions, payload): ActionReturnType
   const isFocusListShown = force !== undefined ? force : !selectTabState(global, tabId).isFocusListShown;
 
   global = updateTabState(global, { isFocusListShown }, tabId);
+  global = { ...global, lastIsFocusListShown: isFocusListShown };
 
   return global;
 });

@@ -1758,38 +1758,42 @@ const Message: FC<OwnProps & StateProps> = ({
                   <Icon name="check" />
                 </Button>
               )}
-              {withCommentButton && isCustomShape && (
-                <CommentButton
-                  threadInfo={repliesThreadInfo}
-                  disabled={noComments}
-                  isLoading={isLoadingComments}
-                  isCustomShape
-                  asActionButton
-                />
-              )}
-              {canForward && (
-                <Button
-                  className="message-action-button"
-                  color="translucent-white"
-                  round
-                  size="tiny"
-                  ariaLabel={oldLang('lng_context_forward_msg')}
-                  onClick={isLastInDocumentGroup ? handleGroupForward : handleForward}
-                >
-                  <Icon name="share-filled" />
-                </Button>
-              )}
-              {canFocus && (
-                <Button
-                  className="message-action-button"
-                  color="translucent-white"
-                  round
-                  size="tiny"
-                  ariaLabel={lang('FocusMessage')}
-                  onClick={isPinnedList ? handleFocus : handleFocusForwarded}
-                >
-                  <Icon name="arrow-right" />
-                </Button>
+              {!isInFocusList && (
+                <>
+                  {withCommentButton && isCustomShape && (
+                    <CommentButton
+                      threadInfo={repliesThreadInfo}
+                      disabled={noComments}
+                      isLoading={isLoadingComments}
+                      isCustomShape
+                      asActionButton
+                    />
+                  )}
+                  {canForward && (
+                    <Button
+                      className="message-action-button"
+                      color="translucent-white"
+                      round
+                      size="tiny"
+                      ariaLabel={oldLang('lng_context_forward_msg')}
+                      onClick={isLastInDocumentGroup ? handleGroupForward : handleForward}
+                    >
+                      <Icon name="share-filled" />
+                    </Button>
+                  )}
+                  {canFocus && (
+                    <Button
+                      className="message-action-button"
+                      color="translucent-white"
+                      round
+                      size="tiny"
+                      ariaLabel={lang('FocusMessage')}
+                      onClick={isPinnedList ? handleFocus : handleFocusForwarded}
+                    >
+                      <Icon name="arrow-right" />
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           )}

@@ -78,11 +78,7 @@
     }
 
     .message-content {
-      max-width: min(27rem, calc(var(--right-column-width) - 7rem)) !important;
-
-      .Message.own & {
-        max-width: min(30rem, calc(var(--right-column-width) - 5rem)) !important;
-      }
+      max-width: min(26rem, calc(var(--right-column-width) - 8rem)) !important;
     }
   }
 }
