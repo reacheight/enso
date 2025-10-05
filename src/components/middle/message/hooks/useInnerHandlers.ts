@@ -32,6 +32,7 @@ export default function useInnerHandlers({
   isRepliesChat,
   isSavedMessages,
   lastPlaybackTimestamp,
+  isInFocusList,
 }: {
   lang: OldLangFn;
   selectMessage: (e: React.MouseEvent<HTMLDivElement, MouseEvent>, groupedId?: string) => void;
@@ -53,11 +54,12 @@ export default function useInnerHandlers({
   isRepliesChat?: boolean;
   isSavedMessages?: boolean;
   lastPlaybackTimestamp?: number;
+  isInFocusList?: boolean;
 }) {
   const {
     openChat, openChatWithDraft, showNotification, focusMessage, openMediaViewer, openAudioPlayer,
     markMessagesRead, cancelUploadMedia, sendPollVote, openForwardMenu,
-    openChatLanguageModal, openThread, openStoryViewer, searchChatMediaMessages, deleteMessages
+    openChatLanguageModal, openThread, openStoryViewer, searchChatMediaMessages, deleteMessages, removeFromFocusList
   } = getActions();
 
   const {
@@ -216,7 +218,11 @@ export default function useInnerHandlers({
   });
 
   const handleMarkAsRead = useLastCallback(() => {
-    deleteMessages({ messageIds: [messageId] });
+    if (isInFocusList) {
+      removeFromFocusList({ chatId, messageId });
+    } else {
+      deleteMessages({ messageIds: [messageId] });
+    }
   });
 
   const handleFocus = useLastCallback(() => {

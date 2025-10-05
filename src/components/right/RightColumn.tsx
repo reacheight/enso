@@ -40,6 +40,7 @@ import MonetizationStatistics from './statistics/MonetizationStatistics';
 import Statistics from './statistics/Statistics.async';
 import StoryStatistics from './statistics/StoryStatistics.async';
 import StickerSearch from './StickerSearch.async';
+import FocusList from './FocusList';
 
 import './RightColumn.scss';
 
@@ -106,6 +107,7 @@ const RightColumn: FC<OwnProps & StateProps> = ({
     closeBoostStatistics,
     setShouldCloseRightColumn,
     closeMonetizationStatistics,
+    toggleFocusList,
   } = getActions();
 
   const containerRef = useRef<HTMLDivElement>();
@@ -133,6 +135,7 @@ const RightColumn: FC<OwnProps & StateProps> = ({
   const isAddingChatMembers = contentKey === RightColumnContent.AddingMembers;
   const isCreatingTopic = contentKey === RightColumnContent.CreateTopic;
   const isEditingTopic = contentKey === RightColumnContent.EditTopic;
+  const isFocusList = contentKey === RightColumnContent.FocusList;
   const isOverlaying = windowWidth <= MIN_SCREEN_WIDTH_FOR_STATIC_RIGHT_COLUMN;
 
   const [shouldSkipTransition, setShouldSkipTransition] = useState(!isOpen);
@@ -232,6 +235,9 @@ const RightColumn: FC<OwnProps & StateProps> = ({
         break;
       case RightColumnContent.EditTopic:
         closeEditTopicPanel();
+        break;
+      case RightColumnContent.FocusList:
+        toggleFocusList({ force: false });
         break;
     }
   });
@@ -364,6 +370,8 @@ const RightColumn: FC<OwnProps & StateProps> = ({
         return <CreateTopic onClose={close} isActive={isOpen && isActive} />;
       case RightColumnContent.EditTopic:
         return <EditTopic onClose={close} isActive={isOpen && isActive} />;
+      case RightColumnContent.FocusList:
+        return <FocusList isActive={isOpen && isActive} />;
     }
 
     return undefined; // Unreachable
@@ -395,6 +403,7 @@ const RightColumn: FC<OwnProps & StateProps> = ({
           isCreatingTopic={isCreatingTopic}
           isEditingTopic={isEditingTopic}
           isAddingChatMembers={isAddingChatMembers}
+          isFocusList={isFocusList}
           profileState={profileState}
           managementScreen={managementScreen}
           onClose={close}

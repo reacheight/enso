@@ -307,6 +307,7 @@ export enum RightColumnContent {
   EditTopic,
   MonetizationStatistics,
   NewGroup,
+  FocusList,
 }
 
 export type MediaViewerMedia = ApiPhoto | ApiVideo | ApiDocument;

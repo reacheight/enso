@@ -2811,6 +2811,20 @@ export interface ActionPayloads {
     chatId: string;
     messageId: number;
   };
+
+  toggleFocusList: ({
+    force?: boolean;
+  } & WithTabId) | undefined;
+
+  addToFocusList: {
+    chatId: string;
+    messageId: number;
+  };
+
+  removeFromFocusList: {
+    chatId: string;
+    messageId: number;
+  };
 }
 
 export interface RequiredActionPayloads {

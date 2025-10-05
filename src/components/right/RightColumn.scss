@@ -12,7 +12,7 @@
 
   background: var(--color-background);
 
-  transition: transform var(--layer-transition);
+  transition: transform var(--layer-transition), width var(--layer-transition);
 
   body.no-page-transitions &,
   body.no-right-column-animations & {

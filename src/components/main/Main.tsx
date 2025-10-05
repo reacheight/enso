@@ -106,6 +106,7 @@ type StateProps = {
   isLeftColumnOpen: boolean;
   isMiddleColumnOpen: boolean;
   isRightColumnOpen: boolean;
+  isFocusListOpen?: boolean;
   isMediaViewerOpen: boolean;
   isStoryViewerOpen: boolean;
   isForwardModalOpen: boolean;
@@ -159,6 +160,7 @@ const Main = ({
   isMobile,
   isLeftColumnOpen,
   isMiddleColumnOpen,
+  isFocusListOpen,
   isRightColumnOpen,
   isMediaViewerOpen,
   isStoryViewerOpen,
@@ -521,6 +523,7 @@ const Main = ({
     isNarrowMessageList && 'narrow-message-list',
     shouldSkipHistoryAnimations && 'history-animation-disabled',
     isFullscreen && 'is-fullscreen',
+    isFocusListOpen && 'focus-list-open',
   );
 
   const handleBlur = useLastCallback(() => {
@@ -660,6 +663,7 @@ export default memo(withGlobal<OwnProps>(
       isLeftColumnOpen: isLeftColumnShown,
       isMiddleColumnOpen: Boolean(chatId),
       isRightColumnOpen: selectIsRightColumnShown(global, isMobile),
+      isFocusListOpen: selectTabState(global).isFocusListShown,
       isMediaViewerOpen: selectIsMediaViewerOpen(global),
       isStoryViewerOpen: selectIsStoryViewerOpen(global),
       isForwardModalOpen: selectIsForwardModalOpen(global),

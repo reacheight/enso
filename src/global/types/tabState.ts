@@ -107,6 +107,7 @@ export type TabState = {
   canInstall?: boolean;
   isChatInfoShown: boolean;
   isStatisticsShown?: boolean;
+  isFocusListShown?: boolean;
   isLeftColumnShown: boolean;
   newChatMembersProgress?: NewChatMembersProgress;
   uiReadyState: 0 | 1 | 2;

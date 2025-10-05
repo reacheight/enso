@@ -243,6 +243,10 @@ export type GlobalState = {
     webPageById: Record<string, ApiWebPage>;
   };
 
+  focusList: {
+    messageIds: string[]; // chatId_messageId
+  };
+
   stories: {
     byPeerId: Record<string, ApiPeerStories>;
     hasNext?: boolean;

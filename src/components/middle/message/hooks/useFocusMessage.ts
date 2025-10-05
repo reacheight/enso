@@ -25,6 +25,7 @@ export default function useFocusMessage({
   isJustAdded,
   isQuote,
   scrollTargetPosition,
+  isInFocusList,
 }: {
   elementRef: ElementRef<HTMLDivElement>;
   chatId: string;
@@ -35,6 +36,7 @@ export default function useFocusMessage({
   isJustAdded?: boolean;
   isQuote?: boolean;
   scrollTargetPosition?: ScrollTargetPosition;
+  isInFocusList?: boolean;
 }) {
   const isRelocatedRef = useRef(!isJustAdded);
 
@@ -42,7 +44,7 @@ export default function useFocusMessage({
     const isRelocated = isRelocatedRef.current;
     isRelocatedRef.current = false;
 
-    if (isFocused && elementRef.current) {
+    if (isFocused && elementRef.current && !isInFocusList) {
       const messagesContainer = elementRef.current.closest<HTMLDivElement>('.MessageList')!;
       // `noFocusHighlight` is always called with “scroll-to-bottom” buttons
       const isToBottom = noFocusHighlight;
@@ -86,5 +88,6 @@ export default function useFocusMessage({
     }
   }, [
     elementRef, chatId, isFocused, focusDirection, noFocusHighlight, isResizingContainer, isQuote, scrollTargetPosition,
+    isInFocusList,
   ]);
 }

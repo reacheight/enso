@@ -162,6 +162,10 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
     playbackByChatId: {},
   },
 
+  focusList: {
+    messageIds: [],
+  },
+
   stories: {
     byPeerId: {},
     albumsByPeerId: {},

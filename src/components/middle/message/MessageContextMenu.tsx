@@ -135,8 +135,11 @@ type OwnProps = {
   onShowPaidReactionModal?: NoneToVoidFunction;
   onReactionPickerOpen?: (position: IAnchorPosition) => void;
   onMoveToBottom?: NoneToVoidFunction;
+  onAddToFocus?: NoneToVoidFunction;
+  onRemoveFromFocus?: NoneToVoidFunction;
   userFullName?: string;
   canGift?: boolean;
+  isInFocusList?: boolean;
 };
 
 const SCROLLBAR_WIDTH = 10;
@@ -230,8 +233,11 @@ const MessageContextMenu: FC<OwnProps> = ({
   onShowOriginal,
   onSelectLanguage,
   onMoveToBottom,
+  onAddToFocus,
+  onRemoveFromFocus,
   userFullName,
   canGift,
+  isInFocusList,
 }) => {
   const {
     showNotification, openStickerSet, openCustomEmojiSets, loadStickers, openGiftModal,
@@ -416,6 +422,12 @@ const MessageContextMenu: FC<OwnProps> = ({
             <MenuSeparator />
           </>
         )}
+        <MenuItem 
+          icon={isInFocusList ? "check" : "favorite"} 
+          onClick={isInFocusList ? onRemoveFromFocus : onAddToFocus}
+          >
+          {isInFocusList ? 'Remove from Focus' : 'Add to Focus'}
+        </MenuItem>
         {shouldShowGiftButton
           && (
             <MenuItem icon="gift" onClick={handleGiftClick}>

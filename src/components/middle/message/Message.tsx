@@ -227,6 +227,8 @@ type OwnProps =
     messageListType: MessageListType;
     noComments: boolean;
     noReplies: boolean;
+    noReactions?: boolean;
+    appearAsNotOwn?: boolean;
     appearanceOrder: number;
     isJustAdded: boolean;
     memoFirstUnreadIdRef?: { current: number | undefined };
@@ -235,6 +237,7 @@ type OwnProps =
     observeIntersectionForLoading?: ObserveFn;
     observeIntersectionForPlaying?: ObserveFn;
     onIntersectPinnedMessage?: OnIntersectPinnedMessage;
+    isInFocusList?: boolean;
   }
   & MessagePositionProperties;
 
@@ -357,6 +360,8 @@ const Message: FC<OwnProps & StateProps> = ({
   withSenderName,
   noComments,
   noReplies,
+  noReactions,
+  appearAsNotOwn,
   appearanceOrder,
   isJustAdded,
   isFirstInGroup,
@@ -367,6 +372,7 @@ const Message: FC<OwnProps & StateProps> = ({
   isTranscribing,
   transcribedText,
   isLastInList,
+  isInFocusList,
   theme,
   forceSenderName,
   sender,
@@ -536,7 +542,7 @@ const Message: FC<OwnProps & StateProps> = ({
   });
 
   const isLocal = isMessageLocal(message);
-  const isOwn = isOwnMessage(message);
+  const isOwn = appearAsNotOwn ? false : isOwnMessage(message);
   const isScheduled = messageListType === 'scheduled' || message.isScheduled;
   const hasMessageReply = isReplyToMessage(message) && !shouldHideReply;
 
@@ -560,7 +566,7 @@ const Message: FC<OwnProps & StateProps> = ({
   const hasThread = Boolean(repliesThreadInfo) && messageListType === 'thread';
   const isCustomShape = !withVoiceTranscription && getMessageCustomShape(message);
   const hasAnimatedEmoji = isCustomShape && (animatedEmoji || animatedCustomEmoji);
-  const hasReactions = reactionMessage?.reactions && !areReactionsEmpty(reactionMessage.reactions);
+  const hasReactions = noReactions ? false : reactionMessage?.reactions && !areReactionsEmpty(reactionMessage.reactions);
   const asForwarded = (
     forwardInfo
     && (!isChatWithSelf || isScheduled)
@@ -585,10 +591,10 @@ const Message: FC<OwnProps & StateProps> = ({
     && !isInDocumentGroupNotLast
     && !isStoryMention
     && !((sticker || hasAnimatedEmoji) && asForwarded)
-  );
+  ) || isInFocusList;
   const canForward = isChannel && !isScheduled && message.isForwardingAllowed
     && !isChatProtected;
-  const canMarkAsRead = isChatWithSelf;
+  const canMarkAsRead = isChatWithSelf || isInFocusList;
   const canFocus = Boolean(isPinnedList
     || (forwardInfo
       && (forwardInfo.isChannelPost || isChatWithSelf || isRepliesChat || isAnonymousForwards)
@@ -695,6 +701,7 @@ const Message: FC<OwnProps & StateProps> = ({
     isRepliesChat,
     isSavedMessages: isChatWithSelf,
     lastPlaybackTimestamp,
+    isInFocusList,
   });
 
   const handleEffectClick = useLastCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -886,6 +893,7 @@ const Message: FC<OwnProps & StateProps> = ({
     isJustAdded,
     isQuote: Boolean(focusedQuote),
     scrollTargetPosition,
+    isInFocusList,
   });
 
   const viaBusinessBotTitle = viaBusinessBot ? getPeerFullTitle(oldLang, viaBusinessBot) : undefined;

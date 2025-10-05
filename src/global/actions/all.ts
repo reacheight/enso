@@ -35,6 +35,7 @@ import './ui/stars';
 import './ui/reactions';
 import './ui/stories';
 import './ui/statistics';
+import './ui/focusList';
 import './apiUpdaters/initial';
 import './apiUpdaters/chats';
 import './apiUpdaters/messages';

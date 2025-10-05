@@ -67,6 +67,7 @@ type OwnProps = {
   isCreatingTopic?: boolean;
   isEditingTopic?: boolean;
   isAddingChatMembers?: boolean;
+  isFocusList?: boolean;
   profileState?: ProfileState;
   managementScreen?: ManagementScreens;
   onClose: (shouldScrollUp?: boolean) => void;
@@ -138,6 +139,7 @@ enum HeaderContent {
   EditTopic,
   SavedDialogs,
   NewDiscussionGroup,
+  FocusList,
 }
 
 const RightHeader: FC<OwnProps & StateProps> = ({
@@ -157,6 +159,7 @@ const RightHeader: FC<OwnProps & StateProps> = ({
   isCreatingTopic,
   isEditingTopic,
   isAddingChatMembers,
+  isFocusList,
   profileState,
   managementScreen,
   canAddContact,
@@ -338,6 +341,8 @@ const RightHeader: FC<OwnProps & StateProps> = ({
     HeaderContent.EditTopic
   ) : isMonetizationStatistics ? (
     HeaderContent.MonetizationStatistics
+  ) : isFocusList ? (
+    HeaderContent.FocusList
   ) : undefined; // When column is closed
 
   const renderingContentKey = useCurrentOrPrev(contentKey, true) ?? -1;
@@ -511,6 +516,8 @@ const RightHeader: FC<OwnProps & StateProps> = ({
         return <h3 className="title">{oldLang('NewTopic')}</h3>;
       case HeaderContent.EditTopic:
         return <h3 className="title">{oldLang('EditTopic')}</h3>;
+      case HeaderContent.FocusList:
+        return <h3 className="title">Focus</h3>;
       case HeaderContent.GiftList:
         return (
           <>

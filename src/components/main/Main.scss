@@ -16,6 +16,15 @@
     grid-template-columns: auto 1fr;
     grid-template-rows: 100%;
   }
+
+  // Wider right column for FocusList
+  &.focus-list-open {
+    --right-column-width: 34rem;
+    
+    @media (min-width: 1276px) and (max-width: 1920px) {
+      --right-column-width: 30vw;
+    }
+  }
 }
 
 .has-call-header {

@@ -1,0 +1,108 @@
+.FocusList {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--color-background-secondary);
+  overflow: hidden;
+
+  &__content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0;
+  }
+
+  &__messages {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  &__message-item {
+    position: relative;
+    transition: background-color 0.15s ease;
+    overflow: visible;
+    padding: 0.75rem 1rem;
+    
+    &:hover {
+      background: var(--color-interactive-element-hover);
+    }
+    
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__message-content {
+    cursor: pointer;
+    user-select: none;
+    overflow: visible;
+    
+    .Message {
+      background: none !important;
+      border: none;
+      padding: 0;
+      margin: 0;
+      box-shadow: none;
+      overflow: visible;
+      
+      &:hover {
+        background: none !important;
+      }
+
+      &:not(.own) {
+        padding-left: 2.5rem;
+
+        @media (max-width: 600px) {
+          padding-left: 2.875rem;
+        }
+      }
+
+      .message-action-buttons,
+      .message-action-button {
+        pointer-events: auto;
+      }
+    }
+
+    &:hover .Message .message-action-buttons {
+      opacity: 1;
+    }
+
+    .sender-group-container {
+      overflow: visible;
+    }
+
+    .message-content-wrapper {
+      overflow: visible;
+    }
+
+    .message-content {
+      max-width: min(27rem, calc(var(--right-column-width) - 7rem)) !important;
+
+      .Message.own & {
+        max-width: min(30rem, calc(var(--right-column-width) - 5rem)) !important;
+      }
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .FocusList {
+    &__header {
+      padding: 0.75rem;
+    }
+
+    &__title {
+      font-size: 1rem;
+    }
+
+    &__message-header {
+      padding: 0.5rem 0.75rem 0.25rem;
+    }
+
+    &__message-content {
+      padding: 0 0.75rem 0.75rem;
+    }
+  }
+}

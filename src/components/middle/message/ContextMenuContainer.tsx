@@ -61,6 +61,7 @@ import {
   selectIsReactionPickerOpen,
   selectMessageCustomEmojiSets,
   selectMessageTranslations,
+  selectIsMessageInFocusList,
   selectPeerStory,
   selectPollFromMessage,
   selectRequestedChatTranslationLanguage,
@@ -163,6 +164,7 @@ type StateProps = {
   userFullName?: string;
   canGift?: boolean;
   savedDialogId?: string;
+  isInFocusList?: boolean;
 };
 
 const selection = window.getSelection();
@@ -233,6 +235,7 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
   canGift,
   className,
   savedDialogId,
+  isInFocusList,
   onClose,
   onCloseAnimationEnd,
 }) => {
@@ -276,6 +279,9 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
     showNotification,
     forwardToSavedMessages,
     deleteMessages,
+    addToFocusList,
+    removeFromFocusList,
+    toggleFocusList,
   } = getActions();
 
   const oldLang = useOldLang();
@@ -415,6 +421,23 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
     });
   });
 
+  const handleAddToFocus = useLastCallback(() => {
+    closeMenu();
+    addToFocusList({
+      chatId: message.chatId,
+      messageId: message.id,
+    });
+    toggleFocusList({ force: true });
+  });
+
+  const handleRemoveFromFocus = useLastCallback(() => {
+    closeMenu();
+    removeFromFocusList({
+      chatId: message.chatId,
+      messageId: message.id,
+    });
+  });
+
   const closePinModal = useLastCallback(() => {
     setIsPinModalOpen(false);
     onClose();
@@ -502,6 +525,10 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
         shouldDeleteForAll: false,
       });
     }, 100);
+  });
+
+  const handleToFocus = useLastCallback(() => {
+    closeMenu();
   });
 
   const handleForward = useLastCallback(() => {
@@ -782,8 +809,11 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
         onShowOriginal={handleShowOriginal}
         onSelectLanguage={handleSelectLanguage}
         onMoveToBottom={handleMoveToBottom}
+        onAddToFocus={handleAddToFocus}
+        onRemoveFromFocus={handleRemoveFromFocus}
         userFullName={userFullName}
         canGift={canGift}
+        isInFocusList={isInFocusList}
       />
       <PinMessageModal
         isOpen={isPinModalOpen}
@@ -978,6 +1008,7 @@ export default memo(withGlobal<OwnProps>(
       canGift,
       savedDialogId,
       webPage,
+      isInFocusList: selectIsMessageInFocusList(global, message.chatId, message.id),
     };
   },
 )(ContextMenuContainer));
