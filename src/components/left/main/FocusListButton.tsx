@@ -19,7 +19,7 @@ const FocusListButton: FC<StateProps> = ({ isActive }) => {
       onClick={() => toggleFocusList()}
       className={buildClassName('FocusListButton-trigger', isActive && 'active')}
     >
-      <Icon name="favorite" />  
+      <Icon name="eye" />  
       Focus
     </div>
   );
