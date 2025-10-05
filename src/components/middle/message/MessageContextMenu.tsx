@@ -414,20 +414,21 @@ const MessageContextMenu: FC<OwnProps> = ({
         )}
         dir={oldLang.isRtl ? 'rtl' : undefined}
       >
-        {isInSavedMessages && !canSendNow && (
-          <>
-            <MenuItem icon="arrow-down" onClick={onMoveToBottom}>
-              Move to bottom
-            </MenuItem>
-            <MenuSeparator />
-          </>
-        )}
         <MenuItem 
           icon={isInFocusList ? "check" : "favorite"} 
           onClick={isInFocusList ? onRemoveFromFocus : onAddToFocus}
           >
           {isInFocusList ? 'Remove from Focus' : 'Add to Focus'}
         </MenuItem>
+        {isInSavedMessages && !canSendNow && (
+          <>
+            <MenuItem icon="arrow-down" onClick={onMoveToBottom}>
+              Move to bottom
+            </MenuItem>
+          </>
+        )}
+        <MenuSeparator />
+
         {shouldShowGiftButton
           && (
             <MenuItem icon="gift" onClick={handleGiftClick}>
