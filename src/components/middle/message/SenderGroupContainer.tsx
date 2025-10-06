@@ -49,6 +49,7 @@ type OwnProps =
     id: string;
     appearanceOrder: number;
     canPost?: boolean;
+    isInFocusList?: boolean;
   };
 
   type StateProps = {
@@ -73,6 +74,7 @@ const SenderGroupContainer: FC<OwnProps & StateProps> = ({
   isRepliesChat,
   isAnonymousForwards,
   canPost,
+  isInFocusList,
 }) => {
   const { openChat, updateInsertingPeerIdMention } = getActions();
 
@@ -142,7 +144,7 @@ const SenderGroupContainer: FC<OwnProps & StateProps> = ({
   const getLayout = useLastCallback(() => ({ withPortal: true }));
 
   const canMention = canPost && avatarPeer && (isAvatarPeerUser || Boolean(getMainUsername(avatarPeer)));
-  const shouldRenderContextMenu = Boolean(contextMenuAnchor) && (isAvatarPeerUser || canMention);
+  const shouldRenderContextMenu = Boolean(contextMenuAnchor) && (isAvatarPeerUser || canMention) && !isInFocusList;
 
   function renderContextMenu() {
     return (

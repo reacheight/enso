@@ -64,6 +64,7 @@ const FocusList: FC<OwnProps & StateProps> = ({
                       message={message}
                       withAvatar={withAvatar}
                       appearanceOrder={-1}
+                      isInFocusList
                     >
                       <Message
                         message={message}

@@ -501,7 +501,7 @@ const Message: FC<OwnProps & StateProps> = ({
     handleContextMenuHide,
   } = useContextMenuHandlers(
     ref,
-    (isTouchScreen && isInSelectMode) || isAccountFrozen,
+    (isTouchScreen && isInSelectMode) || isAccountFrozen || isInFocusList,
     !IS_TAURI,
     IS_ANDROID,
     getIsMessageListReady,
@@ -809,7 +809,7 @@ const Message: FC<OwnProps & StateProps> = ({
     && !isInDocumentGroupNotLast && messageListType === 'thread'
     && !noComments;
   const withQuickReactionButton = !isTouchScreen && !phoneCall && !isInSelectMode && defaultReaction
-    && !isInDocumentGroupNotLast && !isStoryMention && !hasTtl && !isAccountFrozen;
+    && !isInDocumentGroupNotLast && !isStoryMention && !hasTtl && !isAccountFrozen && !isInFocusList;
 
   const hasOutsideReactions = !withVoiceTranscription && hasReactions
     && (isCustomShape || ((photo || video || storyData || (location?.mediaType === 'geo')) && !hasText));
