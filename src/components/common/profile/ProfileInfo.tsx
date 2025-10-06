@@ -558,8 +558,6 @@ const ProfileInfo = ({
       )}
       {!isExpanded && (
         <Avatar
-          withStory
-          storyColors={profileColorSet?.storyColors}
           className={styles.standaloneAvatar}
           key={peer?.id}
           size="jumbo"
