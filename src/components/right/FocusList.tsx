@@ -40,7 +40,7 @@ const FocusList: FC<OwnProps & StateProps> = ({
 
   return (
     <div className="FocusList">
-      <div className="FocusList__content">
+      <div className="FocusList__content custom-scroll">
         {focusMessages.length === 0 ? (
           <NothingFound
             text="No messages in Focus"
