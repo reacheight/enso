@@ -1,5 +1,4 @@
 import type { FC } from '../../lib/teact/teact';
-import type React from '../../lib/teact/teact';
 import { memo, useEffect, useMemo } from '../../lib/teact/teact';
 import { getActions, getGlobal, withGlobal } from '../../global';
 
@@ -7,7 +6,7 @@ import type {
   ApiChat, ApiThreadInfo, ApiTopic, ApiTypingStatus, ApiUser,
 } from '../../api/types';
 import type { IconName } from '../../types/icons';
-import { MediaViewerOrigin, type StoryViewerOrigin, type ThreadId } from '../../types';
+import { MediaViewerOrigin, type ThreadId } from '../../types';
 
 import {
   getChatTypeString,
@@ -63,8 +62,6 @@ type OwnProps = {
   noRtl?: boolean;
   noAvatar?: boolean;
   noStatusOrTyping?: boolean;
-  withStory?: boolean;
-  storyViewerOrigin?: StoryViewerOrigin;
   isSavedDialog?: boolean;
   withMonoforumStatus?: boolean;
   onClick?: VoidFunction;
@@ -103,8 +100,6 @@ const GroupChatInfo: FC<OwnProps & StateProps> = ({
   topic,
   messagesCount,
   noStatusOrTyping,
-  withStory,
-  storyViewerOrigin,
   noEmojiStatus,
   emojiStatusSize,
   isSavedDialog,
@@ -252,10 +247,7 @@ const GroupChatInfo: FC<OwnProps & StateProps> = ({
             className={buildClassName(isSavedDialog && 'overlay-avatar')}
             size={avatarSize}
             peer={chat}
-            withStory={withStory}
             asMessageBubble={Boolean(monoforumChannel)}
-            storyViewerOrigin={storyViewerOrigin}
-            storyViewerMode="single-peer"
             isSavedDialog={isSavedDialog}
             onClick={withMediaViewer ? handleAvatarViewerOpen : undefined}
           />

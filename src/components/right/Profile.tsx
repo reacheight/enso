@@ -873,7 +873,7 @@ const Profile: FC<OwnProps & StateProps> = ({
               onClick={() => handleMemberClick(id)}
               contextActions={getMemberContextAction(id)}
             >
-              <PrivateChatInfo userId={id} adminMember={adminMembersById?.[id]} forceShowSelf withStory />
+              <PrivateChatInfo userId={id} adminMember={adminMembersById?.[id]} forceShowSelf />
             </ListItem>
           ))
         ) : resultType === 'commonChats' ? (

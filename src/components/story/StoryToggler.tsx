@@ -127,8 +127,6 @@ function StoryToggler({
           peer={peer}
           size="tiny"
           className={styles.avatar}
-          withStorySolid
-          forceFriendStorySolid={closeFriends[peer.id]}
         />
       ))}
     </button>

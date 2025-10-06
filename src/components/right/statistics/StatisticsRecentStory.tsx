@@ -82,8 +82,6 @@ function renderSummary(lang: OldLangFn, chat: ApiChat, blobUrl?: string) {
           peer={chat}
           size="small"
           className={styles.image}
-          withStorySolid
-          forceUnreadStorySolid
         />
       )}
 

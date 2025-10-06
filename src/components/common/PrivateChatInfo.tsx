@@ -6,7 +6,7 @@ import { getActions, withGlobal } from '../../global';
 import type {
   ApiChatMember, ApiTypingStatus, ApiUser, ApiUserStatus,
 } from '../../api/types';
-import type { CustomPeer, StoryViewerOrigin } from '../../types';
+import type { CustomPeer } from '../../types';
 import type { IconName } from '../../types/icons';
 import { MediaViewerOrigin } from '../../types';
 
@@ -40,10 +40,8 @@ type OwnProps = {
   withDots?: boolean;
   withMediaViewer?: boolean;
   withUsername?: boolean;
-  withStory?: boolean;
   withFullInfo?: boolean;
   withUpdatingStatus?: boolean;
-  storyViewerOrigin?: StoryViewerOrigin;
   noEmojiStatus?: boolean;
   noFake?: boolean;
   noVerified?: boolean;
@@ -79,7 +77,6 @@ const PrivateChatInfo: FC<OwnProps & StateProps> = ({
   withDots,
   withMediaViewer,
   withUsername,
-  withStory,
   withFullInfo,
   withUpdatingStatus,
   emojiStatusSize,
@@ -97,7 +94,6 @@ const PrivateChatInfo: FC<OwnProps & StateProps> = ({
   adminMember,
   ripple,
   className,
-  storyViewerOrigin,
   isSynced,
   onEmojiStatusClick,
   iconElement,
@@ -246,9 +242,6 @@ const PrivateChatInfo: FC<OwnProps & StateProps> = ({
         className={buildClassName(isSavedDialog && 'overlay-avatar')}
         isSavedMessages={isSavedMessages}
         isSavedDialog={isSavedDialog}
-        withStory={withStory}
-        storyViewerOrigin={storyViewerOrigin}
-        storyViewerMode="single-peer"
         onClick={hasAvatarMediaViewer ? handleAvatarViewerOpen : undefined}
       />
       <div className="info">

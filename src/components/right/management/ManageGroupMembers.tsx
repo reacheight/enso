@@ -238,7 +238,7 @@ const ManageGroupMembers: FC<OwnProps & StateProps> = ({
                   contextActions={getMemberContextAction(id)}
                   withPortalForMenu
                 >
-                  <PrivateChatInfo userId={id} forceShowSelf withStory />
+                  <PrivateChatInfo userId={id} forceShowSelf />
                 </ListItem>
               ))}
             </InfiniteScroll>

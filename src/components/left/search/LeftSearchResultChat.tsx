@@ -3,7 +3,6 @@ import { memo, useCallback } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiChat, ApiUser } from '../../../api/types';
-import { StoryViewerOrigin } from '../../../types';
 
 import { UNMUTE_TIMESTAMP } from '../../../config';
 import { getIsChatMuted } from '../../../global/helpers/notifications';
@@ -113,17 +112,13 @@ const LeftSearchResultChat: FC<OwnProps & StateProps> = ({
         <PrivateChatInfo
           userId={chatId}
           withUsername={withUsername}
-          withStory
           avatarSize="medium"
-          storyViewerOrigin={StoryViewerOrigin.SearchResult}
         />
       ) : (
         <GroupChatInfo
           chatId={chatId}
           withUsername={withUsername}
           avatarSize="medium"
-          withStory
-          storyViewerOrigin={StoryViewerOrigin.SearchResult}
         />
       )}
       {withOpenAppButton && user?.hasMainMiniApp && (

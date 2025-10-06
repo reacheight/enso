@@ -3,7 +3,6 @@ import { memo, useCallback, useMemo } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
 
 import type { ApiUser, ApiUserStatus } from '../../../api/types';
-import { StoryViewerOrigin } from '../../../types';
 
 import { sortUserIds } from '../../../global/helpers';
 import { filterPeersByQuery } from '../../../global/helpers/peers';
@@ -82,8 +81,6 @@ const ContactList: FC<OwnProps & StateProps> = ({
               userId={id}
               forceShowSelf
               avatarSize="large"
-              withStory
-              storyViewerOrigin={StoryViewerOrigin.ChatList}
               ripple={!isMobile}
             />
           </ListItem>

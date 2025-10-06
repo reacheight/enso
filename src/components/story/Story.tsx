@@ -871,8 +871,6 @@ function Story({
             <div className={styles.contentInner}>
               <Avatar
                 peer={peer}
-                withStory
-                storyViewerMode="disabled"
               />
               <div className={styles.name}>{renderText(getPeerTitle(oldLang, peer) || '')}</div>
             </div>

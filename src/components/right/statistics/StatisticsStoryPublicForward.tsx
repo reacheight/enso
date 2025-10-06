@@ -33,7 +33,7 @@ function StatisticsMessagePublicForward({ data, chatsById, usersById }: OwnProps
 
   return (
     <div className={buildClassName(styles.root, 'statistic-public-forward')} onClick={handleClick}>
-      <Avatar size="medium" peer={user || chat} withStorySolid forceUnreadStorySolid />
+      <Avatar size="medium" peer={user || chat} />
 
       <div>
         <div className={styles.title}>

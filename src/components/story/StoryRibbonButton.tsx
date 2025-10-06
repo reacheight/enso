@@ -97,9 +97,6 @@ function StoryRibbonButton({ peer, isArchived }: OwnProps) {
     >
       <Avatar
         peer={peer}
-        withStory
-        storyViewerOrigin={StoryViewerOrigin.StoryRibbon}
-        storyViewerMode="full"
       />
       <div className={buildClassName(styles.name, peer.hasUnreadStories && styles.name_hasUnreadStory)}>
         {isSelf ? lang('MyStory') : getPeerTitle(lang, peer)}

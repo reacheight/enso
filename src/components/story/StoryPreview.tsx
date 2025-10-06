@@ -84,8 +84,6 @@ function StoryPreview({
         <div className={styles.contentInner}>
           <Avatar
             peer={peer}
-            withStory
-            storyViewerMode="disabled"
           />
           <div className={styles.name}>{renderText(getPeerTitle(lang, peer) || '')}</div>
         </div>

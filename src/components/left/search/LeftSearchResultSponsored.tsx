@@ -4,7 +4,6 @@ import { memo, useRef } from '../../../lib/teact/teact';
 import { getActions } from '../../../global';
 
 import type { ApiSponsoredPeer } from '../../../api/types';
-import { StoryViewerOrigin } from '../../../types';
 
 import { isUserId } from '../../../util/entities/ids';
 
@@ -79,17 +78,13 @@ const LeftSearchResultSponsored: FC<OwnProps> = ({
         <PrivateChatInfo
           userId={peerId}
           withUsername
-          withStory
           avatarSize="medium"
-          storyViewerOrigin={StoryViewerOrigin.SearchResult}
         />
       ) : (
         <GroupChatInfo
           chatId={peerId}
           withUsername
           avatarSize="medium"
-          withStory
-          storyViewerOrigin={StoryViewerOrigin.SearchResult}
         />
       )}
       <BadgeButton className="search-sponsored-badge" onMouseDown={handleBadgeMouseDown} onClick={handleBadgeClick}>

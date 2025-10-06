@@ -11,7 +11,7 @@ import type {
 import type { GlobalState } from '../../global/types';
 import type { Signal } from '../../util/signals';
 import { MAIN_THREAD_ID } from '../../api/types';
-import { type MessageListType, StoryViewerOrigin, type ThreadId } from '../../types';
+import { type MessageListType, type ThreadId } from '../../types';
 
 import {
   EDITABLE_INPUT_CSS_SELECTOR,
@@ -293,10 +293,8 @@ const MiddleHeader: FC<OwnProps & StateProps> = ({
               withDots={Boolean(connectionStatusText)}
               withFullInfo
               withMediaViewer
-              withStory={!isChatWithSelf}
               withUpdatingStatus
               isSavedDialog={isSavedDialog}
-              storyViewerOrigin={StoryViewerOrigin.MiddleHeaderAvatar}
               emojiStatusSize={EMOJI_STATUS_SIZE}
               noRtl
               onEmojiStatusClick={handleUserStatusClick}
@@ -313,9 +311,7 @@ const MiddleHeader: FC<OwnProps & StateProps> = ({
               withMediaViewer={threadId === MAIN_THREAD_ID}
               withFullInfo={threadId === MAIN_THREAD_ID}
               withUpdatingStatus
-              withStory
               isSavedDialog={isSavedDialog}
-              storyViewerOrigin={StoryViewerOrigin.MiddleHeaderAvatar}
               emojiStatusSize={EMOJI_STATUS_SIZE}
               onEmojiStatusClick={handleChannelStatusClick}
               noRtl

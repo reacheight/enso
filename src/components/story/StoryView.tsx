@@ -181,7 +181,6 @@ const StoryView = ({
           noStatusOrTyping
           status={status}
           statusIcon={statusIcon}
-          withStory
           forceShowSelf
         />
       ) : (
@@ -190,7 +189,6 @@ const StoryView = ({
           chatId={storyView.peerId}
           status={status}
           statusIcon={statusIcon}
-          withStory
         />
       )}
     </ListItem>
