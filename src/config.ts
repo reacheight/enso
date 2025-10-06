@@ -8,7 +8,6 @@ import type {
 
 export const APP_CODE_NAME = 'A';
 export const APP_NAME = process.env.APP_NAME || `Telegram Web ${APP_CODE_NAME}`;
-export const RELEASE_DATETIME = process.env.RELEASE_DATETIME;
 
 export const PRODUCTION_HOSTNAME = 'web.telegram.org';
 export const PRODUCTION_URL = 'https://web.telegram.org/a';
@@ -160,7 +159,8 @@ export const EDITABLE_STORY_INPUT_CSS_SELECTOR = `#${EDITABLE_STORY_INPUT_ID}`;
 export const CUSTOM_APPENDIX_ATTRIBUTE = 'data-has-custom-appendix';
 export const MESSAGE_CONTENT_CLASS_NAME = 'message-content';
 export const MESSAGE_CONTENT_SELECTOR = '.message-content';
-export const VIEW_TRANSITION_CLASS_NAME = 'active-view-transition';
+export const VT_CLASS_NAME = 'active-view-transition';
+export const VT_TYPE_CLASS_PREFIX = 'active-vt-';
 
 export const RESIZE_HANDLE_CLASS_NAME = 'resizeHandle';
 export const RESIZE_HANDLE_SELECTOR = `.${RESIZE_HANDLE_CLASS_NAME}`;

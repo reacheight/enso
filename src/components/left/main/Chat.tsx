@@ -18,7 +18,7 @@ import type { ObserveFn } from '../../../hooks/useIntersectionObserver';
 import type { ChatAnimationTypes } from './hooks';
 import { MAIN_THREAD_ID } from '../../../api/types';
 
-import { UNMUTE_TIMESTAMP } from '../../../config';
+import { ALL_FOLDER_ID, UNMUTE_TIMESTAMP } from '../../../config';
 import {
   groupStatefulContent,
   isUserOnline,
@@ -120,10 +120,9 @@ type StateProps = {
   currentUserId: string;
   isSynced?: boolean;
   isAccountFrozen?: boolean;
-  folderIds?: number[];
-  orderedIds?: number[];
+  chatFolderIds?: number[];
+  orderedFolderIds?: number[];
   chatFoldersById?: Record<number, ApiChatFolder>;
-  activeChatFolder?: number;
   areTagsEnabled?: boolean;
 };
 
@@ -163,10 +162,9 @@ const Chat: FC<OwnProps & StateProps> = ({
   isSynced,
   onDragEnter,
   isAccountFrozen,
-  folderIds,
-  orderedIds,
+  chatFolderIds,
+  orderedFolderIds,
   chatFoldersById,
-  activeChatFolder,
   areTagsEnabled,
   withTags,
 }) => {
@@ -197,7 +195,23 @@ const Chat: FC<OwnProps & StateProps> = ({
 
   useEnsureMessage(isSavedDialog ? currentUserId : chatId, lastMessageId, lastMessage);
 
-  const shouldRenderTags = areTagsEnabled && withTags && folderIds && folderIds.length > 1;
+  const tagFolderIds = useMemo(() => {
+    const chatFolderIdsSet = new Set(chatFolderIds);
+
+    return orderedFolderIds?.filter((id) => {
+      if (!chatFolderIdsSet.has(id)) return undefined;
+
+      const isActive = id === folderId;
+      const isAll = id === ALL_FOLDER_ID;
+
+      const folder = chatFoldersById?.[id];
+      const hasColor = folder?.color !== undefined && folder.color !== -1;
+
+      return !isActive && !isAll && hasColor;
+    });
+  }, [orderedFolderIds, folderId, chatFoldersById, chatFolderIds]);
+
+  const shouldRenderTags = areTagsEnabled && withTags && Boolean(tagFolderIds?.length);
 
   const { renderSubtitle, ref } = useChatListEntry({
     chat,
@@ -367,7 +381,7 @@ const Chat: FC<OwnProps & StateProps> = ({
     isSelected && 'selected',
     isSelectedForum && 'selected-forum',
     isPreview && 'standalone',
-    shouldRenderTags && 'chat-item-with-tags',
+    areTagsEnabled && withTags && 'chat-item-with-tags',
     className,
   );
 
@@ -411,7 +425,7 @@ const Chat: FC<OwnProps & StateProps> = ({
           <ChatCallStatus isMobile={isMobile} isSelected={isSelected} isActive={withInterfaceAnimations} />
         )}
       </div>
-      <div className={buildClassName('info', shouldRenderTags && 'has-tags')}>
+      <div className={buildClassName('info', areTagsEnabled && withTags && 'has-tags')}>
         <div className="info-row">
           <FullNameTitle
             peer={isMonoforum ? monoforumChannel! : peer}
@@ -421,6 +435,7 @@ const Chat: FC<OwnProps & StateProps> = ({
             isSavedMessages={chatId === user?.id && user?.isSelf}
             isSavedDialog={isSavedDialog}
             observeIntersection={observeIntersection}
+            withStatusTextColor={isSelected}
           />
           {isMuted && !isSavedDialog && <Icon name="muted" />}
           <div className="separator" />
@@ -448,10 +463,8 @@ const Chat: FC<OwnProps & StateProps> = ({
         </div>
         {shouldRenderTags && (
           <ChatTags
-            folderIds={folderIds}
-            orderedIds={orderedIds}
+            orderedFolderIds={tagFolderIds}
             chatFoldersById={chatFoldersById}
-            activeChatFolder={activeChatFolder}
           />
         )}
       </div>
@@ -496,7 +509,7 @@ export default memo(withGlobal<OwnProps>(
       } as Complete<StateProps>;
     }
 
-    const folderIds = getChatFolderIds(chatId);
+    const chatFolderIds = getChatFolderIds(chatId);
     const { areTagsEnabled } = global.chatFolders;
     const isPremium = selectIsCurrentUserPremium(global);
 
@@ -530,8 +543,6 @@ export default memo(withGlobal<OwnProps>(
 
     const monoforumChannel = selectMonoforumChannel(global, chatId);
 
-    const activeChatFolder = selectTabState(global).activeChatFolder;
-
     return {
       chat,
       isMuted: getIsChatMuted(chat, selectNotifyDefaults(global), selectNotifyException(global, chat.id)),
@@ -556,9 +567,8 @@ export default memo(withGlobal<OwnProps>(
       isSynced: global.isSynced,
       isAccountFrozen,
       monoforumChannel,
-      folderIds,
-      orderedIds: global.chatFolders.orderedIds,
-      activeChatFolder,
+      chatFolderIds,
+      orderedFolderIds: global.chatFolders.orderedIds,
       chatFoldersById: global.chatFolders.byId,
       areTagsEnabled: areTagsEnabled && isPremium,
     };

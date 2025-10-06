@@ -54,7 +54,7 @@ import {
   selectTopics,
   selectUserFullInfo,
 } from '../../global/selectors';
-import { selectSharedSettings } from '../../global/selectors/sharedState.ts';
+import { selectSharedSettings } from '../../global/selectors/sharedState';
 import { IS_TAURI } from '../../util/browser/globalEnvironment';
 import {
   IS_ANDROID, IS_IOS, IS_MAC_OS, IS_SAFARI, IS_TRANSLATION_SUPPORTED, MASK_IMAGE_DISABLED,
@@ -63,7 +63,7 @@ import buildClassName from '../../util/buildClassName';
 import buildStyle from '../../util/buildStyle';
 import captureEscKeyListener from '../../util/captureEscKeyListener';
 import { isUserId } from '../../util/entities/ids';
-import { resolveTransitionName } from '../../util/resolveTransitionName.ts';
+import { resolveTransitionName } from '../../util/resolveTransitionName';
 import calculateMiddleFooterTransforms from './helpers/calculateMiddleFooterTransforms';
 
 import useAppLayout from '../../hooks/useAppLayout';
@@ -345,7 +345,7 @@ function MiddleColumn({
     return () => {
       visualViewport.removeEventListener('resize', handleResize);
     };
-  });
+  }, []);
 
   useEffect(() => {
     if (isPrivate) {
@@ -508,7 +508,7 @@ function MiddleColumn({
         `--composer-hidden-scale: ${composerHiddenScale}`,
         `--toolbar-hidden-scale: ${toolbarHiddenScale}`,
         `--unpin-hidden-scale: ${unpinHiddenScale}`,
-        `--toolbar-unpin-hidden-scale: ${toolbarForUnpinHiddenScale},`,
+        `--toolbar-unpin-hidden-scale: ${toolbarForUnpinHiddenScale}`,
         `--composer-translate-x: ${composerTranslateX}px`,
         `--toolbar-translate-x: ${toolbarTranslateX}px`,
         `--pattern-color: ${patternColor}`,
@@ -581,6 +581,11 @@ function MiddleColumn({
                 onIntersectPinnedMessage={renderingHandleIntersectPinnedMessage!}
               />
               <div className={footerClassName}>
+                <FloatingActionButtons
+                  withScrollDown={renderingIsScrollDownShown}
+                  canPost={renderingCanPost}
+                  withExtraShift={withExtraShift}
+                />
                 {renderingCanPost && (
                   <Composer
                     type="messageList"
@@ -710,12 +715,6 @@ function MiddleColumn({
                 {IS_TRANSLATION_SUPPORTED && <ChatLanguageModal isOpen={isChatLanguageModalOpen} />}
               </div>
             </Transition>
-
-            <FloatingActionButtons
-              withScrollDown={renderingIsScrollDownShown}
-              canPost={renderingCanPost}
-              withExtraShift={withExtraShift}
-            />
           </div>
           <MiddleSearch isActive={Boolean(hasActiveMiddleSearch)} />
         </>

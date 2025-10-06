@@ -9,6 +9,7 @@ import { getStickerMediaHash } from '../../../global/helpers';
 import buildClassName from '../../../util/buildClassName';
 import buildStyle from '../../../util/buildStyle';
 import { preloadImage } from '../../../util/files';
+import { clamp } from '../../../util/math';
 
 import useLastCallback from '../../../hooks/useLastCallback';
 import useMedia from '../../../hooks/useMedia';
@@ -23,6 +24,8 @@ type OwnProps = {
   patternIcon?: ApiSticker;
   className?: string;
   clearBottomSector?: boolean;
+  patternSize?: number;
+  patternOpacity?: number;
 };
 
 const RINGS = 3;
@@ -38,8 +41,10 @@ const RadialPatternBackground = ({
   backgroundColors,
   patternColor,
   patternIcon,
+  patternOpacity,
   clearBottomSector,
   className,
+  patternSize = 1,
 }: OwnProps) => {
   const containerRef = useRef<HTMLDivElement>();
   const canvasRef = useRef<HTMLCanvasElement>();
@@ -78,13 +83,12 @@ const RadialPatternBackground = ({
         const xOffset = ringRadius * 1.71 * Math.cos(angle);
         const yOffset = ringRadius * Math.sin(angle);
 
-        const x = 0.5 + xOffset;
-        const y = 0.5 + yOffset;
-
         const sizeFactor = 1.4 - ringProgress * Math.random();
 
         coordinates.push({
-          x, y, sizeFactor,
+          x: xOffset,
+          y: yOffset,
+          sizeFactor,
         });
       }
     }
@@ -115,15 +119,16 @@ const RadialPatternBackground = ({
     const { width, height } = canvas;
     if (!width || !height) return;
 
+    ctx.clearRect(0, 0, width, height);
+
     ctx.save();
     patternPositions.forEach(({
       x, y, sizeFactor,
     }) => {
-      const centerShift = (width - Math.max(width, MIN_SIZE * dpr)) / 2; // Shift coords if canvas is smaller than `MIN_SIZE`
-      const renderX = x * Math.max(width, MIN_SIZE * dpr) + centerShift;
-      const renderY = y * Math.max(height, MIN_SIZE * dpr) + centerShift;
+      const renderX = x * patternSize * Math.max(width, MIN_SIZE * dpr) + width / 2;
+      const renderY = y * patternSize * Math.max(height, MIN_SIZE * dpr) + height / 2;
 
-      const size = BASE_ICON_SIZE * dpr * sizeFactor * (centerShift ? 0.8 : 1);
+      const size = BASE_ICON_SIZE * dpr * patternSize * sizeFactor;
 
       ctx.drawImage(emojiImage, renderX - size / 2, renderY - size / 2, size, size);
     });
@@ -138,8 +143,11 @@ const RadialPatternBackground = ({
     }
 
     const radialGradient = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, width / 2);
-    radialGradient.addColorStop(0, '#FFFFFF77');
-    radialGradient.addColorStop(1, '#FFFFFF');
+
+    const alpha = clamp(0.6 * (patternOpacity ?? 1), 0, 1);
+
+    radialGradient.addColorStop(0, `rgb(255 255 255 / ${1 - alpha})`);
+    radialGradient.addColorStop(1, `rgb(255 255 255 / 1)`);
 
     // Alpha mask
     ctx.save();
@@ -151,12 +159,12 @@ const RadialPatternBackground = ({
 
   useEffect(() => {
     draw();
-  }, [emojiImage]);
+  }, [emojiImage, patternOpacity, patternSize, patternColor, patternPositions]);
 
   useEffect(() => {
     const { width, height } = getContainerSize();
-    const canvas = canvasRef.current!;
-    if (!width || !height) {
+    const canvas = canvasRef.current;
+    if (!width || !height || !canvas) {
       return;
     }
 
@@ -178,7 +186,11 @@ const RadialPatternBackground = ({
         `--_bg-2: ${backgroundColors[1] || backgroundColors[0]}`,
       )}
     >
-      <canvas className={styles.canvas} ref={canvasRef} />
+      <canvas
+        ref={canvasRef}
+        className={buildClassName(styles.canvas, emojiImage && styles.showing)}
+        aria-hidden="true"
+      />
     </div>
   );
 };

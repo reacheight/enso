@@ -60,6 +60,11 @@ import { selectPremiumLimit } from '../../global/selectors/limits';
 import { selectMessageDownloadableMedia } from '../../global/selectors/media';
 import { selectSharedSettings } from '../../global/selectors/sharedState';
 import { selectActiveStoriesCollectionId } from '../../global/selectors/stories';
+import {
+  VTT_PROFILE_GIFTS,
+  VTT_RIGHT_PROFILE_COLLAPSE,
+  VTT_RIGHT_PROFILE_EXPAND,
+} from '../../util/animations/viewTransitionTypes.ts';
 import { areDeepEqual } from '../../util/areDeepEqual';
 import { IS_TOUCH_ENV } from '../../util/browser/windowEnvironment';
 import buildClassName from '../../util/buildClassName';
@@ -71,7 +76,9 @@ import renderText from '../common/helpers/renderText';
 import { getSenderName } from '../left/search/helpers/getSenderName';
 
 import { useViewTransition } from '../../hooks/animations/useViewTransition';
+import { useVtn } from '../../hooks/animations/useVtn.ts';
 import usePeerStoriesPolling from '../../hooks/polling/usePeerStoriesPolling';
+import useTopOverscroll from '../../hooks/scroll/useTopOverscroll.tsx';
 import useCacheBuster from '../../hooks/useCacheBuster';
 import useEffectWithPrevDeps from '../../hooks/useEffectWithPrevDeps';
 import useFlag from '../../hooks/useFlag';
@@ -96,7 +103,7 @@ import NothingFound from '../common/NothingFound';
 import PreviewMedia from '../common/PreviewMedia';
 import PrivateChatInfo from '../common/PrivateChatInfo';
 import ChatExtra from '../common/profile/ChatExtra';
-import ProfileInfo from '../common/ProfileInfo';
+import ProfileInfo from '../common/profile/ProfileInfo.tsx';
 import WebLink from '../common/WebLink';
 import ChatList from '../left/main/ChatList';
 import MediaStory from '../story/MediaStory';
@@ -172,6 +179,7 @@ type StateProps = {
   isSavedDialog?: boolean;
   forceScrollProfileTab?: boolean;
   isSynced?: boolean;
+  hasAvatar?: boolean;
 };
 
 type TabProps = {
@@ -242,6 +250,7 @@ const Profile: FC<OwnProps & StateProps> = ({
   isSavedDialog,
   forceScrollProfileTab,
   isSynced,
+  hasAvatar,
   onProfileStateChange,
 }) => {
   const {
@@ -274,10 +283,11 @@ const Profile: FC<OwnProps & StateProps> = ({
   const lang = useLang();
 
   const [deletingUserId, setDeletingUserId] = useState<string | undefined>();
-  const [isViewTransitionEnabled, enableViewTransition, disableViewTransition] = useFlag();
+  const [isGiftTransitionEnabled, enableGiftTransition, disableGiftTransition] = useFlag();
 
   const profileId = isSavedDialog ? String(threadId) : chatId;
   const isSavedMessages = profileId === currentUserId && !isSavedDialog;
+  const [isProfileExpanded, expandProfile, collapseProfile] = useFlag();
 
   const [restoreContentHeightKey, setRestoreContentHeightKey] = useState(0);
 
@@ -384,11 +394,11 @@ const Profile: FC<OwnProps & StateProps> = ({
   }, [chatId]);
 
   useSyncEffect(() => {
-    enableViewTransition();
+    enableGiftTransition();
   }, [giftsFilter]);
 
   useSyncEffect(() => {
-    disableViewTransition();
+    disableGiftTransition();
   }, [gifts]);
 
   useEffect(() => {
@@ -399,7 +409,8 @@ const Profile: FC<OwnProps & StateProps> = ({
   }, [chatId, hasGiftsTab, isSynced]);
 
   const [renderingGifts, setRenderingGifts] = useState(gifts);
-  const { startViewTransition, shouldApplyVtn } = useViewTransition();
+  const { startViewTransition } = useViewTransition();
+  const { createVtnStyle } = useVtn();
 
   const giftIds = useMemo(() => renderingGifts?.map((gift) => getSavedGiftKey(gift)), [renderingGifts]);
 
@@ -427,7 +438,7 @@ const Profile: FC<OwnProps & StateProps> = ({
       return;
     }
 
-    if (!gifts || !prevGifts || !isViewTransitionEnabled) {
+    if (!gifts || !prevGifts || !isGiftTransitionEnabled) {
       setRenderingGifts(gifts);
       return;
     }
@@ -436,14 +447,14 @@ const Profile: FC<OwnProps & StateProps> = ({
     const newGiftIds = gifts.map((gift) => getSavedGiftKey(gift));
     const hasOrderChanged = prevGiftIds.some((id, index) => id !== newGiftIds[index]);
 
-    if (hasOrderChanged && animationLevel > 0) {
-      startViewTransition(() => {
+    if (hasOrderChanged) {
+      startViewTransition(VTT_PROFILE_GIFTS, () => {
         setRenderingGifts(gifts);
       });
     } else {
       setRenderingGifts(gifts);
     }
-  }, [gifts, startViewTransition, animationLevel, isViewTransitionEnabled]);
+  }, [gifts, startViewTransition, isGiftTransitionEnabled]);
 
   const [resultType, viewportIds, getMore, noProfileInfo] = useProfileViewportIds({
     loadMoreMembers: handleLoadMoreMembers,
@@ -509,15 +520,29 @@ const Profile: FC<OwnProps & StateProps> = ({
     stopAutoScrollToTabs();
   });
 
-  const { handleScroll } = useProfileState(
+  const handleExpandProfile = useLastCallback(() => {
+    if (isProfileExpanded) return;
+    startViewTransition(VTT_RIGHT_PROFILE_EXPAND, () => {
+      expandProfile();
+    });
+  });
+
+  const handleCollapseProfile = useLastCallback(() => {
+    if (!isProfileExpanded) return;
+    startViewTransition(VTT_RIGHT_PROFILE_COLLAPSE, () => {
+      collapseProfile();
+    });
+  });
+
+  const { handleScroll } = useProfileState({
     containerRef,
-    resultType,
+    tabType: resultType,
     profileState,
-    onProfileStateChange,
     forceScrollProfileTab,
     allowAutoScrollToTabs,
+    onProfileStateChange,
     handleStopAutoScrollToTabs,
-  );
+  });
 
   const { applyTransitionFix, releaseTransitionFix } = useTransitionFixes(containerRef);
 
@@ -589,6 +614,10 @@ const Profile: FC<OwnProps & StateProps> = ({
   const handleResetGiftsFilter = useLastCallback(() => {
     resetGiftProfileFilter({ peerId: chatId });
   });
+
+  useTopOverscroll(
+    containerRef, handleExpandProfile, handleCollapseProfile, !hasAvatar,
+  );
 
   useEffect(() => {
     if (!transitionRef.current || !IS_TOUCH_ENV) {
@@ -977,7 +1006,8 @@ const Profile: FC<OwnProps & StateProps> = ({
               <SavedGift
                 peerId={chatId}
                 key={getSavedGiftKey(gift)}
-                style={shouldApplyVtn ? `view-transition-name: vt${getSavedGiftKey(gift)}` : undefined}
+                className="saved-gift"
+                style={createVtnStyle(getSavedGiftKey(gift))}
                 gift={gift}
                 observeIntersection={observeIntersectionForMedia}
               />
@@ -1002,6 +1032,24 @@ const Profile: FC<OwnProps & StateProps> = ({
   const handleOnStop = useLastCallback(() => {
     setRestoreContentHeightKey(restoreContentHeightKey + 1);
   });
+
+  function renderProfileInfo(peerId: string, isReady: boolean) {
+    return (
+      <div className="profile-info">
+        <ProfileInfo
+          isExpanded={isProfileExpanded}
+          peerId={peerId}
+          canPlayVideo={isReady}
+          isForMonoforum={Boolean(monoforumChannel)}
+        />
+        <ChatExtra
+          chatOrUserId={profileId}
+          isSavedDialog={isSavedDialog}
+          style={createVtnStyle('chatExtra')}
+        />
+      </div>
+    );
+  }
 
   function renderSpinnerOrContent(noContent: boolean, noSpinner: boolean) {
     const baseContent = renderSpinnerOrContentBase(noContent, noSpinner);
@@ -1071,13 +1119,12 @@ const Profile: FC<OwnProps & StateProps> = ({
         renderProfileInfo(
           monoforumChannel?.id || profileId,
           isRightColumnShown && canRenderContent,
-          isSavedDialog,
-          Boolean(monoforumChannel),
         )
       )}
       {!isRestricted && (
         <div
           className="shared-media"
+          style={createVtnStyle('sharedMedia')}
         >
           <Transition
             ref={transitionRef}
@@ -1119,15 +1166,6 @@ const Profile: FC<OwnProps & StateProps> = ({
     </InfiniteScroll>
   );
 };
-
-function renderProfileInfo(profileId: string, isReady: boolean, isSavedDialog?: boolean, isForMonoforum?: boolean) {
-  return (
-    <div className="profile-info">
-      <ProfileInfo peerId={profileId} canPlayVideo={isReady} isForMonoforum={isForMonoforum} />
-      <ChatExtra chatOrUserId={profileId} isSavedDialog={isSavedDialog} />
-    </div>
-  );
-}
 
 export default memo(withGlobal<OwnProps>(
   (global, {
@@ -1201,6 +1239,7 @@ export default memo(withGlobal<OwnProps>(
 
     const monoforumChannel = selectMonoforumChannel(global, chatId);
     const isRestricted = chat && selectIsChatRestricted(global, chat.id);
+    const hasAvatar = Boolean(peer?.avatarPhotoId);
 
     return {
       theme: selectTheme(global),
@@ -1251,6 +1290,7 @@ export default memo(withGlobal<OwnProps>(
       adminMembersById: hasMembersTab ? adminMembersById : undefined,
       commonChatIds: commonChats?.ids,
       monoforumChannel,
+      hasAvatar,
     };
   },
 )(Profile));

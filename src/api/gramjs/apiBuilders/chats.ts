@@ -63,9 +63,9 @@ function buildApiChatFieldsFromPeerEntity(
   const hasVideoAvatar = 'photo' in peerEntity && peerEntity.photo && 'hasVideo' in peerEntity.photo
     && peerEntity.photo.hasVideo;
   const avatarPhotoId = ('photo' in peerEntity) && peerEntity.photo ? buildAvatarPhotoId(peerEntity.photo) : undefined;
-  const hasUsername = Boolean('username' in peerEntity && peerEntity.username);
 
   const usernames = buildApiUsernames(peerEntity);
+  const hasUsername = usernames?.some((username) => username.isActive);
 
   // Chat and channel shared fields
   const isCallActive = 'callActive' in peerEntity && peerEntity.callActive;
@@ -83,6 +83,7 @@ function buildApiChatFieldsFromPeerEntity(
   const botVerificationIconId = userOrChannel?.botVerificationIcon?.toString();
   const storiesUnavailable = userOrChannel?.storiesUnavailable;
   const color = userOrChannel?.color ? buildApiPeerColor(userOrChannel.color) : undefined;
+  const profileColor = userOrChannel?.profileColor ? buildApiPeerColor(userOrChannel.profileColor) : undefined;
   const emojiStatus = userOrChannel?.emojiStatus ? buildApiEmojiStatus(userOrChannel.emojiStatus) : undefined;
   const paidMessagesStars = userOrChannel?.sendPaidMessagesStars;
   const isVerified = userOrChannel?.verified;
@@ -107,6 +108,7 @@ function buildApiChatFieldsFromPeerEntity(
     isCreator,
     fakeType: isScam ? 'scam' : (isFake ? 'fake' : undefined),
     color,
+    profileColor,
     isJoinToSend: channel?.joinToSend,
     isJoinRequest: channel?.joinRequest,
     isForum: channel?.forum,
