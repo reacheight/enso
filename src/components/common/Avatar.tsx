@@ -8,14 +8,13 @@ import type {
   ApiPeer, ApiPhoto, ApiWebDocument,
 } from '../../api/types';
 import type { ObserveFn } from '../../hooks/useIntersectionObserver';
-import type { CustomPeer, StoryViewerOrigin } from '../../types';
+import type { CustomPeer } from '../../types';
 import { ApiMediaFormat } from '../../api/types';
 
 import { IS_TEST } from '../../config';
 import {
   getChatAvatarHash,
   getChatTitle,
-  getPeerStoryHtmlId,
   getUserFullName,
   getVideoProfilePhotoMediaHash,
   getWebDocumentHash,
@@ -39,7 +38,6 @@ import useMediaTransitionDeprecated from '../../hooks/useMediaTransitionDeprecat
 import useOldLang from '../../hooks/useOldLang';
 
 import OptimizedVideo from '../ui/OptimizedVideo';
-import AvatarStoryCircle from './AvatarStoryCircle';
 import Icon from './icons/Icon';
 
 import './Avatar.scss';
@@ -75,14 +73,7 @@ type OwnProps = {
   isSavedMessages?: boolean;
   isSavedDialog?: boolean;
   withVideo?: boolean;
-  withStory?: boolean;
   forPremiumPromo?: boolean;
-  withStoryGap?: boolean;
-  withStorySolid?: boolean;
-  forceFriendStorySolid?: boolean;
-  forceUnreadStorySolid?: boolean;
-  storyViewerOrigin?: StoryViewerOrigin;
-  storyViewerMode?: 'full' | 'single-peer' | 'disabled';
   loopIndefinitely?: boolean;
   noPersonalPhoto?: boolean;
   asMessageBubble?: boolean;
@@ -103,14 +94,7 @@ const Avatar: FC<OwnProps> = ({
   isSavedMessages,
   isSavedDialog,
   withVideo,
-  withStory,
   forPremiumPromo,
-  withStoryGap,
-  withStorySolid,
-  forceFriendStorySolid,
-  forceUnreadStorySolid,
-  storyViewerOrigin,
-  storyViewerMode = 'single-peer',
   loopIndefinitely,
   noPersonalPhoto,
   asMessageBubble,
@@ -118,8 +102,6 @@ const Avatar: FC<OwnProps> = ({
   onContextMenu,
   onMouseMove,
 }) => {
-  const { openStoryViewer } = getActions();
-
   const ref = useRef<HTMLDivElement>();
   const videoLoopCountRef = useRef(0);
   const isCustomPeer = peer && 'isCustomPeer' in peer;
@@ -249,8 +231,7 @@ const Avatar: FC<OwnProps> = ({
     content = getFirstLetters(text, 2);
   }
 
-  const isRoundedRect = (isCustomPeer && peer.isAvatarSquare)
-    || (isForum && !((withStory || withStorySolid) && realPeer?.hasStories));
+  const isRoundedRect = (isCustomPeer && peer.isAvatarSquare) || isForum;
   const isPremiumGradient = isCustomPeer && peer.withPremiumGradient;
   const customColor = isCustomPeer && peer.customPeerAvatarColor;
 
@@ -267,10 +248,6 @@ const Avatar: FC<OwnProps> = ({
     isRoundedRect && 'forum',
     asMessageBubble && 'message-bubble',
     (photo || webPhoto) && 'force-fit',
-    ((withStory && realPeer?.hasStories) || forPremiumPromo) && 'with-story-circle',
-    withStorySolid && realPeer?.hasStories && 'with-story-solid',
-    withStorySolid && forceFriendStorySolid && 'close-friend',
-    withStorySolid && (realPeer?.hasUnreadStories || forceUnreadStorySolid) && 'has-unread-story',
     onClick && 'interactive',
     (!isSavedMessages && !imgUrl) && 'no-photo',
   );
@@ -278,17 +255,6 @@ const Avatar: FC<OwnProps> = ({
   const hasMedia = Boolean(isSavedMessages || imgUrl);
 
   const { handleClick, handleMouseDown } = useFastClick((e: ReactMouseEvent<HTMLDivElement, MouseEvent>) => {
-    if (withStory && storyViewerMode !== 'disabled' && realPeer?.hasStories) {
-      e.stopPropagation();
-
-      openStoryViewer({
-        peerId: realPeer.id,
-        isSinglePeer: storyViewerMode === 'single-peer',
-        origin: storyViewerOrigin,
-      });
-      return;
-    }
-
     if (onClick) {
       onClick(e, hasMedia);
     }
@@ -298,7 +264,6 @@ const Avatar: FC<OwnProps> = ({
     <div
       ref={ref}
       className={fullClassName}
-      id={realPeer?.id && withStory ? getPeerStoryHtmlId(realPeer.id) : undefined}
       data-peer-id={realPeer?.id}
       data-test-sender-id={IS_TEST ? realPeer?.id : undefined}
       aria-label={typeof content === 'string' ? author : undefined}
@@ -311,9 +276,6 @@ const Avatar: FC<OwnProps> = ({
       <div className="inner">
         {typeof content === 'string' ? renderText(content, [isBig ? 'hq_emoji' : 'emoji']) : content}
       </div>
-      {withStory && realPeer?.hasStories && (
-        <AvatarStoryCircle peerId={realPeer.id} size={pxSize} withExtraGap={withStoryGap} />
-      )}
     </div>
   );
 };
