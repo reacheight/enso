@@ -18,6 +18,7 @@ import { IS_TOUCH_ENV } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
 import captureEscKeyListener from '../../../util/captureEscKeyListener';
 import { captureEvents, SwipeDirection } from '../../../util/captureEvents';
+import { getOrderedIds } from '../../../util/folderManager';
 import { MEMO_EMPTY_ARRAY } from '../../../util/memo';
 import { resolveTransitionName } from '../../../util/resolveTransitionName.ts';
 import { renderTextWithEntities } from '../../common/helpers/renderTextWithEntities';
@@ -177,6 +178,40 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
   });
 
   const folderCountersById = useFolderManagerForUnreadCounters();
+  
+  const adjustedFolderCountersById = useMemo(() => {
+    const shouldFilterByWorkspace = currentWorkspaceId === everythingWorkspace.id && excludeOtherWorkspaces;
+    if (!shouldFilterByWorkspace) {
+      return folderCountersById;
+    }
+
+    const folderFromWorkspaces = savedWorkspaces.flatMap(w => w.foldersIds);
+    const adjusted = { ...folderCountersById };
+    
+    const allFolderUnreadChats = folderUnreadChatsCountersById[ALL_FOLDER_ID];
+    if (allFolderUnreadChats) {
+      const filteredUnreadChats = allFolderUnreadChats.filter((chatId) => 
+        !folderFromWorkspaces.some(folderId => getOrderedIds(folderId)?.includes(chatId))
+      );
+      
+      if (adjusted[ALL_FOLDER_ID]) {
+        adjusted[ALL_FOLDER_ID] = {
+          ...adjusted[ALL_FOLDER_ID],
+          chatsCount: filteredUnreadChats.length,
+        };
+      }
+    }
+    
+    return adjusted;
+  }, [
+    folderCountersById, 
+    currentWorkspaceId, 
+    excludeOtherWorkspaces, 
+    savedWorkspaces, 
+    folderUnreadChatsCountersById,
+    everythingWorkspace.id,
+  ]);
+
   const folderTabs = useMemo(() => {
     if (!displayedFolders || !displayedFolders.length) {
       return undefined;
@@ -266,14 +301,14 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
           entities: title.entities,
           noCustomEmojiPlayback: folder.noTitleAnimations,
         }),
-        badgeCount: folderCountersById[id]?.chatsCount,
-        isBadgeActive: Boolean(folderCountersById[id]?.notificationsCount),
+        badgeCount: adjustedFolderCountersById[id]?.chatsCount,
+        isBadgeActive: Boolean(adjustedFolderCountersById[id]?.notificationsCount),
         isBlocked,
         contextActions: contextActions?.length ? contextActions : undefined,
       } satisfies TabWithProperties;
     });
   }, [
-    displayedFolders, maxFolders, folderCountersById, lang, chatFoldersById, maxChatLists, folderInvitesById,
+    displayedFolders, maxFolders, adjustedFolderCountersById, lang, chatFoldersById, maxChatLists, folderInvitesById,
     maxFolderInvites, folderUnreadChatsCountersById, openSettingsScreen,
   ]);
 

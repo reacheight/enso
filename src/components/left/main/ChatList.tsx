@@ -21,7 +21,7 @@ import {
 } from '../../../config';
 import { IS_APP, IS_MAC_OS } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
-import { getOrderKey, getPinnedChatsCount } from '../../../util/folderManager';
+import { getOrderedIds, getOrderKey, getPinnedChatsCount } from '../../../util/folderManager';
 import { getServerTime } from '../../../util/serverTime';
 
 import usePeerStoriesPolling from '../../../hooks/polling/usePeerStoriesPolling';
@@ -41,6 +41,7 @@ import Chat from './Chat';
 import EmptyFolder from './EmptyFolder';
 import FrozenAccountNotification from './FrozenAccountNotification';
 import UnconfirmedSession from './UnconfirmedSession';
+import { useWorkspaceStorage } from '../../../hooks/useWorkspaceStorage';
 
 type OwnProps = {
   className?: string;
@@ -85,6 +86,10 @@ const ChatList: FC<OwnProps> = ({
   const containerRef = useRef<HTMLDivElement>();
   const shouldIgnoreDragRef = useRef(false);
   const [unconfirmedSessionHeight, setUnconfirmedSessionHeight] = useState(0);
+  const { currentWorkspaceId, excludeOtherWorkspaces, savedWorkspaces } = useWorkspaceStorage();
+
+  const EVERYTHING_WORKSPACE_ID = '0';
+  const folderFromWorkspaces = savedWorkspaces.flatMap(w => w.foldersIds);
 
   const isArchived = folderType === 'archived';
   const isAllFolder = folderType === 'all';
@@ -211,7 +216,12 @@ const ChatList: FC<OwnProps> = ({
 
     const pinnedCount = getPinnedChatsCount(resolvedFolderId) || 0;
 
-    return viewportIds!.map((id, i) => {
+    const shouldFilterByWorkspace = isAllFolder && currentWorkspaceId === EVERYTHING_WORKSPACE_ID && excludeOtherWorkspaces;
+    const filteredViewportIds = shouldFilterByWorkspace
+      ? viewportIds!.filter((chatId) => !folderFromWorkspaces.some(folderId => getOrderedIds(folderId)!.includes(chatId)))
+      : viewportIds;
+
+    return filteredViewportIds!.map((id, i) => {
       const isPinned = viewportOffset + i < pinnedCount;
       const offsetTop = unconfirmedSessionHeight + archiveHeight + frozenNotificationHeight
         + (viewportOffset + i) * CHAT_HEIGHT_PX;

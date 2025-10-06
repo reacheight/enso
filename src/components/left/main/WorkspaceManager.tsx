@@ -89,7 +89,7 @@ const WorkspaceManager: FC = () => {
         >
           <Switcher
             checked={excludeOtherWorkspaces}
-            label="Exclude folders from other workspaces"
+            label="Exclude folders and chats from other workspaces"
           />
           Exclude others
         </MenuItem>
