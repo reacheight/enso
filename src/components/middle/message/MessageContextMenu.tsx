@@ -415,7 +415,7 @@ const MessageContextMenu: FC<OwnProps> = ({
         dir={oldLang.isRtl ? 'rtl' : undefined}
       >
         <MenuItem 
-          icon={isInFocusList ? "eye-crossed" : "eye"} 
+          icon={isInFocusList ? "check" : "next"} 
           onClick={isInFocusList ? onRemoveFromFocus : onAddToFocus}
           >
           {isInFocusList ? 'Remove from Priority' : 'Add to Priority'}
