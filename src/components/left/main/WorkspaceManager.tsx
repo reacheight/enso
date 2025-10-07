@@ -1,6 +1,6 @@
 import type { FC } from '../../../lib/teact/teact';
 import React, { memo, useCallback } from '../../../lib/teact/teact';
-import { getActions } from '../../../global';
+import { getActions, withGlobal } from '../../../global';
 import { Workspace } from '../../../types';
 import { useWorkspaceStorage } from '../../../hooks/useWorkspaceStorage';
 
@@ -12,8 +12,15 @@ import buildClassName from '../../../util/buildClassName';
 import Icon from '../../common/icons/Icon';
 import MenuSeparator from '../../ui/MenuSeparator';
 import Switcher from '../../ui/Switcher';
+import { ApiUser } from '../../../api/types';
+import { selectUser } from '../../../global/selectors/users';
+import WorkspaceAvatar from './WorkspaceAvatar';
 
-const WorkspaceManager: FC = () => {
+type StateProps = {
+  currentUser?: ApiUser;
+};
+
+const WorkspaceManager: FC<StateProps> = ({ currentUser }) => {
   const { openWorkspaceCreator, openWorkspaceEditor, setActiveChatFolder } = getActions();
   const {
     savedWorkspaces,
@@ -23,7 +30,7 @@ const WorkspaceManager: FC = () => {
     setExcludeOtherWorkspaces,
   } = useWorkspaceStorage();
 
-  const everythingWorkspace: Workspace = { id: '0', name: 'Everything', foldersIds: [] };
+  const everythingWorkspace: Workspace = { id: '0', name: 'Personal', foldersIds: [] };
   const selectedWorkspace = savedWorkspaces.find(workspace => workspace.id === currentWorkspaceId) || everythingWorkspace;
 
   const handleWorkspaceSelect = useCallback((workspace: Workspace) => {
@@ -46,7 +53,7 @@ const WorkspaceManager: FC = () => {
       onClick={onTrigger}
       className={buildClassName('WorkspaceManager-trigger', isOpen && 'active')}
     >
-      <Icon name="my-notes" />
+      <WorkspaceAvatar workspace={selectedWorkspace} currentUser={currentUser} size="tiny" />
       {selectedWorkspace.name}
     </div>
   ), [selectedWorkspace]);
@@ -62,6 +69,7 @@ const WorkspaceManager: FC = () => {
           key={workspace.id}
           onClick={() => handleWorkspaceSelect(workspace)}
           className="WorkspaceManager-workspace"
+          customIcon={<WorkspaceAvatar workspace={workspace} currentUser={currentUser} size="mini" />}
         >
           {workspace.name}
           {workspace.id === currentWorkspaceId && <Icon name="check" />}
@@ -98,4 +106,10 @@ const WorkspaceManager: FC = () => {
   );
 };
 
-export default memo(WorkspaceManager);
+export default memo(withGlobal<StateProps>(
+  (global): StateProps => {
+    return {
+      currentUser: selectUser(global, global.currentUserId!),
+    };
+  },
+)(WorkspaceManager));

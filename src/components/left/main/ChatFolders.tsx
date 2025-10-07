@@ -137,7 +137,7 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
   }, [orderedFolderIds, lang]);
 
   const { currentWorkspaceId, savedWorkspaces, excludeOtherWorkspaces } = useWorkspaceStorage();
-  const everythingWorkspace = { id: '0', name: 'Everything', foldersIds: [] } satisfies Workspace;
+  const everythingWorkspace = { id: '0', name: 'Personal', foldersIds: [] } satisfies Workspace;
   const currentWorkspace = savedWorkspaces.find((workspace) => workspace.id === currentWorkspaceId) || everythingWorkspace;
 
   const displayedFolders = useMemo(() => {

@@ -7,6 +7,7 @@
 
   &-trigger {
     display: flex;
+    gap: 0.5rem;
     align-items: center;
     font-weight: 500;
     font-size: 1rem;
@@ -20,17 +21,11 @@
     &.active {
       background-color: var(--color-interactive-element-hover);
     }
-
-    .icon {
-      font-size: 1.25rem;
-      color: var(--color-icon-secondary);
-      margin-right: 0.5rem;
-    }
   }
 
   &-workspace {
     display: flex;
-    justify-content: space-between;
+    gap: 0.75rem;
     
     &.compact {
       padding-inline: 0.5rem;
@@ -39,6 +34,7 @@
     .icon {
       color: var(--color-primary);
       margin: 0 !important;
+      margin-left: auto !important;
     }
   }
 

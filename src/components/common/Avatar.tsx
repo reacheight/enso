@@ -78,6 +78,7 @@ type OwnProps = {
   loopIndefinitely?: boolean;
   noPersonalPhoto?: boolean;
   asMessageBubble?: boolean;
+  isRectangular?: boolean;
   observeIntersection?: ObserveFn;
   onClick?: (e: ReactMouseEvent<HTMLDivElement, MouseEvent>, hasMedia: boolean) => void;
   onContextMenu?: (e: React.MouseEvent) => void;
@@ -100,6 +101,7 @@ const Avatar: FC<OwnProps> = ({
   loopIndefinitely,
   noPersonalPhoto,
   asMessageBubble,
+  isRectangular,
   onClick,
   onContextMenu,
   onMouseMove,
@@ -235,7 +237,7 @@ const Avatar: FC<OwnProps> = ({
     content = getFirstLetters(text, 2);
   }
 
-  const isRoundedRect = (isCustomPeer && peer.isAvatarSquare) || isForum;
+  const isRoundedRect = (isCustomPeer && peer.isAvatarSquare) || isForum || isRectangular;
   const isPremiumGradient = isCustomPeer && peer.withPremiumGradient;
   const customColor = isCustomPeer && peer.customPeerAvatarColor;
 

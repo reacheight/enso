@@ -8,7 +8,9 @@ import './CustomButtons.scss';
 const CustomButtons: FC = () => {
   return (
     <div className="CustomButtons">
-      <WorkspaceManager />
+      <div className="workspace-manager">
+        <WorkspaceManager />
+      </div>
       <SavedMessages />
       <FocusListButton />
     </div>
