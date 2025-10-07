@@ -519,7 +519,7 @@ const RightHeader: FC<OwnProps & StateProps> = ({
       case HeaderContent.EditTopic:
         return <h3 className="title">{oldLang('EditTopic')}</h3>;
       case HeaderContent.FocusList:
-        return <h3 className="title">Focus</h3>;
+        return <h3 className="title">Priority</h3>;
       case HeaderContent.GiftList:
         return (
           <>

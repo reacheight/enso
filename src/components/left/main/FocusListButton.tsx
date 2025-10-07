@@ -1,5 +1,5 @@
 import { getActions, withGlobal } from '../../../global';
-import { selectTabState } from '../../../global/selectors';
+import { selectFocusListCount, selectTabState } from '../../../global/selectors';
 import type { FC } from '../../../lib/teact/teact';
 import React, { memo } from '../../../lib/teact/teact';
 import buildClassName from '../../../util/buildClassName';
@@ -9,9 +9,10 @@ import './FocusListButton.scss';
 
 type StateProps = {
   isActive?: boolean;
+  count?: number;
 }
 
-const FocusListButton: FC<StateProps> = ({ isActive }) => {
+const FocusListButton: FC<StateProps> = ({ isActive, count }) => {
   const { toggleFocusList } = getActions();
 
   return (
@@ -19,8 +20,9 @@ const FocusListButton: FC<StateProps> = ({ isActive }) => {
       onClick={() => toggleFocusList()}
       className={buildClassName('FocusListButton-trigger', isActive && 'active')}
     >
-      <Icon name="eye" />  
-      Focus
+      <Icon name="next" />  
+      Priority
+      <span className="count">{count}</span>
     </div>
   );
 };
@@ -31,6 +33,7 @@ export default memo(withGlobal<StateProps>(
 
     return {
       isActive: isFocusListShown,
+      count: selectFocusListCount(global),
     }
   }
 )(FocusListButton));

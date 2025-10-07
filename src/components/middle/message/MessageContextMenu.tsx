@@ -418,7 +418,7 @@ const MessageContextMenu: FC<OwnProps> = ({
           icon={isInFocusList ? "eye-crossed" : "eye"} 
           onClick={isInFocusList ? onRemoveFromFocus : onAddToFocus}
           >
-          {isInFocusList ? 'Remove from Focus' : 'Add to Focus'}
+          {isInFocusList ? 'Remove from Priority' : 'Add to Priority'}
         </MenuItem>
         {isInSavedMessages && !canSendNow && (
           <>

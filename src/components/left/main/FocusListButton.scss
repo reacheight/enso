@@ -27,5 +27,14 @@
       color: var(--color-icon-secondary);
       margin-right: 0.5rem;
     }
+
+    .count {
+      margin-left: auto;
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+      border-radius: var(--border-radius-default-tiny);
+      border: 2px solid var(--color-borders-input);
+      padding: 0.1rem 0.3rem;
+    }
   }
 }
