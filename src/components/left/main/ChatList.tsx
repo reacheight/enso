@@ -89,8 +89,7 @@ const ChatList: FC<OwnProps> = ({
   const { currentWorkspaceId, excludeOtherWorkspaces, savedWorkspaces } = useWorkspaceStorage();
 
   const EVERYTHING_WORKSPACE_ID = '0';
-  const folderFromWorkspaces = savedWorkspaces.flatMap(w => w.foldersIds);
-
+  
   const isArchived = folderType === 'archived';
   const isAllFolder = folderType === 'all';
   const isSaved = folderType === 'saved';
@@ -102,16 +101,31 @@ const ChatList: FC<OwnProps> = ({
   const shouldShowFrozenAccountNotification = isAccountFrozen && isAllFolder;
 
   const orderedIds = useFolderManagerForOrderedIds(resolvedFolderId);
-  usePeerStoriesPolling(orderedIds);
+  
+  const foldersFromWorkspaces = useMemo(() => savedWorkspaces.flatMap(w => w.foldersIds), [savedWorkspaces]);
+  const shouldFilterByWorkspace = isAllFolder && currentWorkspaceId === EVERYTHING_WORKSPACE_ID && excludeOtherWorkspaces;
 
-  const chatsHeight = (orderedIds?.length || 0) * CHAT_HEIGHT_PX;
+  const filteredOrderedIds = useMemo(() => {
+    if (!shouldFilterByWorkspace || !orderedIds) {
+      return orderedIds;
+    }
+
+    return orderedIds.filter((chatId) => {
+      return !foldersFromWorkspaces.some(folderId => {
+        const folderChatIds = getOrderedIds(folderId);
+        return folderChatIds?.includes(chatId);
+      });
+    });
+  }, [orderedIds, shouldFilterByWorkspace, foldersFromWorkspaces]);
+
+  const chatsHeight = (filteredOrderedIds?.length || 0) * CHAT_HEIGHT_PX;
   const archiveHeight = shouldDisplayArchive
     ? archiveSettings?.isMinimized ? ARCHIVE_MINIMIZED_HEIGHT : CHAT_HEIGHT_PX : 0;
   const frozenNotificationHeight = shouldShowFrozenAccountNotification ? 68 : 0;
 
-  const { orderDiffById, getAnimationType } = useOrderDiff(orderedIds);
+  const { orderDiffById, getAnimationType } = useOrderDiff(filteredOrderedIds);
 
-  const [viewportIds, getMore] = useInfiniteScroll(undefined, orderedIds, undefined, CHAT_LIST_SLICE);
+  const [viewportIds, getMore] = useInfiniteScroll(undefined, filteredOrderedIds, undefined, CHAT_LIST_SLICE);
 
   const shouldShowUnconfirmedSessions = useMemo(() => {
     const sessionsArray = Object.values(sessions || {});
@@ -126,20 +140,20 @@ const ChatList: FC<OwnProps> = ({
   }, [shouldShowUnconfirmedSessions]);
 
   // Support <Alt>+<Up/Down> to navigate between chats
-  useHotkeys(useMemo(() => (isActive && orderedIds?.length ? {
+  useHotkeys(useMemo(() => (isActive && filteredOrderedIds?.length ? {
     'Alt+ArrowUp': (e: KeyboardEvent) => {
       e.preventDefault();
-      openNextChat({ targetIndexDelta: -1, orderedIds });
+      openNextChat({ targetIndexDelta: -1, orderedIds: filteredOrderedIds });
     },
     'Alt+ArrowDown': (e: KeyboardEvent) => {
       e.preventDefault();
-      openNextChat({ targetIndexDelta: 1, orderedIds });
+      openNextChat({ targetIndexDelta: 1, orderedIds: filteredOrderedIds });
     },
-  } : undefined), [isActive, orderedIds]));
+  } : undefined), [isActive, filteredOrderedIds]));
 
   // Support <Cmd>+<Digit> to navigate between chats
   useEffect(() => {
-    if (!isActive || isSaved || !orderedIds || !IS_APP) {
+    if (!isActive || isSaved || !filteredOrderedIds || !IS_APP) {
       return undefined;
     }
 
@@ -158,9 +172,9 @@ const ChatList: FC<OwnProps> = ({
           return;
         }
 
-        if (position > orderedIds!.length - 1) return;
+        if (position > filteredOrderedIds!.length - 1) return;
 
-        openChat({ id: orderedIds![position], shouldReplaceHistory: true });
+        openChat({ id: filteredOrderedIds![position], shouldReplaceHistory: true });
       }
     }
 
@@ -170,7 +184,7 @@ const ChatList: FC<OwnProps> = ({
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [
-    archiveSettings, isSaved, isActive, openChat, openNextChat, orderedIds, shouldDisplayArchive, isMainList,
+    archiveSettings, isSaved, isActive, openChat, openNextChat, filteredOrderedIds, shouldDisplayArchive, isMainList,
   ]);
 
   const { observe } = useIntersectionObserver({
@@ -212,16 +226,11 @@ const ChatList: FC<OwnProps> = ({
   });
 
   function renderChats() {
-    const viewportOffset = orderedIds!.indexOf(viewportIds![0]);
+    const viewportOffset = filteredOrderedIds!.indexOf(viewportIds![0]);
 
     const pinnedCount = getPinnedChatsCount(resolvedFolderId) || 0;
 
-    const shouldFilterByWorkspace = isAllFolder && currentWorkspaceId === EVERYTHING_WORKSPACE_ID && excludeOtherWorkspaces;
-    const filteredViewportIds = shouldFilterByWorkspace
-      ? viewportIds!.filter((chatId) => !folderFromWorkspaces.some(folderId => getOrderedIds(folderId)!.includes(chatId)))
-      : viewportIds;
-
-    return filteredViewportIds!.map((id, i) => {
+    return viewportIds!.map((id, i) => {
       const isPinned = viewportOffset + i < pinnedCount;
       const offsetTop = unconfirmedSessionHeight + archiveHeight + frozenNotificationHeight
         + (viewportOffset + i) * CHAT_HEIGHT_PX;
