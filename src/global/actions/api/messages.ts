@@ -990,6 +990,10 @@ addActionHandler('deleteMessages', (global, actions, payload): ActionReturnType 
   if (editingId && messageIds.includes(editingId)) {
     actions.setEditingId({ messageId: undefined, tabId });
   }
+
+  messageIdsToDelete.forEach((messageId) => {
+    actions.removeFromFocusList({ chatId, messageId });
+  });
 });
 
 addActionHandler('resetLocalPaidMessages', (global, actions, payload): ActionReturnType => {
