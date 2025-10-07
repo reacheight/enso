@@ -1,9 +1,8 @@
 import type { FC } from '../../../lib/teact/teact';
-import type React from '../../../lib/teact/teact';
 import {
   memo, useEffect, useMemo, useRef, useState,
 } from '../../../lib/teact/teact';
-import { getActions } from '../../../global';
+import { getActions, withGlobal } from '../../../global';
 
 import type { ApiSession } from '../../../api/types';
 import type { GlobalState } from '../../../global/types';
@@ -24,8 +23,6 @@ import buildClassName from '../../../util/buildClassName';
 import { getOrderedIds, getOrderKey, getPinnedChatsCount } from '../../../util/folderManager';
 import { getServerTime } from '../../../util/serverTime';
 
-import usePeerStoriesPolling from '../../../hooks/polling/usePeerStoriesPolling';
-import useTopOverscroll from '../../../hooks/scroll/useTopOverscroll';
 import useDebouncedCallback from '../../../hooks/useDebouncedCallback';
 import { useFolderManagerForOrderedIds } from '../../../hooks/useFolderManager';
 import { useHotkeys } from '../../../hooks/useHotkeys';
@@ -58,11 +55,15 @@ type OwnProps = {
   withTags?: boolean;
 };
 
+type StateProps = {
+  currentUserId?: string;
+};
+
 const INTERSECTION_THROTTLE = 200;
 const DRAG_ENTER_DEBOUNCE = 500;
 const RESERVED_HOTKEYS = new Set(['9', '0']);
 
-const ChatList: FC<OwnProps> = ({
+const ChatList: FC<OwnProps & StateProps> = ({
   className,
   folderType,
   folderId,
@@ -75,6 +76,7 @@ const ChatList: FC<OwnProps> = ({
   isMainList,
   foldersDispatch,
   withTags,
+  currentUserId,
 }) => {
   const {
     openChat,
@@ -111,7 +113,7 @@ const ChatList: FC<OwnProps> = ({
     }
 
     return orderedIds.filter((chatId) => {
-      return !foldersFromWorkspaces.some(folderId => {
+      return chatId !== currentUserId && !foldersFromWorkspaces.some(folderId => {
         const folderChatIds = getOrderedIds(folderId);
         return folderChatIds?.includes(chatId);
       });
@@ -304,4 +306,11 @@ const ChatList: FC<OwnProps> = ({
   );
 };
 
-export default memo(ChatList);
+export default memo(withGlobal<OwnProps>(
+  (global): StateProps => {
+    return {
+      currentUserId: global.currentUserId!,
+    };
+  },
+)(ChatList));
+
