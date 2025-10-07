@@ -380,7 +380,7 @@ const RightColumn: FC<OwnProps & StateProps> = ({
   return (
     <div
       id="RightColumn-wrapper"
-      className={!isChatSelected ? 'is-hidden' : undefined}
+      className={(!isChatSelected && !isFocusList) ? 'is-hidden' : undefined}
     >
       {isOverlaying && (
         <div className="overlay-backdrop" onClick={close} />
