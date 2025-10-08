@@ -84,6 +84,7 @@ const ChatList: FC<OwnProps & StateProps> = ({
     closeForumPanel,
     openFrozenAccountModal,
     openLeftColumnContent,
+    toggleFocusList,
   } = getActions();
   const containerRef = useRef<HTMLDivElement>();
   const shouldIgnoreDragRef = useRef(false);
@@ -152,6 +153,10 @@ const ChatList: FC<OwnProps & StateProps> = ({
     'Alt+ArrowDown': (e: KeyboardEvent) => {
       e.preventDefault();
       openNextChat({ targetIndexDelta: 1, orderedIds: filteredOrderedIds });
+    },
+    'Ctrl+P': (e: KeyboardEvent) => {
+      e.preventDefault();
+      toggleFocusList();
     },
   } : undefined), [isActive, filteredOrderedIds]));
 
