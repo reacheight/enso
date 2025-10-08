@@ -42,10 +42,12 @@ const FocusList: FC<OwnProps & StateProps> = ({
     <div className="FocusList">
       <div className="FocusList__content custom-scroll">
         {focusMessages.length === 0 ? (
-          <NothingFound
-            text="No messages in Priority"
-            description="Add important messages to your Priority list for quick access"
-          />
+          <div className="FocusList__empty">
+            <NothingFound
+              text="No messages in Priority"
+              description="Add important messages to your Priority list for quick access"
+            />
+          </div>
         ) : (
           <div className="FocusList__messages">
             {focusMessages.map((message, i) => {
