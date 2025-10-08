@@ -334,7 +334,7 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
 
   archiveSettings: {
     isMinimized: false,
-    isHidden: false,
+    isHidden: true,
   },
 
   workspaces: {
