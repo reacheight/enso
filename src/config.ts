@@ -365,6 +365,9 @@ export const BOOST_PER_SENT_GIFT = 3;
 export const FRAGMENT_PHONE_CODE = '888';
 export const FRAGMENT_PHONE_LENGTH = 11;
 
+export const ENSO_LIGHT_THEME_BG_COLOR = '#ced7de';
+export const ENSO_DARK_THEME_BG_COLOR = '#28292d';
+
 export const LIGHT_THEME_BG_COLOR = '#99BA92';
 export const DARK_THEME_BG_COLOR = '#0F0F0F';
 export const DEFAULT_PATTERN_COLOR = '#4A8E3A8C';

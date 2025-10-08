@@ -11,6 +11,8 @@ import {
   DEFAULT_PLAYBACK_RATE,
   DEFAULT_RESALE_GIFTS_FILTER_OPTIONS,
   DEFAULT_VOLUME,
+  ENSO_DARK_THEME_BG_COLOR,
+  ENSO_LIGHT_THEME_BG_COLOR,
   IOS_DEFAULT_MESSAGE_TEXT_SIZE_PX,
   MACOS_DEFAULT_MESSAGE_TEXT_SIZE_PX,
 } from '../config';
@@ -312,10 +314,12 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
       light: {
         isBlurred: true,
         patternColor: DEFAULT_PATTERN_COLOR,
+        backgroundColor: ENSO_LIGHT_THEME_BG_COLOR
       },
       dark: {
         isBlurred: true,
         patternColor: DARK_THEME_PATTERN_COLOR,
+        backgroundColor: ENSO_DARK_THEME_BG_COLOR
       },
     },
     accountDaysTtl: 365,
