@@ -52,7 +52,7 @@ export const IS_PWA = (
   || document.referrer.includes('android-app://')
 );
 
-export const IS_APP = IS_PWA || IS_TAURI;
+export const IS_APP = true;
 
 export const IS_TOUCH_ENV = window.matchMedia('(pointer: coarse)').matches;
 export const IS_VOICE_RECORDING_SUPPORTED = Boolean(

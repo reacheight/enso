@@ -154,7 +154,7 @@ const ChatList: FC<OwnProps & StateProps> = ({
       e.preventDefault();
       openNextChat({ targetIndexDelta: 1, orderedIds: filteredOrderedIds });
     },
-    'Ctrl+P': (e: KeyboardEvent) => {
+    'Mod+P': (e: KeyboardEvent) => {
       e.preventDefault();
       toggleFocusList();
     },
@@ -170,6 +170,9 @@ const ChatList: FC<OwnProps & StateProps> = ({
       if (((IS_MAC_OS && e.metaKey) || (!IS_MAC_OS && e.ctrlKey)) && e.code.startsWith('Digit')) {
         const [, digit] = e.code.match(/Digit(\d)/) || [];
         if (!digit || RESERVED_HOTKEYS.has(digit)) return;
+
+        e.preventDefault();
+        e.stopPropagation();
 
         const isArchiveInList = shouldDisplayArchive && archiveSettings && !archiveSettings.isMinimized;
 
