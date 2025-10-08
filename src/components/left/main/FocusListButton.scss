@@ -11,8 +11,7 @@
     transition: background-color 0.15s, color 0.15s;
     cursor: pointer;
 
-    &:hover,
-    &.active {
+    &:hover {
       background-color: var(--color-interactive-element-hover);
     }
 
