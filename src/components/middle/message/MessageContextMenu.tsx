@@ -36,6 +36,7 @@ import useFlag from '../../../hooks/useFlag';
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useOldLang from '../../../hooks/useOldLang';
+import { TargetIcon } from '../../left/main/FocusListButton';
 
 import AvatarList from '../../common/AvatarList';
 import Menu from '../../ui/Menu';
@@ -415,7 +416,8 @@ const MessageContextMenu: FC<OwnProps> = ({
         dir={oldLang.isRtl ? 'rtl' : undefined}
       >
         <MenuItem 
-          icon={isInFocusList ? "check" : "next"} 
+          icon={isInFocusList ? "check" : undefined}
+          customIcon={!isInFocusList ? <TargetIcon /> : undefined}
           onClick={isInFocusList ? onRemoveFromFocus : onAddToFocus}
           >
           {isInFocusList ? 'Remove from Priority' : 'Add to Priority'}

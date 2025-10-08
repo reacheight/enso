@@ -3,7 +3,22 @@ import { selectFocusListCount, selectTabState } from '../../../global/selectors'
 import type { FC } from '../../../lib/teact/teact';
 import React, { memo } from '../../../lib/teact/teact';
 import buildClassName from '../../../util/buildClassName';
-import Icon from '../../common/icons/Icon';
+
+export const TargetIcon: FC = () => (
+  <span className="icon">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2.3"/>
+      <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2.3"/>
+      <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+    </svg>
+  </span>
+);
 
 import './FocusListButton.scss';
 
@@ -20,7 +35,7 @@ const FocusListButton: FC<StateProps> = ({ isActive, count }) => {
       onClick={() => toggleFocusList()}
       className={buildClassName('FocusListButton-trigger', isActive && 'active')}
     >
-      <Icon name="next" />  
+      <TargetIcon />  
       Priority
       <span className="count">{count}</span>
     </div>
