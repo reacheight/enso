@@ -108,17 +108,19 @@ const ChatList: FC<OwnProps & StateProps> = ({
   const shouldFilterByWorkspace = isAllFolder && currentWorkspaceId === EVERYTHING_WORKSPACE_ID && excludeOtherWorkspaces;
 
   const filteredOrderedIds = useMemo(() => {
-    if (!shouldFilterByWorkspace || !orderedIds) {
-      return orderedIds;
+    const orderedIdsWithoutSelf = orderedIds?.filter((chatId) => chatId !== currentUserId);
+
+    if (!shouldFilterByWorkspace || !orderedIdsWithoutSelf) {
+      return orderedIdsWithoutSelf;
     }
 
-    return orderedIds.filter((chatId) => {
-      return chatId !== currentUserId && !foldersFromWorkspaces.some(folderId => {
+    return orderedIdsWithoutSelf.filter((chatId) => {
+      return !foldersFromWorkspaces.some(folderId => {
         const folderChatIds = getOrderedIds(folderId);
         return folderChatIds?.includes(chatId);
       });
     });
-  }, [orderedIds, shouldFilterByWorkspace, foldersFromWorkspaces]);
+  }, [orderedIds, shouldFilterByWorkspace, foldersFromWorkspaces, currentUserId]);
 
   const chatsHeight = (filteredOrderedIds?.length || 0) * CHAT_HEIGHT_PX;
   const archiveHeight = shouldDisplayArchive
