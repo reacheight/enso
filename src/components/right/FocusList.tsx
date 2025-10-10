@@ -4,9 +4,10 @@ import { getActions, withGlobal } from '../../global';
 
 import type { ApiMessage } from '../../api/types';
 
-import { selectFocusListMessages } from '../../global/selectors';
+import { selectFocusListMessages, selectTheme, selectThemeValues } from '../../global/selectors';
 import { getMessageOriginalId } from '../../global/helpers/messages';
 
+import buildStyle from '../../util/buildStyle';
 import useLastCallback from '../../hooks/useLastCallback';
 
 import NothingFound from '../common/NothingFound';
@@ -22,11 +23,13 @@ type OwnProps = {
 
 type StateProps = {
   focusMessages?: ApiMessage[];
+  patternColor?: string;
 };
 
 const FocusList: FC<OwnProps & StateProps> = ({
   isActive,
   focusMessages,
+  patternColor,
 }) => {
   const { focusMessage } = getActions();
 
@@ -39,7 +42,7 @@ const FocusList: FC<OwnProps & StateProps> = ({
   }
 
   return (
-    <div className="FocusList">
+    <div className="FocusList" style={buildStyle(`--pattern-color: ${patternColor}`)}>
       <div className="FocusList__content custom-scroll">
         {focusMessages.length === 0 ? (
           <div className="FocusList__empty">
@@ -100,7 +103,13 @@ const FocusList: FC<OwnProps & StateProps> = ({
 };
 
 export default memo(withGlobal<OwnProps>(
-  (global): StateProps => ({
-    focusMessages: selectFocusListMessages(global),
-  }),
+  (global): StateProps => {
+    const theme = selectTheme(global);
+    const { patternColor } = selectThemeValues(global, theme) || {};
+    
+    return {
+      focusMessages: selectFocusListMessages(global),
+      patternColor,
+    };
+  },
 )(FocusList));
