@@ -1,10 +1,10 @@
-import type { FC } from '@teact';
+import { type FC, useEffect } from '@teact';
 import { memo } from '@teact';
 import { getActions, withGlobal } from '../../global';
 
 import type { ApiMessage } from '../../api/types';
 
-import { selectFocusListMessages } from '../../global/selectors';
+import { selectFocusListMessageKeys, selectFocusListMessages } from '../../global/selectors';
 import { getMessageOriginalId } from '../../global/helpers/messages';
 
 import useLastCallback from '../../hooks/useLastCallback';
@@ -21,22 +21,37 @@ type OwnProps = {
 };
 
 type StateProps = {
-  focusMessages: ApiMessage[];
+  focusMessages?: ApiMessage[];
+  focusMessagesKeys?: string[];
 };
 
 const FocusList: FC<OwnProps & StateProps> = ({
   isActive,
   focusMessages,
+  focusMessagesKeys,
 }) => {
-  const { focusMessage } = getActions();
+  const { focusMessage, removeFromFocusList } = getActions();
 
   const handleMessageClick = useLastCallback((message: ApiMessage) => {
     focusMessage({ chatId: message.chatId, messageId: message.id });
   });
 
-  if (!isActive) {
+  if (!isActive || !focusMessages || !focusMessagesKeys) {
     return undefined;
   }
+
+  useEffect(() => {
+    if (!focusMessagesKeys || !focusMessages) return;
+
+    focusMessagesKeys.forEach((messageKey) => {
+      const [chatId, messageIdStr] = messageKey.split('_');
+      const messageId = parseInt(messageIdStr, 10);
+
+      if (!focusMessages.some((message) => message.chatId === chatId && message.id === messageId)) {
+        removeFromFocusList({ chatId, messageId });
+      }
+    });
+  }, [focusMessagesKeys, focusMessages, removeFromFocusList, focusMessage]);
 
   return (
     <div className="FocusList">
@@ -102,5 +117,6 @@ const FocusList: FC<OwnProps & StateProps> = ({
 export default memo(withGlobal<OwnProps>(
   (global): StateProps => ({
     focusMessages: selectFocusListMessages(global),
+    focusMessagesKeys: selectFocusListMessageKeys(global),
   }),
 )(FocusList));

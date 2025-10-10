@@ -17,6 +17,10 @@ export function selectFocusListMessages(global: GlobalState): ApiMessage[] {
     .filter((message): message is ApiMessage => message !== undefined);
 }
 
+export function selectFocusListMessageKeys(global: GlobalState): string[] {
+  return global.focusList.messageIds;
+}
+
 export function selectFocusListCount(global: GlobalState): number {
   return global.focusList.messageIds.length;
 }
