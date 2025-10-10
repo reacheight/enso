@@ -296,6 +296,7 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
   const [isClosePollDialogOpen, openClosePollDialog, closeClosePollDialog] = useFlag();
   const [selectionQuoteOffset, setSelectionQuoteOffset] = useState(UNQUOTABLE_OFFSET);
   const [requestCalendar, calendar] = useSchedule(canScheduleUntilOnline, onClose, message.date);
+  const [requestRemindMeCalendar, remindMeCalendar] = useSchedule(false, onClose, message.date, true);
 
   // `undefined` indicates that emoji are present and loading
   const hasCustomEmoji = customEmojiSetsInfo === undefined || Boolean(customEmojiSetsInfo.length);
@@ -527,10 +528,6 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
     }, 100);
   });
 
-  const handleToFocus = useLastCallback(() => {
-    closeMenu();
-  });
-
   const handleForward = useLastCallback(() => {
     closeMenu();
     if (album?.messages) {
@@ -591,6 +588,19 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
   const handleOpenCalendar = useLastCallback(() => {
     setIsMenuOpen(false);
     requestCalendar(handleRescheduleMessage);
+  });
+
+  const handleRemindScheduleMessage = useLastCallback((scheduledAt: number) => {
+    forwardToSavedMessages({ scheduledAt });
+    onClose();
+  });
+
+  const handleRemindMe = useLastCallback(() => {
+    const messageIds = album?.messages ? album.messages.map(({ id }) => id) : [message.id];
+    openForwardMenu({ fromChatId: message.chatId, messageIds, isRemindMe: true });
+    setIsMenuOpen(false);
+
+    requestRemindMeCalendar(handleRemindScheduleMessage);
   });
 
   const handleOpenSeenByModal = useLastCallback(() => {
@@ -814,6 +824,7 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
         userFullName={userFullName}
         canGift={canGift}
         isInFocusList={isInFocusList}
+        onRemindMe={handleRemindMe}
       />
       <PinMessageModal
         isOpen={isPinModalOpen}
@@ -829,6 +840,7 @@ const ContextMenuContainer: FC<OwnProps & StateProps> = ({
         confirmHandler={handlePollClose}
       />
       {canReschedule && calendar}
+      {canForward && remindMeCalendar}
     </div>
   );
 };

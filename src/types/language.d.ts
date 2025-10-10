@@ -1793,6 +1793,13 @@ export interface LangPairWithVariables<V = LangVariable> {
     'date': V;
     'time': V;
   };
+  'RemindMeMessageSendToday': {
+    'time': V;
+  };
+  'RemindMeMessageSendOn': {
+    'date': V;
+    'time': V;
+  };
   'ChatListDeleteAndLeaveGroupConfirmation': {
     'chat': V;
   };

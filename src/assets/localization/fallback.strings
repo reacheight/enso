@@ -246,6 +246,8 @@
 "Close" = "Close";
 "ConversationScheduleMessageSendToday" = "Send today at {time}";
 "ConversationScheduleMessageSendOn" = "Send on {date} at {time}";
+"RemindMeMessageSendToday" = "Remind today at {time}";
+"RemindMeMessageSendOn" = "Remind on {date} at {time}";
 "Phone" = "Phone";
 "Username" = "Username";
 "UserBio" = "Bio";

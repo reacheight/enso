@@ -540,7 +540,7 @@ addActionHandler('openReplyMenu', (global, actions, payload): ActionReturnType =
 
 addActionHandler('openForwardMenu', (global, actions, payload): ActionReturnType => {
   const {
-    fromChatId, messageIds, storyId, groupedId, withMyScore, tabId = getCurrentTabId(),
+    fromChatId, messageIds, storyId, groupedId, withMyScore, tabId = getCurrentTabId(), isRemindMe,
   } = payload;
   let groupedMessageIds;
   if (groupedId) {
@@ -553,7 +553,8 @@ addActionHandler('openForwardMenu', (global, actions, payload): ActionReturnType
       storyId,
       withMyScore,
     },
-    isShareMessageModalShown: true,
+    isShareMessageModalShown: !isRemindMe,
+    isRemindMeCalendarShown: isRemindMe,
   }, tabId);
 });
 

@@ -31,6 +31,7 @@ export type OwnProps = {
   isPastMode?: boolean;
   isOpen: boolean;
   withTimePicker?: boolean;
+  isRemindMe?: boolean;
   submitButtonLabel?: string;
   secondButtonLabel?: string;
   description?: string;
@@ -58,6 +59,7 @@ const CalendarModal: FC<OwnProps> = ({
   isPastMode,
   isOpen,
   withTimePicker,
+  isRemindMe,
   submitButtonLabel,
   secondButtonLabel,
   description,
@@ -145,8 +147,8 @@ const CalendarModal: FC<OwnProps> = ({
   ), [currentMonth, currentYear]);
 
   const submitLabel = useMemo(() => {
-    return submitButtonLabel || formatSubmitLabel(lang, selectedDate);
-  }, [lang, selectedDate, submitButtonLabel]);
+    return submitButtonLabel || formatSubmitLabel(lang, selectedDate, isRemindMe);
+  }, [lang, selectedDate, submitButtonLabel, isRemindMe]);
 
   function handlePrevMonth() {
     setCurrentMonthAndYear((d) => {
@@ -415,15 +417,15 @@ function formatDay(year: number, month: number, day: number) {
   return `${year}-${month + 1}-${day}`;
 }
 
-function formatSubmitLabel(lang: OldLangFn, date: Date) {
+function formatSubmitLabel(lang: OldLangFn, date: Date, isRemindMe?: boolean) {
   const day = formatDateToString(date, lang.code);
   const today = formatDateToString(new Date(), lang.code);
 
   if (day === today) {
-    return lang('Conversation.ScheduleMessage.SendToday', formatTime(lang, date));
+    return lang(isRemindMe ? 'RemindMeMessageSendToday' : 'Conversation.ScheduleMessage.SendToday', formatTime(lang, date));
   }
 
-  return lang('Conversation.ScheduleMessage.SendOn', [day, formatTime(lang, date)]);
+  return lang(isRemindMe ? 'RemindMeMessageSendOn' : 'Conversation.ScheduleMessage.SendOn', [day, formatTime(lang, date)]);
 }
 
 export default memo(CalendarModal);

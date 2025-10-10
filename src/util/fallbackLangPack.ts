@@ -89,6 +89,8 @@ export default {
   'Weekday.ShortSaturday': 'Sat',
   'Weekday.ShortFriday': 'Fri',
   'Conversation.ScheduleMessage.SendOn': 'Send on %@ at %@',
+  RemindMeMessageSendToday: 'Remind today at %@',
+  RemindMeMessageSendOn: 'Remind on %@ at %@',
   'Weekday.ShortThursday': 'Thu',
   'Weekday.ShortWednesday': 'Wed',
   'Weekday.ShortTuesday': 'Tue',

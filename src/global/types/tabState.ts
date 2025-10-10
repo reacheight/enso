@@ -386,6 +386,7 @@ export type TabState = {
   };
 
   isShareMessageModalShown?: boolean;
+  isRemindMeCalendarShown?: boolean;
 
   replyingMessage: {
     fromChatId?: string;

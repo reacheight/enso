@@ -437,6 +437,7 @@ export const INITIAL_TAB_STATE: TabState = {
   },
 
   isShareMessageModalShown: false,
+  isRemindMeCalendarShown: false,
 
   isWebAppsCloseConfirmationModalOpen: false,
 

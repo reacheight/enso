@@ -14,6 +14,7 @@ const useSchedule = (
   canScheduleUntilOnline?: boolean,
   onCancel?: () => void,
   openAt?: number,
+  isRemindMe?: boolean,
 ) => {
   const lang = useOldLang();
   const [onScheduled, setOnScheduled] = useState<OnScheduledCallback | undefined>();
@@ -57,6 +58,7 @@ const useSchedule = (
       onClose={handleCloseCalendar}
       onSubmit={handleMessageSchedule}
       onSecondButtonClick={canScheduleUntilOnline ? handleMessageScheduleUntilOnline : undefined}
+      isRemindMe={isRemindMe}
     />
   );
 

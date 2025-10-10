@@ -258,7 +258,7 @@ export default memo(withGlobal<OwnProps>(
     const isShareMessageModalOpen = tabState.isShareMessageModalShown;
     const isAnyModalOpen = Boolean(isShareMessageModalOpen || tabState.requestedDraft
       || tabState.requestedAttachBotInChat || tabState.requestedAttachBotInstall || tabState.reportModal
-      || tabState.deleteMessageModal);
+      || tabState.deleteMessageModal || tabState.isRemindMeCalendarShown);
 
     return {
       chat,

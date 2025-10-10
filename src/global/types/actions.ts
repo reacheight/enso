@@ -1902,6 +1902,7 @@ export interface ActionPayloads {
     storyId?: number;
     groupedId?: string;
     withMyScore?: boolean;
+    isRemindMe?: boolean;
   } & WithTabId;
   openForwardMenuForSelectedMessages: WithTabId | undefined;
   setForwardChatOrTopic: {
@@ -1924,7 +1925,7 @@ export interface ActionPayloads {
   } & WithTabId;
   exitForwardMode: WithTabId | undefined;
   changeRecipient: WithTabId | undefined;
-  forwardToSavedMessages: WithTabId | undefined;
+  forwardToSavedMessages: { scheduledAt?: number } & WithTabId | undefined;
   forwardStory: {
     toChatId: string;
   } & WithTabId;

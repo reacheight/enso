@@ -138,6 +138,7 @@ type OwnProps = {
   onMoveToBottom?: NoneToVoidFunction;
   onAddToFocus?: NoneToVoidFunction;
   onRemoveFromFocus?: NoneToVoidFunction;
+  onRemindMe?: NoneToVoidFunction;
   userFullName?: string;
   canGift?: boolean;
   isInFocusList?: boolean;
@@ -236,6 +237,7 @@ const MessageContextMenu: FC<OwnProps> = ({
   onMoveToBottom,
   onAddToFocus,
   onRemoveFromFocus,
+  onRemindMe,
   userFullName,
   canGift,
   isInFocusList,
@@ -258,6 +260,12 @@ const MessageContextMenu: FC<OwnProps> = ({
   const isStarGiftUnique = message.content.action?.type === 'starGiftUnique';
   const shouldShowGiftButton = isUserId(message.chatId)
     && canGift && (isPremiumGift || isGiftCode || isStarGift || isStarGiftUnique);
+
+  const canAddOrRemoveFromFocus = !canSendNow;
+  const canRemindMe = canForward;
+  const canMoveToBottom = isInSavedMessages && canForward;
+
+  const showEnsoActions = canAddOrRemoveFromFocus || canRemindMe || canMoveToBottom;
 
   const [areItemsHidden, hideItems] = useFlag();
   const [isReady, markIsReady, unmarkIsReady] = useFlag();
@@ -415,21 +423,32 @@ const MessageContextMenu: FC<OwnProps> = ({
         )}
         dir={oldLang.isRtl ? 'rtl' : undefined}
       >
-        <MenuItem 
-          icon={isInFocusList ? "check" : undefined}
-          customIcon={!isInFocusList ? <TargetIcon /> : undefined}
-          onClick={isInFocusList ? onRemoveFromFocus : onAddToFocus}
-          >
-          {isInFocusList ? 'Remove from Priority' : 'Add to Priority'}
-        </MenuItem>
-        {isInSavedMessages && !canSendNow && (
+        {showEnsoActions && (
           <>
-            <MenuItem icon="arrow-down" onClick={onMoveToBottom}>
-              Move to bottom
-            </MenuItem>
+            {canAddOrRemoveFromFocus && (
+              <MenuItem 
+                icon={isInFocusList ? "check" : undefined}
+                customIcon={!isInFocusList ? <TargetIcon /> : undefined}
+                onClick={isInFocusList ? onRemoveFromFocus : onAddToFocus}
+              >
+                {isInFocusList ? 'Remove from Priority' : 'Add to Priority'}
+              </MenuItem>
+            )}
+            {canRemindMe && (
+              <MenuItem icon='schedule' onClick={onRemindMe}>
+                Remind me
+              </MenuItem>
+            )}
+            {canMoveToBottom && (
+              <>
+                <MenuItem icon="arrow-down" onClick={onMoveToBottom}>
+                  Move to bottom
+                </MenuItem>
+              </>
+            )}
+            <MenuSeparator />
           </>
         )}
-        <MenuSeparator />
 
         {shouldShowGiftButton
           && (
