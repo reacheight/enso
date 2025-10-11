@@ -24,7 +24,7 @@ env:
   IS_ON_MASTER: ${{ github.ref == 'refs/heads/master' }}
   SHOULD_PUBLISH: ${{ github.ref == 'refs/heads/master' && vars.PUBLISH_REPO || '' }}
   PUBLISH_REPO: ${{ vars.PUBLISH_REPO }}
-  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  GH_TOKEN: ${{ secrets.GH_TOKEN_TAURI }}
   UPDATER_GIST_URL: ${{ secrets.UPDATER_GIST_URL }}
   UPDATER_GIST_ID: ${{ secrets.UPDATER_GIST_ID }}
 
@@ -262,9 +262,10 @@ jobs:
 
       # Windows release
       - name: Install DigiCert Client tools
+        if: matrix.settings.platform == 'windows-latest' && secrets.SM_CLIENT_CERT_FILE_B64 != ''
         uses: digicert/ssm-code-signing@v1.1.1
       - name: Setup certificate and set environment variables (Windows)
-        if: matrix.settings.platform == 'windows-latest'
+        if: matrix.settings.platform == 'windows-latest' && secrets.SM_CLIENT_CERT_FILE_B64 != ''
         shell: bash
         run: |
           echo "${{ secrets.SM_CLIENT_CERT_FILE_B64 }}" | base64 --decode > /d/Certificate_pkcs12.p12
@@ -278,7 +279,7 @@ jobs:
           echo "C:\Program Files\DigiCert\DigiCert One Signing Manager Tools" >> $GITHUB_PATH
 
       - name: Sign package (Windows)
-        if: matrix.settings.platform == 'windows-latest'
+        if: matrix.settings.platform == 'windows-latest' && secrets.SM_CLIENT_CERT_FILE_B64 != ''
         env:
           KEYPAIR_ALIAS: ${{ secrets.KEYPAIR_ALIAS }}
           FILE_PATH: ${{ steps.file-info.outputs.path }}/${{ steps.file-info.outputs.filename }}
