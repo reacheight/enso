@@ -2,7 +2,6 @@
 export default function prepareTauriConfig() {
   const config = {
     build: {
-      frontendDist: process.env.BASE_URL,
       devUrl: null,
     },
   };
