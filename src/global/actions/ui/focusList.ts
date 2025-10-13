@@ -44,3 +44,15 @@ addActionHandler('removeFromFocusList', (global, actions, payload): ActionReturn
     },
   };
 });
+
+addActionHandler('replaceFocusList', (global, actions, payload): ActionReturnType => {
+  const { messageKeys } = payload;
+  
+  return {
+    ...global,
+    focusList: {
+      ...global.focusList,
+      messageIds: messageKeys,
+    },
+  };
+});

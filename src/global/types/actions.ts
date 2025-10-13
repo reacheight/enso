@@ -2826,6 +2826,10 @@ export interface ActionPayloads {
     chatId: string;
     messageId: number;
   };
+
+  replaceFocusList: {
+    messageKeys: string[];
+  };
 }
 
 export interface RequiredActionPayloads {

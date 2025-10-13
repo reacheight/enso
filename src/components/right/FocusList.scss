@@ -19,30 +19,18 @@
   }
 
   &__messages {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    position: relative;
   }
 
   &__message-item {
-    position: relative;
-    transition: background-color 0.15s ease;
+    position: absolute;
+    width: 100%;
+    transition: top 0.3s ease;
     overflow: visible;
     padding: 0.75rem 1rem;
-    
-    &:hover {
-      background: var(--color-interactive-element-hover);
-    }
-    
-    &:last-child {
-      border-bottom: none;
-    }
-  }
-
-  &__message-content {
     cursor: pointer;
     user-select: none;
-    overflow: visible;
+    will-change: top;
     
     .Message {
       background: none !important;
@@ -51,17 +39,15 @@
       margin: 0;
       box-shadow: none;
       overflow: visible;
+
+      padding-left: 2.5rem;
+
+      @media (max-width: 600px) {
+        padding-left: 2.875rem;
+      }
       
       &:hover {
         background: none !important;
-      }
-
-      &:not(.own) {
-        padding-left: 2.5rem;
-
-        @media (max-width: 600px) {
-          padding-left: 2.875rem;
-        }
       }
 
       .message-action-buttons,
@@ -84,6 +70,15 @@
 
     .message-content {
       max-width: min(26rem, calc(var(--right-column-width) - 8rem)) !important;
+    }
+  }
+
+  .draggable-knob {
+    right: 0.5rem !important;
+    top: 2rem !important;
+    
+    @media (max-width: 768px) {
+      right: 0.25rem !important;
     }
   }
 }
