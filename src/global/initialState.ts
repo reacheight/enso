@@ -346,6 +346,8 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
     isCreatorOpen: false,
     editingWorkspaceId: undefined,
   },
+
+  isFocusMode: false,
 };
 
 export const INITIAL_TAB_STATE: TabState = {

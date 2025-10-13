@@ -136,6 +136,14 @@ addActionHandler('updatePerformanceSettings', (global, actions, payload): Action
   return global;
 });
 
+addActionHandler('setFocusMode', (global, actions, payload): ActionReturnType => {
+  const { isEnabled } = payload!;
+  return {
+    ...global,
+    isFocusMode: isEnabled,
+  };
+});
+
 addActionHandler('setThemeSettings', (global, actions, payload): ActionReturnType => {
   const { theme, ...settings } = payload;
 

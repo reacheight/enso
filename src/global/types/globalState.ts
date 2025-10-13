@@ -484,6 +484,8 @@ export type GlobalState = {
     isCreatorOpen: boolean;
     editingWorkspaceId?: string;
   };
+
+  isFocusMode: boolean;
 };
 
 export type RequiredGlobalState = GlobalState & { _: never };

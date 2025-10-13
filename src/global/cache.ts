@@ -316,6 +316,10 @@ function unsafeMigrateCache(cached: GlobalState, initialState: GlobalState) {
     cached.chats.notifyExceptionById = initialState.chats.notifyExceptionById;
   }
 
+  if (cached.isFocusMode === undefined) {
+    cached.isFocusMode = initialState.isFocusMode;
+  }
+
   if (!cached.sharedState) {
     cached.sharedState = initialState.sharedState;
     cached.sharedState.settings = {
@@ -429,6 +433,7 @@ function reduceGlobal<T extends GlobalState>(global: T) {
       'timezones',
       'availableEffectById',
       'focusList',
+      'isFocusMode',
     ]),
     lastIsChatInfoShown: !getIsMobile() ? global.lastIsChatInfoShown : undefined,
     lastIsFocusListShown: !getIsMobile() ? global.lastIsFocusListShown : undefined,

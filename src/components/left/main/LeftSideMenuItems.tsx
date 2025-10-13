@@ -48,7 +48,7 @@ type StateProps = {
   theme: ThemeKey;
   attachBots: GlobalState['attachMenu']['bots'];
   accountsTotalLimit: number;
-} & Pick<GlobalState, 'currentUserId' | 'archiveSettings'>;
+} & Pick<GlobalState, 'currentUserId' | 'archiveSettings' | 'isFocusMode'>;
 
 const LeftSideMenuItems = ({
   archiveSettings,
@@ -57,6 +57,7 @@ const LeftSideMenuItems = ({
   attachBots,
   currentUser,
   accountsTotalLimit,
+  isFocusMode,
   onSelectArchived,
   onSelectContacts,
   onSelectSettings,
@@ -66,6 +67,7 @@ const LeftSideMenuItems = ({
   const {
     setSharedSettingOption,
     updatePerformanceSettings,
+    setFocusMode,
   } = getActions();
   const lang = useLang();
 
@@ -101,6 +103,13 @@ const LeftSideMenuItems = ({
 
   const handleChangelogClick = useLastCallback(() => {
     window.open(BETA_CHANGELOG_URL, '_blank', 'noopener,noreferrer');
+  });
+
+  const handleFocusModeToggle = useLastCallback((e: React.SyntheticEvent<HTMLElement>) => {
+    e.stopPropagation();
+    const newValue = !isFocusMode;
+    
+    setFocusMode({ isEnabled: newValue });
   });
 
   return (
@@ -161,6 +170,18 @@ const LeftSideMenuItems = ({
         />
       </MenuItem>
       <MenuItem
+        icon="unmute"
+        onClick={handleFocusModeToggle}
+      >
+        <span className="menu-item-name">{lang('MenuFocusMode')}</span>
+        <Switcher
+          id="focusmode"
+          label={lang(isFocusMode ? 'AriaMenuDisableFocusMode' : 'AriaMenuEnableFocusMode')}
+          checked={isFocusMode}
+          noAnimation
+        />
+      </MenuItem>
+      <MenuItem
         icon="animations"
         onClick={handleAnimationLevelChange}
       >
@@ -182,7 +203,7 @@ const LeftSideMenuItems = ({
 export default memo(withGlobal<OwnProps>(
   (global): Complete<StateProps> => {
     const {
-      currentUserId, archiveSettings,
+      currentUserId, archiveSettings, isFocusMode,
     } = global;
     const { animationLevel } = selectSharedSettings(global);
     const attachBots = global.attachMenu.bots;
@@ -195,6 +216,7 @@ export default memo(withGlobal<OwnProps>(
       archiveSettings,
       attachBots,
       accountsTotalLimit: selectPremiumLimit(global, 'moreAccounts'),
+      isFocusMode,
     };
   },
 )(LeftSideMenuItems));

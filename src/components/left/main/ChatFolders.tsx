@@ -34,7 +34,6 @@ import useLastCallback from '../../../hooks/useLastCallback';
 import useShowTransition from '../../../hooks/useShowTransition';
 import { useWorkspaceStorage } from '../../../hooks/useWorkspaceStorage';
 
-import StoryRibbon from '../../story/StoryRibbon';
 import TabList from '../../ui/TabList';
 import Transition from '../../ui/Transition';
 import ChatList from './ChatList';
@@ -62,6 +61,7 @@ type StateProps = {
   isStoryRibbonShown?: boolean;
   sessions?: Record<string, ApiSession>;
   isAccountFrozen?: boolean;
+  isFocusMode?: boolean;
 };
 
 const SAVED_MESSAGES_HOTKEY = '0';
@@ -87,6 +87,7 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
   isStoryRibbonShown,
   sessions,
   isAccountFrozen,
+  isFocusMode,
 }) => {
   const {
     loadChatFolders,
@@ -301,8 +302,8 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
           entities: title.entities,
           noCustomEmojiPlayback: folder.noTitleAnimations,
         }),
-        badgeCount: adjustedFolderCountersById[id]?.chatsCount,
-        isBadgeActive: Boolean(adjustedFolderCountersById[id]?.notificationsCount),
+        badgeCount: isFocusMode ? 0 : adjustedFolderCountersById[id]?.chatsCount,
+        isBadgeActive: !isFocusMode && Boolean(adjustedFolderCountersById[id]?.notificationsCount),
         isBlocked,
         contextActions: contextActions?.length ? contextActions : undefined,
       } satisfies TabWithProperties;
@@ -310,6 +311,7 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
   }, [
     displayedFolders, maxFolders, adjustedFolderCountersById, lang, chatFoldersById, maxChatLists, folderInvitesById,
     maxFolderInvites, folderUnreadChatsCountersById, openSettingsScreen,
+    isFocusMode,
   ]);
 
   const handleSwitchTab = useLastCallback((index: number) => {
@@ -481,6 +483,7 @@ export default memo(withGlobal<OwnProps>(
       },
       currentUserId,
       archiveSettings,
+      isFocusMode,
     } = global;
     const { animationLevel } = selectSharedSettings(global);
     const { shouldSkipHistoryAnimations, activeChatFolder } = selectTabState(global);
@@ -504,6 +507,7 @@ export default memo(withGlobal<OwnProps>(
       isStoryRibbonShown,
       sessions,
       isAccountFrozen,
+      isFocusMode,
     };
   },
 )(ChatFolders));

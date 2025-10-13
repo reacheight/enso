@@ -1420,8 +1420,11 @@
 "MenuContacts" = "Contacts";
 "MenuSettings" = "Settings";
 "MenuNightMode" = "Night Mode";
+"MenuFocusMode" = "Focus Mode";
 "AriaMenuEnableNightMode" = "Enable night mode";
 "AriaMenuDisableNightMode" = "Disable night mode";
+"AriaMenuEnableFocusMode" = "Enable Focus mode";
+"AriaMenuDisableFocusMode" = "Disable Focus mode";
 "MenuAnimationsSwitch" = "Animations";
 "MenuTelegramFeatures" = "Telegram Features";
 "TelegramFeaturesUsername" = "TelegramTips";

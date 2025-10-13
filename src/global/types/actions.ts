@@ -189,6 +189,7 @@ export interface ActionPayloads {
   setSettingOption: Partial<AccountSettings> | undefined;
   setSharedSettingOption: Partial<SharedState['settings']> | undefined;
   updatePerformanceSettings: Partial<PerformanceType>;
+  setFocusMode: { isEnabled: boolean };
   loadPasswordInfo: undefined;
   clearTwoFaError: undefined;
   openMonetizationVerificationModal: {

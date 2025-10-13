@@ -124,6 +124,7 @@ type StateProps = {
   orderedFolderIds?: number[];
   chatFoldersById?: Record<number, ApiChatFolder>;
   areTagsEnabled?: boolean;
+  showChatBadge?: boolean;
 };
 
 const Chat: FC<OwnProps & StateProps> = ({
@@ -167,6 +168,7 @@ const Chat: FC<OwnProps & StateProps> = ({
   chatFoldersById,
   areTagsEnabled,
   withTags,
+  showChatBadge,
 }) => {
   const {
     openChat,
@@ -419,14 +421,16 @@ const Chat: FC<OwnProps & StateProps> = ({
           {!isAvatarOnlineShown && Boolean(chat.subscriptionUntil) && (
             <StarIcon type="gold" className="avatar-badge avatar-subscription" size="adaptive" />
           )}
-          <ChatBadge
-            chat={chat}
-            isMuted={isMuted}
-            shouldShowOnlyMostImportant
-            forceHidden={getIsForumPanelClosed}
-            topics={topics}
-            isSelected={isSelected}
-          />
+          {showChatBadge && (
+            <ChatBadge
+              chat={chat}
+              isMuted={isMuted}
+              shouldShowOnlyMostImportant
+              forceHidden={getIsForumPanelClosed}
+              topics={topics}
+              isSelected={isSelected}
+            />
+          )}
         </div>
         {chat.isCallActive && chat.isCallNotEmpty && (
           <ChatCallStatus isMobile={isMobile} isSelected={isSelected} isActive={withInterfaceAnimations} />
@@ -456,7 +460,7 @@ const Chat: FC<OwnProps & StateProps> = ({
         </div>
         <div className="subtitle">
           {renderSubtitle()}
-          {!isPreview && (
+          {!isPreview && showChatBadge && (
             <ChatBadge
               chat={chat}
               isPinned={isPinned}
@@ -578,6 +582,7 @@ export default memo(withGlobal<OwnProps>(
       orderedFolderIds: global.chatFolders.orderedIds,
       chatFoldersById: global.chatFolders.byId,
       areTagsEnabled: areTagsEnabled && isPremium,
+      showChatBadge: !global.isFocusMode,
     };
   },
 )(Chat));
