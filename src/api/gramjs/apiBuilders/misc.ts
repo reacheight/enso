@@ -7,9 +7,6 @@ import type {
   ApiCountry,
   ApiLanguage,
   ApiOldLangString,
-  ApiPeerColors,
-  ApiPeerNotifySettings,
-  ApiPeerProfileColorSet,
   ApiPrivacyKey,
   ApiRestrictionReason,
   ApiSession,
@@ -20,10 +17,10 @@ import type {
   LangPackStringValue,
 } from '../../types';
 
-import { numberToHexColor } from '../../../util/colors';
 import {
-  buildCollectionByCallback, omit, omitUndefined, pick,
+  omit, omitUndefined, pick,
 } from '../../../util/iteratees';
+import { toJSNumber } from '../../../util/numbers';
 import { addUserToLocalDb } from '../helpers/localDb';
 import { omitVirtualClassFields } from './helpers';
 import { buildApiDocument, buildMessageTextContent } from './messageContent';
@@ -108,23 +105,6 @@ export function buildPrivacyKey(key: GramJs.TypePrivacyKey): ApiPrivacyKey | und
   }
 
   return undefined;
-}
-
-export function buildApiPeerNotifySettings(
-  notifySettings: GramJs.TypePeerNotifySettings,
-): ApiPeerNotifySettings {
-  const {
-    silent, muteUntil, showPreviews, otherSound,
-  } = notifySettings;
-
-  const hasSound = !(otherSound instanceof GramJs.NotificationSoundNone);
-
-  return {
-    hasSound,
-    isSilentPosting: silent,
-    mutedUntil: muteUntil,
-    shouldShowPreviews: showPreviews,
-  };
 }
 
 function buildApiCountry(country: GramJs.help.Country, code: GramJs.help.CountryCode) {
@@ -294,46 +274,6 @@ export function buildApiLanguage(lang: GramJs.TypeLangPackLanguage): ApiLanguage
   };
 }
 
-function buildApiPeerColorSet(colorSet: GramJs.help.PeerColorSet) {
-  return colorSet.colors.map((color) => numberToHexColor(color));
-}
-
-function buildApiPeerProfileColorSet(colorSet: GramJs.help.PeerColorProfileSet): ApiPeerProfileColorSet {
-  return {
-    paletteColors: colorSet.paletteColors.map((color) => numberToHexColor(color)),
-    bgColors: colorSet.bgColors.map((color) => numberToHexColor(color)),
-    storyColors: colorSet.storyColors.map((color) => numberToHexColor(color)),
-  };
-}
-
-export function buildApiPeerColors(wrapper: GramJs.help.TypePeerColors): ApiPeerColors['general'] | undefined {
-  if (!(wrapper instanceof GramJs.help.PeerColors)) return undefined;
-
-  return buildCollectionByCallback(wrapper.colors, (color) => {
-    return [color.colorId, {
-      isHidden: color.hidden,
-      colors: color.colors instanceof GramJs.help.PeerColorSet
-        ? buildApiPeerColorSet(color.colors) : undefined,
-      darkColors: color.darkColors instanceof GramJs.help.PeerColorSet
-        ? buildApiPeerColorSet(color.darkColors) : undefined,
-    }];
-  });
-}
-
-export function buildApiPeerProfileColors(wrapper: GramJs.help.TypePeerColors): ApiPeerColors['profile'] | undefined {
-  if (!(wrapper instanceof GramJs.help.PeerColors)) return undefined;
-
-  return buildCollectionByCallback(wrapper.colors, (color) => {
-    return [color.colorId, {
-      isHidden: color.hidden,
-      colors: color.colors instanceof GramJs.help.PeerColorProfileSet
-        ? buildApiPeerProfileColorSet(color.colors) : undefined,
-      darkColors: color.darkColors instanceof GramJs.help.PeerColorProfileSet
-        ? buildApiPeerProfileColorSet(color.darkColors) : undefined,
-    }];
-  });
-}
-
 export function buildApiTimezone(timezone: GramJs.TypeTimezone): ApiTimezone {
   const { id, name, utcOffset } = timezone;
   return {
@@ -362,9 +302,9 @@ export function buildApiCollectibleInfo(info: GramJs.fragment.TypeCollectibleInf
   } = info;
 
   return {
-    amount: amount.toJSNumber(),
+    amount: toJSNumber(amount),
     currency,
-    cryptoAmount: cryptoAmount.toJSNumber(),
+    cryptoAmount: toJSNumber(cryptoAmount),
     cryptoCurrency,
     purchaseDate,
     url,

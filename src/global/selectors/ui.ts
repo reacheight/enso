@@ -61,7 +61,7 @@ export function selectRightColumnContentKey<T extends GlobalState>(
     RightColumnContent.AddingMembers
   ) : tabState.isFocusListShown ? (
     RightColumnContent.FocusList
-  ) : tabState.isChatInfoShown && tabState.messageLists.length ? (
+  ) : tabState.chatInfo.isOpen && tabState.messageLists.length ? (
     RightColumnContent.ChatInfo
   ) : undefined;
 }

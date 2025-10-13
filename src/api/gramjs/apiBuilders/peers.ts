@@ -1,10 +1,18 @@
-import type BigInt from 'big-integer';
 import { Api as GramJs } from '../../../lib/gramjs';
 
-import type { ApiEmojiStatusType, ApiPeerColor } from '../../types';
+import type {
+  ApiBotVerification,
+  ApiEmojiStatusType,
+  ApiPeerColor,
+  ApiPeerColors,
+  ApiPeerNotifySettings,
+  ApiPeerProfileColorSet,
+  ApiProfileTab,
+} from '../../types';
 
 import { CHANNEL_ID_BASE } from '../../../config';
 import { numberToHexColor } from '../../../util/colors';
+import { buildCollectionByCallback } from '../../../util/iteratees';
 
 type TypePeerOrInput = GramJs.TypePeer | GramJs.TypeInputPeer | GramJs.TypeInputUser | GramJs.TypeInputChannel;
 
@@ -20,16 +28,16 @@ export function isMtpPeerChannel(peer: TypePeerOrInput): peer is GramJs.PeerChan
   return peer.hasOwnProperty('channelId');
 }
 
-export function buildApiPeerId(id: BigInt.BigInteger, type: 'user' | 'chat' | 'channel') {
+export function buildApiPeerId(id: bigint, type: 'user' | 'chat' | 'channel') {
   if (type === 'user') {
     return id.toString();
   }
 
   if (type === 'channel') {
-    return id.add(CHANNEL_ID_BASE).negate().toString();
+    return ((id + CHANNEL_ID_BASE) * -1n).toString();
   }
 
-  return id.negate().toString();
+  return (id * -1n).toString();
 }
 
 export function getApiChatIdFromMtpPeer(peer: TypePeerOrInput) {
@@ -48,6 +56,46 @@ export function buildApiPeerColor(peerColor: GramJs.TypePeerColor): ApiPeerColor
     color,
     backgroundEmojiId: backgroundEmojiId?.toString(),
   };
+}
+
+function buildApiPeerColorSet(colorSet: GramJs.help.PeerColorSet) {
+  return colorSet.colors.map((color) => numberToHexColor(color));
+}
+
+function buildApiPeerProfileColorSet(colorSet: GramJs.help.PeerColorProfileSet): ApiPeerProfileColorSet {
+  return {
+    paletteColors: colorSet.paletteColors.map((color) => numberToHexColor(color)),
+    bgColors: colorSet.bgColors.map((color) => numberToHexColor(color)),
+    storyColors: colorSet.storyColors.map((color) => numberToHexColor(color)),
+  };
+}
+
+export function buildApiPeerColors(wrapper: GramJs.help.TypePeerColors): ApiPeerColors['general'] | undefined {
+  if (!(wrapper instanceof GramJs.help.PeerColors)) return undefined;
+
+  return buildCollectionByCallback(wrapper.colors, (color) => {
+    return [color.colorId, {
+      isHidden: color.hidden,
+      colors: color.colors instanceof GramJs.help.PeerColorSet
+        ? buildApiPeerColorSet(color.colors) : undefined,
+      darkColors: color.darkColors instanceof GramJs.help.PeerColorSet
+        ? buildApiPeerColorSet(color.darkColors) : undefined,
+    }];
+  });
+}
+
+export function buildApiPeerProfileColors(wrapper: GramJs.help.TypePeerColors): ApiPeerColors['profile'] | undefined {
+  if (!(wrapper instanceof GramJs.help.PeerColors)) return undefined;
+
+  return buildCollectionByCallback(wrapper.colors, (color) => {
+    return [color.colorId, {
+      isHidden: color.hidden,
+      colors: color.colors instanceof GramJs.help.PeerColorProfileSet
+        ? buildApiPeerProfileColorSet(color.colors) : undefined,
+      darkColors: color.darkColors instanceof GramJs.help.PeerColorProfileSet
+        ? buildApiPeerProfileColorSet(color.darkColors) : undefined,
+    }];
+  });
 }
 
 export function buildApiEmojiStatus(mtpEmojiStatus: GramJs.TypeEmojiStatus):
@@ -77,4 +125,62 @@ ApiEmojiStatusType | undefined {
   }
 
   return undefined;
+}
+
+export function buildAvatarPhotoId(photo: GramJs.TypeUserProfilePhoto | GramJs.TypeChatPhoto) {
+  if ('photoId' in photo) {
+    return photo.photoId.toString();
+  }
+
+  return undefined;
+}
+
+export function buildApiBotVerification(botVerification: GramJs.BotVerification): ApiBotVerification {
+  return {
+    botId: buildApiPeerId(botVerification.botId, 'user'),
+    iconId: botVerification.icon.toString(),
+    description: botVerification.description,
+  };
+}
+
+export function buildApiPeerNotifySettings(
+  notifySettings: GramJs.TypePeerNotifySettings,
+): ApiPeerNotifySettings {
+  const {
+    silent, muteUntil, showPreviews, otherSound,
+  } = notifySettings;
+
+  const hasSound = !(otherSound instanceof GramJs.NotificationSoundNone);
+
+  return {
+    hasSound,
+    isSilentPosting: silent,
+    mutedUntil: muteUntil,
+    shouldShowPreviews: showPreviews,
+  };
+}
+
+export function buildApiProfileTab(profileTab: GramJs.TypeProfileTab): ApiProfileTab {
+  switch (profileTab.className) {
+    case 'ProfileTabPosts':
+      return 'stories';
+    case 'ProfileTabGifts':
+      return 'gifts';
+    case 'ProfileTabMedia':
+      return 'media';
+    case 'ProfileTabFiles':
+      return 'documents';
+    case 'ProfileTabMusic':
+      return 'audio';
+    case 'ProfileTabVoice':
+      return 'voice';
+    case 'ProfileTabLinks':
+      return 'links';
+    case 'ProfileTabGifs':
+      return 'gif';
+    default: {
+      const _exhaustiveCheck: never = profileTab;
+      return _exhaustiveCheck;
+    }
+  }
 }

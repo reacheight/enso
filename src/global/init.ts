@@ -34,11 +34,15 @@ addActionHandler('init', (global, actions, payload): ActionReturnType => {
 
   const initialTabState = cloneDeep(INITIAL_TAB_STATE);
   initialTabState.id = tabId;
-  initialTabState.isChatInfoShown = Boolean(global.lastIsChatInfoShown);
   initialTabState.isFocusListShown = Boolean(global.lastIsFocusListShown);
   initialTabState.audioPlayer.playbackRate = global.audioPlayer.lastPlaybackRate;
   initialTabState.audioPlayer.isPlaybackRateActive = global.audioPlayer.isLastPlaybackRateActive;
   initialTabState.mediaViewer.playbackRate = global.mediaViewer.lastPlaybackRate;
+  if (global.lastIsChatInfoShown) {
+    initialTabState.chatInfo = {
+      isOpen: true,
+    };
+  }
 
   global = {
     ...global,
@@ -112,7 +116,7 @@ addActionHandler('init', (global, actions, payload): ActionReturnType => {
     Object.values(global.byTabId).forEach(({ id: otherTabId }) => {
       if (otherTabId === tabId) return;
       global = updateTabState(global, {
-        isInactive: true,
+        inactiveReason: 'auth',
       }, otherTabId);
     });
   }

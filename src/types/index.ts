@@ -395,13 +395,14 @@ export type ProfileTabType =
   | 'links'
   | 'audio'
   | 'voice'
+  | 'gif'
   | 'stories'
   | 'storiesArchive'
   | 'similarChannels'
   | 'similarBots'
   | 'dialogs'
   | 'gifts';
-export type SharedMediaType = 'media' | 'documents' | 'links' | 'audio' | 'voice';
+export type SharedMediaType = 'media' | 'documents' | 'links' | 'audio' | 'voice' | 'gif';
 export type MiddleSearchType = 'chat' | 'myChats' | 'channels';
 export type MiddleSearchParams = {
   requestedQuery?: string;
@@ -674,7 +675,9 @@ export interface Point {
 
 export type WebPageMediaSize = 'large' | 'small';
 
-export type StarGiftCategory = number | 'all' | 'limited' | 'stock' | 'resale';
+export type AttachmentCompression = 'compress' | 'original';
+
+export type StarGiftCategory = 'all' | 'myCollectibles' | 'resale';
 
 export type CallSound = (
   'join' | 'allowTalk' | 'leave' | 'connecting' | 'incoming' | 'end' | 'connect' | 'busy' | 'ringing'

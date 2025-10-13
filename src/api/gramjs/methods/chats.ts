@@ -1,6 +1,6 @@
-import BigInt from 'big-integer';
 import { Api as GramJs } from '../../../lib/gramjs';
 import { RPCError } from '../../../lib/gramjs/errors';
+import { generateRandomBigInt } from '../../../lib/gramjs/Helpers';
 
 import type { ChatListType } from '../../../types';
 import type {
@@ -17,6 +17,7 @@ import type {
   ApiPeer,
   ApiPeerNotifySettings,
   ApiPhoto,
+  ApiProfileTab,
   ApiTopic,
   ApiUser,
   ApiUserStatus,
@@ -51,10 +52,15 @@ import {
   buildChatMembers,
   getPeerKey,
 } from '../apiBuilders/chats';
-import { buildApiBotVerification, buildApiPhoto } from '../apiBuilders/common';
+import { buildApiPhoto } from '../apiBuilders/common';
 import { buildApiMessage, buildMessageDraft } from '../apiBuilders/messages';
-import { buildApiPeerNotifySettings } from '../apiBuilders/misc';
-import { buildApiPeerId, getApiChatIdFromMtpPeer } from '../apiBuilders/peers';
+import {
+  buildApiBotVerification,
+  buildApiPeerId,
+  buildApiPeerNotifySettings,
+  buildApiProfileTab,
+  getApiChatIdFromMtpPeer,
+} from '../apiBuilders/peers';
 import { buildStickerSet } from '../apiBuilders/symbols';
 import { buildApiPeerSettings, buildApiUser, buildApiUserStatuses } from '../apiBuilders/users';
 import {
@@ -66,12 +72,12 @@ import {
   buildInputChatReactions,
   buildInputPeer,
   buildInputPhoto,
+  buildInputProfileTab,
   buildInputReplyTo,
   buildInputSuggestedPost,
   buildInputUser,
   buildMtpMessageEntity,
   DEFAULT_PRIMITIVES,
-  generateRandomBigInt,
   getEntityTypeById,
 } from '../gramjsBuilders';
 import {
@@ -655,6 +661,7 @@ async function getFullChannelInfo(
     stargiftsCount,
     stargiftsAvailable,
     paidMessagesAvailable,
+    mainTab,
   } = result.fullChat;
 
   if (chatPhoto) {
@@ -754,6 +761,7 @@ async function getFullChannelInfo(
       starGiftCount: stargiftsCount,
       areStarGiftsAvailable: Boolean(stargiftsAvailable),
       arePaidMessagesAvailable: paidMessagesAvailable,
+      mainTab: mainTab && buildApiProfileTab(mainTab),
     },
     chats,
     userStatusesById: statusesById,
@@ -2089,6 +2097,15 @@ export function toggleAutoTranslation({
   return invokeRequest(new GramJs.channels.ToggleAutotranslation({
     channel: buildInputChannel(chat.id, chat.accessHash),
     enabled: isEnabled,
+  }), {
+    shouldReturnTrue: true,
+  });
+}
+
+export function setChannelMainProfileTab({ chat, tab }: { chat: ApiChat; tab: ApiProfileTab }) {
+  return invokeRequest(new GramJs.channels.SetMainProfileTab({
+    channel: buildInputChannel(chat.id, chat.accessHash),
+    tab: buildInputProfileTab(tab),
   }), {
     shouldReturnTrue: true,
   });

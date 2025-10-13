@@ -224,6 +224,7 @@ const Main = ({
     loadPremiumGifts,
     loadTonGifts,
     loadStarGifts,
+    loadMyCollectibleGifts,
     loadDefaultTopicIcons,
     loadAddedStickers,
     loadFavoriteStickers,
@@ -339,6 +340,7 @@ const Main = ({
       loadPremiumGifts();
       loadTonGifts();
       loadStarGifts();
+      loadMyCollectibleGifts();
       loadAvailableEffects();
       loadBirthdayNumbersStickers();
       loadRestrictedEmojiStickers();

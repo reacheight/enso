@@ -37,6 +37,7 @@ import type {
   ApiPreparedInlineMessage,
   ApiPrivacyKey,
   ApiPrivacySettings,
+  ApiProfileTab,
   ApiReaction,
   ApiReactionWithPaid,
   ApiReportReason,
@@ -67,6 +68,7 @@ import type { ReducerAction } from '../../hooks/useReducer';
 import type { P2pMessage } from '../../lib/secret-sauce';
 import type {
   AccountSettings,
+  AttachmentCompression,
   AudioOrigin,
   CallSound,
   ChatListType,
@@ -310,7 +312,7 @@ export interface ActionPayloads {
     hashtag: string;
   } & WithTabId;
   setSharedMediaSearchType: {
-    mediaType: SharedMediaType;
+    mediaType?: SharedMediaType;
   } & WithTabId;
   searchSharedMediaMessages: WithTabId | undefined;
   searchChatMediaMessages: {
@@ -359,8 +361,13 @@ export interface ActionPayloads {
   openChatWithInfo: ActionPayloads['openChat'] & {
     profileTab?: ProfileTabType;
     forceScrollProfileTab?: boolean;
+    isOwnProfile?: boolean;
   } & WithTabId;
-  openThreadWithInfo: ActionPayloads['openThread'] & WithTabId;
+  openThreadWithInfo: ActionPayloads['openThread'] & {
+    profileTab?: ProfileTabType;
+    forceScrollProfileTab?: boolean;
+    isOwnProfile?: boolean;
+  } & WithTabId;
   openLinkedChat: { id: string } & WithTabId;
   loadMoreMembers: {
     chatId: string;
@@ -1140,6 +1147,10 @@ export interface ActionPayloads {
     chatId: string;
     isEnabled: boolean;
   } & WithTabId;
+  setMainProfileTab: {
+    chatId: string;
+    tab: ApiProfileTab;
+  };
 
   updateChat: {
     chatId: string;
@@ -1189,6 +1200,7 @@ export interface ActionPayloads {
     chatId?: string;
     originMessageId: number;
     originChannelId: string;
+    threadId?: never;
   } | {
     isComments?: false;
     chatId: string;
@@ -1244,7 +1256,10 @@ export interface ActionPayloads {
     chatId: string;
     isEnabled: boolean;
   };
-  resetNextProfileTab: WithTabId | undefined;
+  changeProfileTab: {
+    profileTab: ProfileTabType | undefined;
+    shouldScrollTo?: boolean;
+  } & WithTabId;
 
   openForumPanel: {
     chatId: string;
@@ -2285,12 +2300,15 @@ export interface ActionPayloads {
   } & WithTabId;
 
   updateAttachmentSettings: {
+    defaultAttachmentCompression?: AttachmentCompression;
     shouldCompress?: boolean;
     shouldSendGrouped?: boolean;
     isInvertedMedia?: true;
     webPageMediaSize?: WebPageMediaSize;
     shouldSendInHighQuality?: boolean;
   };
+  updateShouldSaveAttachmentsCompression: { shouldSave: boolean } & WithTabId;
+  applyDefaultAttachmentsCompression: undefined;
 
   saveEffectInDraft: {
     chatId: string;
@@ -2514,6 +2532,12 @@ export interface ActionPayloads {
   } & WithTabId;
   closeSuggestedPostApprovalModal: WithTabId | undefined;
 
+  openQuickPreview: {
+    id: string;
+    threadId?: ThreadId;
+  } & WithTabId;
+  closeQuickPreview: WithTabId | undefined;
+
   openDeleteMessageModal: ({
     chatId: string;
     messageIds: number[];
@@ -2530,6 +2554,9 @@ export interface ActionPayloads {
   loadPremiumGifts: undefined;
   loadTonGifts: undefined;
   loadStarGifts: undefined;
+  loadMyCollectibleGifts: {
+    shouldRefresh?: true;
+  } | undefined;
   updateResaleGiftsFilter: {
     filter: ResaleGiftsFilterOptions;
   } & WithTabId;
@@ -2570,11 +2597,20 @@ export interface ActionPayloads {
   } | {
     gift: ApiStarGift;
   }) & WithTabId;
+  openLockedGiftModalInfo: {
+    untilDate?: number;
+    reason?: ApiFormattedText;
+  } & WithTabId;
+  checkCanSendGift: {
+    gift: ApiStarGift;
+    onSuccess: () => void;
+  } & WithTabId;
   openGiftResalePriceComposerModal: ({
     peerId: string;
     gift: ApiSavedStarGift;
   }) & WithTabId;
   closeGiftInfoModal: WithTabId | undefined;
+  closeLockedGiftModal: WithTabId | undefined;
   closeGiftResalePriceComposerModal: WithTabId | undefined;
   openGiftInMarket: {
     gift: ApiStarGift;
@@ -2620,6 +2656,11 @@ export interface ActionPayloads {
     recipientId: string;
   } & WithTabId;
   closeGiftTransferModal: WithTabId | undefined;
+  openGiftTransferConfirmModal: {
+    gift: ApiSavedStarGift;
+    recipientId: string;
+  } & WithTabId;
+  closeGiftTransferConfirmModal: WithTabId | undefined;
   updateSelectedGiftCollection: {
     peerId: string;
     collectionId: number;

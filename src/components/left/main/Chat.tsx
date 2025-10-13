@@ -181,6 +181,7 @@ const Chat: FC<OwnProps & StateProps> = ({
     reportMessages,
     openFrozenAccountModal,
     updateChatMutedState,
+    openQuickPreview,
   } = getActions();
 
   const { isMobile } = useAppLayout();
@@ -234,7 +235,13 @@ const Chat: FC<OwnProps & StateProps> = ({
 
   const getIsForumPanelClosed = useSelectorSignal(selectIsForumPanelClosed);
 
-  const handleClick = useLastCallback(() => {
+  const handleClick = useLastCallback((e: React.MouseEvent) => {
+    if (e.altKey && !isSavedDialog && !isForum && !isPreview) {
+      e.preventDefault();
+      openQuickPreview({ id: chatId });
+      return;
+    }
+
     const noForumTopicPanel = isMobile && isForumAsMessages;
 
     if (isMobile) {

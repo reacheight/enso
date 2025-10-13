@@ -27,11 +27,20 @@
 }
 
 .plain.minimized {
+  padding-block: 1.5rem 0;
   color: var(--color-text);
 
   .userRatingNegativeWrapper,
   .userRatingWrapper {
     color: var(--color-white);
+  }
+
+  .status {
+    color: var(--color-text-secondary);
+  }
+
+  .getStatus, .userStatus {
+    opacity: 1;
   }
 
   :global(.VerifiedIcon),
@@ -377,14 +386,9 @@
 
 .radialPatternBackground {
   pointer-events: none;
-
-  // Hacky way to keep background stable during resizes
   position: absolute;
-  top: 8rem;
-
+  inset: 0;
   aspect-ratio: 1 / 1;
-  width: 140%;
-  margin-top: -70%;
 }
 
 .standaloneAvatar {
@@ -459,20 +463,7 @@
 
 @include mixins.on-active-vt('profileExpand') {
   &::view-transition-old(.avatar) {
-    :local {
-      animation-name: fadeOut;
-      animation-duration: 0.1s;
-    }
-
-    @keyframes fadeOut {
-      from {
-        opacity: 1;
-      }
-
-      to {
-        opacity: 0;
-      }
-    }
+    z-index: -1;
   }
 
   &::view-transition-new(.avatar) {
@@ -502,21 +493,7 @@
 
 @include mixins.on-active-vt('profileCollapse') {
   &::view-transition-new(.avatar) {
-    :local {
-      animation-name: fadeIn;
-      animation-duration: 0.125s;
-      animation-delay: 0.125s;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-      }
-
-      to {
-        opacity: 1;
-      }
-    }
+    z-index: -1;
   }
 
   &::view-transition-old(.avatar) {
@@ -533,11 +510,8 @@
       }
 
       25% {
-        clip-path: inset(0 0 0 0 round 50%);
-      }
-
-      50% {
         opacity: 1;
+        clip-path: inset(0 0 0 0 round 50%);
       }
 
       to {

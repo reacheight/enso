@@ -546,6 +546,33 @@ addActionHandler('openGiveawayModal', async (global, actions, payload): Promise<
   setGlobal(global);
 });
 
+addActionHandler('checkCanSendGift', async (global, actions, payload): Promise<void> => {
+  const {
+    gift, onSuccess, tabId = getCurrentTabId(),
+  } = payload;
+
+  if (gift.type !== 'starGift' || !gift.lockedUntilDate) {
+    onSuccess();
+    return;
+  }
+
+  const result = await callApi('fetchCheckCanSendGift', {
+    giftId: gift.id,
+  });
+
+  if (!result) return;
+
+  if (result?.canSend) {
+    onSuccess();
+  } else {
+    actions.openLockedGiftModalInfo({
+      untilDate: gift.type === 'starGift' ? gift.lockedUntilDate : undefined,
+      reason: result.reason,
+      tabId,
+    });
+  }
+});
+
 addActionHandler('openGiftModal', async (global, actions, payload): Promise<void> => {
   const {
     forUserId, selectedResaleGift, tabId = getCurrentTabId(),
@@ -581,7 +608,12 @@ addActionHandler('openStarsGiftModal', async (global, actions, payload): Promise
     return;
   }
 
-  const starsGiftOptions = await callApi('getStarsGiftOptions', {});
+  const chat = forUserId ? selectChat(global, forUserId) : undefined;
+  if (forUserId && !chat) return;
+
+  const starsGiftOptions = await callApi('fetchStarsGiftOptions', {
+    chat,
+  });
 
   global = getGlobal();
   global = updateTabState(global, {

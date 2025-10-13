@@ -45,6 +45,7 @@ import buildStyle from '../../../util/buildStyle';
 import { captureEvents, SwipeDirection } from '../../../util/captureEvents';
 import { MEMO_EMPTY_ARRAY } from '../../../util/memo';
 import { resolveTransitionName } from '../../../util/resolveTransitionName';
+import { REM } from '../helpers/mediaDimensions.ts';
 import renderText from '../helpers/renderText.tsx';
 
 import { useVtn } from '../../../hooks/animations/useVtn';
@@ -76,6 +77,7 @@ type OwnProps = {
   isForSettings?: boolean;
   canPlayVideo: boolean;
   isForMonoforum?: boolean;
+  onExpand?: NoneToVoidFunction;
 };
 
 type StateProps = {
@@ -103,9 +105,7 @@ const EMOJI_TOPIC_SIZE = 120;
 const LOAD_MORE_THRESHOLD = 3;
 const MAX_PHOTO_DASH_COUNT = 30;
 const STATUS_UPDATE_INTERVAL = 1000 * 60; // 1 min
-const PATTERN_COLOR = '#000000';
-const PATTERN_SIZE_FACTOR = 0.75;
-const PATTERN_OPACITY = 0.75;
+const PATTERN_Y_SHIFT = 8 * REM;
 
 const ProfileInfo = ({
   isExpanded,
@@ -130,6 +130,7 @@ const ProfileInfo = ({
   theme,
   isPlain,
   savedGifts,
+  onExpand,
 }: OwnProps & StateProps) => {
   const {
     openMediaViewer,
@@ -277,6 +278,15 @@ const ProfileInfo = ({
     if (user) {
       openProfileRatingModal({ userId: user.id, level });
     }
+  });
+
+  const handleMinimizedAvatarClick = useLastCallback(() => {
+    if (isForSettings) {
+      handleProfilePhotoClick();
+      return;
+    }
+
+    onExpand?.();
   });
 
   function handleSelectFallbackPhoto() {
@@ -482,10 +492,11 @@ const ProfileInfo = ({
         <RadialPatternBackground
           backgroundColors={profileColorSet.bgColors}
           patternIcon={backgroundEmoji}
-          patternColor={collectibleEmojiStatus?.patternColor || PATTERN_COLOR}
+          patternColor={collectibleEmojiStatus?.patternColor}
+          patternSize={16}
+          withLinearGradient={!collectibleEmojiStatus}
           className={styles.radialPatternBackground}
-          patternSize={PATTERN_SIZE_FACTOR}
-          patternOpacity={collectibleEmojiStatus ? 1 : PATTERN_OPACITY}
+          yPosition={PATTERN_Y_SHIFT}
         />
       )}
       {pinnedGifts && (
@@ -563,7 +574,7 @@ const ProfileInfo = ({
           size="jumbo"
           peer={peer}
           style={createVtnStyle('avatar', true)}
-          onClick={isForSettings ? handleProfilePhotoClick : undefined}
+          onClick={handleMinimizedAvatarClick}
         />
       )}
 

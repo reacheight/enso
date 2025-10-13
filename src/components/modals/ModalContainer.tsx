@@ -1,4 +1,4 @@
-import type React from '../../lib/teact/teact';
+import type { FC } from '../../lib/teact/teact';
 import { memo } from '../../lib/teact/teact';
 import { withGlobal } from '../../global';
 
@@ -21,9 +21,11 @@ import EmojiStatusAccessModal from './emojiStatusAccess/EmojiStatusAccessModal.a
 import FrozenAccountModal from './frozenAccount/FrozenAccountModal.async';
 import PremiumGiftModal from './gift/GiftModal.async';
 import GiftInfoModal from './gift/info/GiftInfoModal.async';
+import GiftLockedModal from './gift/locked/GiftLockedModal.async';
 import GiftRecipientPicker from './gift/recipient/GiftRecipientPicker.async';
 import GiftResalePriceComposerModal from './gift/resale/GiftResalePriceComposerModal.async';
 import GiftStatusInfoModal from './gift/status/GiftStatusInfoModal.async';
+import GiftTransferConfirmModal from './gift/transfer/GiftTransferConfirmModal.async';
 import GiftTransferModal from './gift/transfer/GiftTransferModal.async';
 import GiftUpgradeModal from './gift/upgrade/GiftUpgradeModal.async';
 import GiftInfoValueModal from './gift/value/GiftInfoValueModal.async';
@@ -37,6 +39,7 @@ import PaidReactionModal from './paidReaction/PaidReactionModal.async';
 import PreparedMessageModal from './preparedMessage/PreparedMessageModal.async';
 import PriceConfirmModal from './priceConfirm/PriceConfirmModal.async';
 import ProfileRatingModal from './profileRating/ProfileRatingModal.async';
+import QuickPreviewModal from './quickPreview/QuickPreviewModal.async';
 import ReportAdModal from './reportAd/ReportAdModal.async';
 import ReportModal from './reportModal/ReportModal.async';
 import SharePreparedMessageModal from './sharePreparedMessage/SharePreparedMessageModal.async';
@@ -80,6 +83,7 @@ type ModalKey = keyof Pick<TabState,
   'isWebAppsCloseConfirmationModalOpen' |
   'giftInfoModal' |
   'giftInfoValueModal' |
+  'lockedGiftModal' |
   'giftResalePriceComposerModal' |
   'suggestedStatusModal' |
   'emojiStatusAccessModal' |
@@ -92,19 +96,21 @@ type ModalKey = keyof Pick<TabState,
   'sharePreparedMessageModal' |
   'giftStatusInfoModal' |
   'giftTransferModal' |
+  'giftTransferConfirmModal' |
   'chatRefundModal' |
   'priceConfirmModal' |
   'isFrozenAccountModalOpen' |
   'deleteAccountModal' |
   'isAgeVerificationModalOpen' |
-  'profileRatingModal'
+  'profileRatingModal' |
+  'quickPreview'
 >;
 
 type StateProps = {
   [K in ModalKey]?: TabState[K];
 };
 type ModalRegistry = {
-  [K in ModalKey]: React.FC<{
+  [K in ModalKey]: FC<{
     modal: TabState[K];
   }>;
 };
@@ -139,6 +145,7 @@ const MODALS: ModalRegistry = {
   isWebAppsCloseConfirmationModalOpen: WebAppsCloseConfirmationModal,
   giftInfoModal: GiftInfoModal,
   giftInfoValueModal: GiftInfoValueModal,
+  lockedGiftModal: GiftLockedModal,
   giftResalePriceComposerModal: GiftResalePriceComposerModal,
   suggestedStatusModal: SuggestedStatusModal,
   emojiStatusAccessModal: EmojiStatusAccessModal,
@@ -151,12 +158,14 @@ const MODALS: ModalRegistry = {
   preparedMessageModal: PreparedMessageModal,
   sharePreparedMessageModal: SharePreparedMessageModal,
   giftTransferModal: GiftTransferModal,
+  giftTransferConfirmModal: GiftTransferConfirmModal,
   chatRefundModal: ChatRefundModal,
   priceConfirmModal: PriceConfirmModal,
   isFrozenAccountModalOpen: FrozenAccountModal,
   deleteAccountModal: DeleteAccountModal,
   isAgeVerificationModalOpen: AgeVerificationModal,
   profileRatingModal: ProfileRatingModal,
+  quickPreview: QuickPreviewModal,
 };
 const MODAL_KEYS = Object.keys(MODALS) as ModalKey[];
 const MODAL_ENTRIES = Object.entries(MODALS) as Entries<ModalRegistry>;

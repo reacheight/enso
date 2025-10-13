@@ -51,7 +51,7 @@ const LeftSearchResultChat: FC<OwnProps & StateProps> = ({
   withOpenAppButton,
   onClick,
 }) => {
-  const { requestMainWebView, updateChatMutedState } = getActions();
+  const { requestMainWebView, updateChatMutedState, openQuickPreview } = getActions();
   const oldLang = useOldLang();
 
   const [isMuteModalOpen, openMuteModal, closeMuteModal] = useFlag();
@@ -84,7 +84,12 @@ const LeftSearchResultChat: FC<OwnProps & StateProps> = ({
     handleChatFolderChange,
   }, true);
 
-  const handleClick = useLastCallback(() => {
+  const handleClick = useLastCallback((e: React.MouseEvent) => {
+    if (e.altKey && chat && !chat.isForum) {
+      e.preventDefault();
+      openQuickPreview({ id: chatId });
+      return;
+    }
     onClick(chatId);
   });
 
@@ -99,7 +104,9 @@ const LeftSearchResultChat: FC<OwnProps & StateProps> = ({
     });
   });
 
-  const buttonRef = useSelectWithEnter(handleClick);
+  const buttonRef = useSelectWithEnter(() => {
+    onClick(chatId);
+  });
 
   return (
     <ListItem
