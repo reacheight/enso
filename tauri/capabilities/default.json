@@ -3,13 +3,23 @@
   "webviews": ["*"],
   "permissions": [
     "core:event:default",
-    "core:window:allow-is-fullscreen",
-    "core:window:allow-start-dragging",
     "process:default",
     "updater:default",
     "notification:allow-is-permission-granted",
     "notification:allow-notify",
     "notification:allow-request-permission",
-    "shell:default"
+    "shell:default",
+    "core:window:allow-close",
+    "core:window:allow-center",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-set-size",
+    "core:window:allow-set-focus",
+    "core:window:allow-is-maximized",
+    "core:window:allow-start-dragging",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-is-fullscreen",
+    "core:window:allow-internal-toggle-maximize",
+    "decorum:allow-show-snap-overlay"
   ]
 }

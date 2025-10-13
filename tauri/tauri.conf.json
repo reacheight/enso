@@ -3,7 +3,8 @@
   "app": {
     "security": {
       "csp": null
-    }
+    },
+    "withGlobalTauri": true
   },
   "build": {
     "beforeDevCommand": "npm run dev",

@@ -95,6 +95,16 @@ body.is-ios {
 body.is-tauri {
   --custom-cursor: default;
   --window-controls-width: 5rem;
+  --titlebar-height: 2rem;
+  
+  div[data-tauri-decorum-tb] {
+    background-color: var(--color-background-secondary-accent) !important;
+  }
+  
+  #Main {
+    margin-top: var(--titlebar-height);
+    height: calc(100% - var(--titlebar-height));
+  }
 }
 
 body.cursor-grabbing {

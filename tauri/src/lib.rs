@@ -3,6 +3,7 @@ use std::sync::{LazyLock, Mutex};
 
 use serde_json::json;
 use tauri::{Emitter, LogicalPosition, Manager, webview::DownloadEvent};
+use tauri_plugin_decorum::WebviewWindowExt;
 use url::Url;
 use uuid::Uuid;
 
@@ -104,7 +105,8 @@ pub fn run() {
     .plugin(tauri_plugin_log::Builder::default().build())
     .plugin(tauri_plugin_window_state::Builder::default().build())
     .plugin(tauri_plugin_deep_link::init())
-    .plugin(tauri_plugin_process::init());
+    .plugin(tauri_plugin_process::init())
+    .plugin(tauri_plugin_decorum::init());
 
   let app = app.on_window_event(|window, event| match event {
     tauri::WindowEvent::CloseRequested { api, .. } => {
@@ -155,6 +157,8 @@ pub fn run() {
 
     let _main_window = open_new_window(app.handle().clone(), BASE_URL.to_string())
       .expect("Failed to open main window");
+
+    _main_window.create_overlay_titlebar().unwrap();
 
     let deeplink = Deeplink::init();
     if let Err(err) = deeplink.setup(app.handle()) {
