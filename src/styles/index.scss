@@ -97,13 +97,10 @@ body.is-tauri {
   --window-controls-width: 5rem;
   --titlebar-height: 2rem;
   
+  padding-top: var(--titlebar-height);
+  
   div[data-tauri-decorum-tb] {
     background-color: var(--color-background-secondary-accent) !important;
-  }
-  
-  #Main {
-    margin-top: var(--titlebar-height);
-    height: calc(100% - var(--titlebar-height));
   }
 }
 
