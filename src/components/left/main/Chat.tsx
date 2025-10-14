@@ -125,6 +125,7 @@ type StateProps = {
   chatFoldersById?: Record<number, ApiChatFolder>;
   areTagsEnabled?: boolean;
   showChatBadge?: boolean;
+  isFocusMode?: boolean;
 };
 
 const Chat: FC<OwnProps & StateProps> = ({
@@ -169,6 +170,7 @@ const Chat: FC<OwnProps & StateProps> = ({
   areTagsEnabled,
   withTags,
   showChatBadge,
+  isFocusMode,
 }) => {
   const {
     openChat,
@@ -365,7 +367,7 @@ const Chat: FC<OwnProps & StateProps> = ({
   }, [chatId, listedTopicIds, isSynced, isForum, isIntersecting]);
 
   const isOnline = user && userStatus && isUserOnline(user, userStatus);
-  const { hasShownClass: isAvatarOnlineShown } = useShowTransitionDeprecated(isOnline);
+  const { hasShownClass: isAvatarOnlineShown } = !isFocusMode ? useShowTransitionDeprecated(isOnline) : { hasShownClass: false };
 
   const href = useMemo(() => {
     if (!IS_OPEN_IN_NEW_TAB_SUPPORTED) return undefined;
@@ -583,6 +585,7 @@ export default memo(withGlobal<OwnProps>(
       chatFoldersById: global.chatFolders.byId,
       areTagsEnabled: areTagsEnabled && isPremium,
       showChatBadge: !global.isFocusMode,
+      isFocusMode: global.isFocusMode,
     };
   },
 )(Chat));
