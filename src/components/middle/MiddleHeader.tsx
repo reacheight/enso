@@ -342,7 +342,7 @@ const MiddleHeader: FC<OwnProps & StateProps> = ({
 
   return (
     <div className="MiddleHeader" ref={componentRef} data-tauri-drag-region={IS_TAURI && IS_MAC_OS ? true : undefined}>
-      {!isMobile && !isSavedMessages && !isSavedDialog && (
+      {false && !isMobile && !isSavedMessages && !isSavedDialog && (
       <Button className="saved-messages-button" round size="smaller" color="translucent" onClick={handleOpenSavedMessages} ariaLabel="Saved Messages">
           <Icon name="saved-messages" />
         </Button>
