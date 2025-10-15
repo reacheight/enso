@@ -137,10 +137,10 @@ addActionHandler('updatePerformanceSettings', (global, actions, payload): Action
 });
 
 addActionHandler('setFocusMode', (global, actions, payload): ActionReturnType => {
-  const { isEnabled } = payload!;
+  const { mode } = payload!;
   return {
     ...global,
-    isFocusMode: isEnabled,
+    focusMode: mode,
   };
 });
 

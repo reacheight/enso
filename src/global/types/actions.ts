@@ -73,6 +73,7 @@ import type {
   CallSound,
   ChatListType,
   ConfettiParams,
+  FocusMode,
   GiftProfileFilterOptions,
   GlobalSearchContent,
   IAnchorPosition,
@@ -189,7 +190,7 @@ export interface ActionPayloads {
   setSettingOption: Partial<AccountSettings> | undefined;
   setSharedSettingOption: Partial<SharedState['settings']> | undefined;
   updatePerformanceSettings: Partial<PerformanceType>;
-  setFocusMode: { isEnabled: boolean };
+  setFocusMode: { mode: FocusMode | undefined };
   loadPasswordInfo: undefined;
   clearTwoFaError: undefined;
   openMonetizationVerificationModal: {

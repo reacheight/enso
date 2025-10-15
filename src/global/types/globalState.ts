@@ -60,6 +60,7 @@ import type {
   ChatListType,
   ChatTranslatedMessages,
   EmojiKeywords,
+  FocusMode,
   IThemeSettings,
   ServiceNotification,
   SimilarBotsInfo,
@@ -485,7 +486,7 @@ export type GlobalState = {
     editingWorkspaceId?: string;
   };
 
-  isFocusMode: boolean;
+  focusMode: FocusMode | undefined;
 };
 
 export type RequiredGlobalState = GlobalState & { _: never };

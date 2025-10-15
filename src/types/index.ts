@@ -766,3 +766,5 @@ export type ForwardMessagesParams = {
   forwardedLocalMessagesSlice?: ForwardedLocalMessagesSlice;
   messagePriceInStars?: number;
 };
+
+export type FocusMode = 'noDistraction' | 'deepWork';

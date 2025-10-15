@@ -4,7 +4,7 @@ import { getActions, withGlobal } from '../../../global';
 
 import type { ApiUser } from '../../../api/types';
 import type { GlobalState } from '../../../global/types';
-import type { AnimationLevel, ThemeKey } from '../../../types';
+import type { AnimationLevel, FocusMode, ThemeKey } from '../../../types';
 
 import {
   ANIMATION_LEVEL_MAX,
@@ -48,7 +48,7 @@ type StateProps = {
   theme: ThemeKey;
   attachBots: GlobalState['attachMenu']['bots'];
   accountsTotalLimit: number;
-} & Pick<GlobalState, 'currentUserId' | 'archiveSettings' | 'isFocusMode'>;
+} & Pick<GlobalState, 'currentUserId' | 'archiveSettings' | 'focusMode'>;
 
 const LeftSideMenuItems = ({
   archiveSettings,
@@ -57,7 +57,7 @@ const LeftSideMenuItems = ({
   attachBots,
   currentUser,
   accountsTotalLimit,
-  isFocusMode,
+  focusMode,
   onSelectArchived,
   onSelectContacts,
   onSelectSettings,
@@ -107,10 +107,21 @@ const LeftSideMenuItems = ({
 
   const handleFocusModeToggle = useLastCallback((e: React.SyntheticEvent<HTMLElement>) => {
     e.stopPropagation();
-    const newValue = !isFocusMode;
     
-    setFocusMode({ isEnabled: newValue });
+    if (!focusMode) {
+      setFocusMode({ mode: 'noDistraction' });
+      return;
+    }
+
+    if (focusMode === 'noDistraction') {
+      setFocusMode({ mode: 'deepWork' });
+      return;
+    }
+
+    setFocusMode({ mode: undefined });
   });
+
+  const focusModeToToggleLevel = (focusMode: FocusMode | undefined) => !focusMode ? 'min' : (focusMode === 'noDistraction' ? 'mid' : 'max');
 
   return (
     <>
@@ -174,12 +185,7 @@ const LeftSideMenuItems = ({
         onClick={handleFocusModeToggle}
       >
         <span className="menu-item-name">{lang('MenuFocusMode')}</span>
-        <Switcher
-          id="focusmode"
-          label={lang(isFocusMode ? 'AriaMenuDisableFocusMode' : 'AriaMenuEnableFocusMode')}
-          checked={isFocusMode}
-          noAnimation
-        />
+        <Toggle value={focusModeToToggleLevel(focusMode)} />
       </MenuItem>
       <MenuItem
         icon="animations"
@@ -203,7 +209,7 @@ const LeftSideMenuItems = ({
 export default memo(withGlobal<OwnProps>(
   (global): Complete<StateProps> => {
     const {
-      currentUserId, archiveSettings, isFocusMode,
+      currentUserId, archiveSettings, focusMode,
     } = global;
     const { animationLevel } = selectSharedSettings(global);
     const attachBots = global.attachMenu.bots;
@@ -216,7 +222,7 @@ export default memo(withGlobal<OwnProps>(
       archiveSettings,
       attachBots,
       accountsTotalLimit: selectPremiumLimit(global, 'moreAccounts'),
-      isFocusMode,
+      focusMode,
     };
   },
 )(LeftSideMenuItems));

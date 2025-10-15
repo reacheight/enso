@@ -16,6 +16,7 @@ import type {
 } from '../../../api/types';
 import type { ObserveFn } from '../../../hooks/useIntersectionObserver';
 import type { ChatAnimationTypes } from './hooks';
+import type { FocusMode } from '../../../types';
 import { MAIN_THREAD_ID } from '../../../api/types';
 
 import { ALL_FOLDER_ID, UNMUTE_TIMESTAMP } from '../../../config';
@@ -124,8 +125,7 @@ type StateProps = {
   orderedFolderIds?: number[];
   chatFoldersById?: Record<number, ApiChatFolder>;
   areTagsEnabled?: boolean;
-  showChatBadge?: boolean;
-  isFocusMode?: boolean;
+  focusMode?: FocusMode;
 };
 
 const Chat: FC<OwnProps & StateProps> = ({
@@ -169,8 +169,7 @@ const Chat: FC<OwnProps & StateProps> = ({
   chatFoldersById,
   areTagsEnabled,
   withTags,
-  showChatBadge,
-  isFocusMode,
+  focusMode,
 }) => {
   const {
     openChat,
@@ -367,7 +366,8 @@ const Chat: FC<OwnProps & StateProps> = ({
   }, [chatId, listedTopicIds, isSynced, isForum, isIntersecting]);
 
   const isOnline = user && userStatus && isUserOnline(user, userStatus);
-  const { hasShownClass: isAvatarOnlineShown } = !isFocusMode ? useShowTransitionDeprecated(isOnline) : { hasShownClass: false };
+  const { hasShownClass: isAvatarOnlineShown } = !focusMode ? useShowTransitionDeprecated(isOnline) : { hasShownClass: false };
+  const shouldDisableChatBadge = focusMode === 'deepWork' || (focusMode === 'noDistraction' && isMuted);
 
   const href = useMemo(() => {
     if (!IS_OPEN_IN_NEW_TAB_SUPPORTED) return undefined;
@@ -423,7 +423,7 @@ const Chat: FC<OwnProps & StateProps> = ({
           {!isAvatarOnlineShown && Boolean(chat.subscriptionUntil) && (
             <StarIcon type="gold" className="avatar-badge avatar-subscription" size="adaptive" />
           )}
-          {showChatBadge && (
+          {!shouldDisableChatBadge && (
             <ChatBadge
               chat={chat}
               isMuted={isMuted}
@@ -462,7 +462,7 @@ const Chat: FC<OwnProps & StateProps> = ({
         </div>
         <div className="subtitle">
           {renderSubtitle()}
-          {!isPreview && showChatBadge && (
+          {!isPreview && !shouldDisableChatBadge && (
             <ChatBadge
               chat={chat}
               isPinned={isPinned}
@@ -584,8 +584,7 @@ export default memo(withGlobal<OwnProps>(
       orderedFolderIds: global.chatFolders.orderedIds,
       chatFoldersById: global.chatFolders.byId,
       areTagsEnabled: areTagsEnabled && isPremium,
-      showChatBadge: !global.isFocusMode,
-      isFocusMode: global.isFocusMode,
+      focusMode: global.focusMode,
     };
   },
 )(Chat));

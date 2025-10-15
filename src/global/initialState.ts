@@ -347,7 +347,7 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
     editingWorkspaceId: undefined,
   },
 
-  isFocusMode: false,
+  focusMode: undefined,
 };
 
 export const INITIAL_TAB_STATE: TabState = {

@@ -5,7 +5,7 @@ import { getActions, getGlobal, withGlobal } from '../../../global';
 import type { ApiChatFolder, ApiChatlistExportedInvite, ApiSession } from '../../../api/types';
 import type { GlobalState } from '../../../global/types';
 import type { FolderEditDispatch } from '../../../hooks/reducers/useFoldersReducer';
-import type { AnimationLevel, Workspace } from '../../../types';
+import type { AnimationLevel, FocusMode, Workspace } from '../../../types';
 import type { MenuItemContextAction } from '../../ui/ListItem';
 import type { TabWithProperties } from '../../ui/TabList';
 import { SettingsScreens } from '../../../types';
@@ -61,7 +61,7 @@ type StateProps = {
   isStoryRibbonShown?: boolean;
   sessions?: Record<string, ApiSession>;
   isAccountFrozen?: boolean;
-  isFocusMode?: boolean;
+  focusMode?: FocusMode;
 };
 
 const SAVED_MESSAGES_HOTKEY = '0';
@@ -87,7 +87,7 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
   isStoryRibbonShown,
   sessions,
   isAccountFrozen,
-  isFocusMode,
+  focusMode,
 }) => {
   const {
     loadChatFolders,
@@ -302,8 +302,8 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
           entities: title.entities,
           noCustomEmojiPlayback: folder.noTitleAnimations,
         }),
-        badgeCount: isFocusMode ? 0 : adjustedFolderCountersById[id]?.chatsCount,
-        isBadgeActive: !isFocusMode && Boolean(adjustedFolderCountersById[id]?.notificationsCount),
+        badgeCount: focusMode ? 0 : adjustedFolderCountersById[id]?.chatsCount,
+        isBadgeActive: !focusMode && Boolean(adjustedFolderCountersById[id]?.notificationsCount),
         isBlocked,
         contextActions: contextActions?.length ? contextActions : undefined,
       } satisfies TabWithProperties;
@@ -311,7 +311,7 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
   }, [
     displayedFolders, maxFolders, adjustedFolderCountersById, lang, chatFoldersById, maxChatLists, folderInvitesById,
     maxFolderInvites, folderUnreadChatsCountersById, openSettingsScreen,
-    isFocusMode,
+    focusMode,
   ]);
 
   const handleSwitchTab = useLastCallback((index: number) => {
@@ -483,7 +483,7 @@ export default memo(withGlobal<OwnProps>(
       },
       currentUserId,
       archiveSettings,
-      isFocusMode,
+      focusMode,
     } = global;
     const { animationLevel } = selectSharedSettings(global);
     const { shouldSkipHistoryAnimations, activeChatFolder } = selectTabState(global);
@@ -507,7 +507,7 @@ export default memo(withGlobal<OwnProps>(
       isStoryRibbonShown,
       sessions,
       isAccountFrozen,
-      isFocusMode,
+      focusMode,
     };
   },
 )(ChatFolders));

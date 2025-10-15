@@ -35,7 +35,8 @@ export default memo(withGlobal<StateProps>(
   (global): StateProps => {
     const currentUserId = global.currentUserId!;
     const currentChat = selectCurrentChat(global);
-    const savedMesagesUnreadCount = selectChat(global, currentUserId)?.unreadCount;
+    const showUnreadCount = global.focusMode !== 'deepWork';
+    const savedMesagesUnreadCount = showUnreadCount ? selectChat(global, currentUserId)?.unreadCount : undefined;
     const isChatWithSelf = currentChat ? currentChat.id === currentUserId : false;
 
     return {
