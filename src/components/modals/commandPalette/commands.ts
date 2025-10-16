@@ -10,10 +10,10 @@ export function getAvailableCommands(focusMode?: FocusMode): CommandCategory[] {
   if (!focusMode) {
     focusModeCommands.push({
       id: 'enable-focus-no-distraction',
-      title: 'Enable Focus Mode: No Distraction',
-      subtitle: 'Minimize distractions and stay focused',
+      title: 'Focus: No Distraction',
+      subtitle: 'Hide muted chat badges and online status',
       icon: 'eye-crossed',
-      keywords: ['focus', 'enable', 'no distraction', 'distraction'],
+      keywords: ['enable', 'nodistraction'],
       action: () => {
         setFocusMode({ mode: 'noDistraction' });
       },
@@ -21,10 +21,10 @@ export function getAvailableCommands(focusMode?: FocusMode): CommandCategory[] {
 
     focusModeCommands.push({
       id: 'enable-focus-deep-work',
-      title: 'Enable Focus Mode: Deep Work',
-      subtitle: 'Enter deep work mode for maximum productivity',
+      title: 'Focus: Deep Work',
+      subtitle: 'Hide all chat badges and online status',
       icon: 'mute',
-      keywords: ['focus', 'enable', 'deep work', 'work', 'productivity'],
+      keywords: ['enable', 'deepwork'],
       action: () => {
         setFocusMode({ mode: 'deepWork' });
       },
@@ -35,7 +35,7 @@ export function getAvailableCommands(focusMode?: FocusMode): CommandCategory[] {
       title: 'Disable Focus Mode',
       subtitle: `Currently: ${focusMode === 'noDistraction' ? 'No Distraction' : 'Deep Work'}`,
       icon: 'unmute',
-      keywords: ['focus', 'disable', 'turn off', 'exit'],
+      keywords: ['turn off', 'exit'],
       action: () => {
         setFocusMode({ mode: undefined });
       },
@@ -49,7 +49,7 @@ export function getAvailableCommands(focusMode?: FocusMode): CommandCategory[] {
       title: `Switch to ${otherModeTitle}`,
       subtitle: `Currently: ${focusMode === 'noDistraction' ? 'No Distraction' : 'Deep Work'}`,
       icon: 'replace',
-      keywords: ['focus', 'switch', otherModeTitle.toLowerCase()],
+      keywords: ['focus', otherModeTitle.toLowerCase(), otherMode.toLowerCase()],
       action: () => {
         setFocusMode({ mode: otherMode });
       },
@@ -83,12 +83,9 @@ export function searchCommands(
   categories.forEach((category) => {
     category.commands.forEach((command) => {
       const titleMatch = command.title.toLowerCase().includes(lowerQuery);
-      const subtitleMatch = command.subtitle?.toLowerCase().includes(lowerQuery);
-      const keywordsMatch = command.keywords?.some((keyword) =>
-        keyword.toLowerCase().includes(lowerQuery),
-      );
+      const keywordsMatch = command.keywords?.some((keyword) => keyword.toLowerCase().includes(lowerQuery));
 
-      if (titleMatch || subtitleMatch || keywordsMatch) {
+      if (titleMatch || keywordsMatch) {
         results.push(command);
       }
     });
