@@ -1718,6 +1718,8 @@ export interface LangPair {
   'ConfirmBuyGiftForTonDescription': undefined;
   'TitleGiftLocked': undefined;
   'QuickPreview': undefined;
+  'CommandPaletteSearchPlaceholder': undefined;
+  'CommandPaletteNoResults': undefined;
 }
 
 export interface LangPairWithVariables<V = LangVariable> {

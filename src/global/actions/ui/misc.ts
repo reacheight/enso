@@ -942,6 +942,37 @@ addActionHandler('processPremiumFloodWait', (global, actions, payload): ActionRe
   };
 });
 
+addActionHandler('openCommandPalette', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+  return updateTabState(global, {
+    commandPalette: {
+      isOpen: true,
+      query: '',
+    },
+  }, tabId);
+});
+
+addActionHandler('closeCommandPalette', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+  return updateTabState(global, {
+    commandPalette: {
+      isOpen: false,
+      query: '',
+    },
+  }, tabId);
+});
+
+addActionHandler('setCommandPaletteQuery', (global, actions, payload): ActionReturnType => {
+  const { query, tabId = getCurrentTabId() } = payload;
+  const tabState = selectTabState(global, tabId);
+  return updateTabState(global, {
+    commandPalette: {
+      ...tabState.commandPalette,
+      query,
+    },
+  }, tabId);
+});
+
 let prevIsScreenLocked: boolean | undefined;
 let prevBlurredTabsCount: number = 0;
 let onlineTimeout: number | undefined;

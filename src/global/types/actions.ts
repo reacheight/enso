@@ -865,6 +865,12 @@ export interface ActionPayloads {
   };
   resetLeftColumnWidth: undefined;
 
+  openCommandPalette: WithTabId | undefined;
+  closeCommandPalette: WithTabId | undefined;
+  setCommandPaletteQuery: {
+    query: string;
+  } & WithTabId;
+
   copySelectedMessages: WithTabId | undefined;
   copyMessagesByIds: {
     messageIds?: number[];

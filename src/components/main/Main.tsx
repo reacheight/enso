@@ -2,7 +2,7 @@ import '../../global/actions/all';
 
 import {
   beginHeavyAnimation,
-  memo, useEffect, useLayoutEffect,
+  memo, useEffect, useLayoutEffect, useMemo,
   useRef, useState,
 } from '../../lib/teact/teact';
 import { addExtraClass } from '../../lib/teact/teact-dom';
@@ -45,6 +45,7 @@ import useTimeout from '../../hooks/schedulers/useTimeout';
 import useTauriEvent from '../../hooks/tauri/useTauriEvent';
 import useAppLayout from '../../hooks/useAppLayout';
 import useForceUpdate from '../../hooks/useForceUpdate';
+import { useHotkeys } from '../../hooks/useHotkeys';
 import useLang from '../../hooks/useLang';
 import useLastCallback from '../../hooks/useLastCallback';
 import usePreventPinchZoomGesture from '../../hooks/usePreventPinchZoomGesture';
@@ -527,6 +528,15 @@ const Main = ({
     isFullscreen && 'is-fullscreen',
     isFocusListOpen && 'focus-list-open',
   );
+
+  const { openCommandPalette } = getActions();
+
+  useHotkeys(useMemo(() => ({
+    'Mod+K': (e: KeyboardEvent) => {
+      e.preventDefault();
+      openCommandPalette();
+    },
+  }), []));
 
   const handleBlur = useLastCallback(() => {
     onTabFocusChange({ isBlurred: true });

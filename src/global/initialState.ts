@@ -472,6 +472,10 @@ export const INITIAL_TAB_STATE: TabState = {
     isOpen: false,
   },
 
+  commandPalette: {
+    isOpen: false,
+  },
+
   requestedTranslations: {
     byChatId: {},
   },

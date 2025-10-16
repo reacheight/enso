@@ -54,6 +54,7 @@ import SuggestedStatusModal from './suggestedStatus/SuggestedStatusModal.async';
 import SuggestMessageModal from './suggestMessage/SuggestMessageModal.async';
 import UrlAuthModal from './urlAuth/UrlAuthModal.async';
 import WebAppModal from './webApp/WebAppModal.async';
+import CommandPalette from './commandPalette/CommandPalette.async';
 
 // `Pick` used only to provide tab completion
 type ModalKey = keyof Pick<TabState,
@@ -103,7 +104,8 @@ type ModalKey = keyof Pick<TabState,
   'deleteAccountModal' |
   'isAgeVerificationModalOpen' |
   'profileRatingModal' |
-  'quickPreview'
+  'quickPreview' |
+  'commandPalette'
 >;
 
 type StateProps = {
@@ -166,6 +168,7 @@ const MODALS: ModalRegistry = {
   isAgeVerificationModalOpen: AgeVerificationModal,
   profileRatingModal: ProfileRatingModal,
   quickPreview: QuickPreviewModal,
+  commandPalette: CommandPalette,
 };
 const MODAL_KEYS = Object.keys(MODALS) as ModalKey[];
 const MODAL_ENTRIES = Object.entries(MODALS) as Entries<ModalRegistry>;

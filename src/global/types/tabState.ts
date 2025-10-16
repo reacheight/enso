@@ -895,6 +895,11 @@ export type TabState = {
     threadId?: ThreadId;
   };
 
+  commandPalette?: {
+    isOpen?: boolean;
+    query?: string;
+  };
+
   isWaitingForStarGiftUpgrade?: true;
   isWaitingForStarGiftTransfer?: true;
   insertingPeerIdMention?: string;
