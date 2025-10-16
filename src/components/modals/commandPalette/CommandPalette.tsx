@@ -12,6 +12,8 @@ import useLastCallback from '../../../hooks/useLastCallback';
 import Avatar from '../../common/Avatar';
 import Modal from '../../ui/Modal';
 import InputText from '../../ui/InputText';
+import PickerItem from '../../common/pickers/PickerItem';
+import FullNameTitle from '../../common/FullNameTitle';
 
 import styles from './CommandPalette.module.scss';
 
@@ -26,15 +28,15 @@ type StateProps = {
   query?: string;
   chatIds?: string[];
   chatsById?: Record<string, ApiChat>;
+  currentUserId?: string;
 };
 
-const CommandPalette = ({ isOpen, query = '', chatIds, chatsById }: StateProps) => {
+const CommandPalette = ({ isOpen, query = '', chatIds, chatsById, currentUserId }: StateProps) => {
   const lang = useLang();
   const { closeCommandPalette, setCommandPaletteQuery, openChat } = getActions();
 
   const inputRef = useRef<HTMLInputElement>();
-  const listRef = useRef<HTMLUListElement>();
-  const itemRefs = useRef<Record<string, HTMLLIElement>>({});
+  const listRef = useRef<HTMLDivElement>();
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const results = useMemo(() => {
@@ -69,8 +71,8 @@ const CommandPalette = ({ isOpen, query = '', chatIds, chatsById }: StateProps) 
   }, [query]);
 
   useEffect(() => {
-    const selectedItem = itemRefs.current[results[selectedIndex]?.id];
-    if (selectedItem && listRef.current) {
+    const selectedItem = listRef.current?.children[selectedIndex] as HTMLElement | undefined;
+    if (selectedItem) {
       selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [selectedIndex, results]);
@@ -142,31 +144,41 @@ const CommandPalette = ({ isOpen, query = '', chatIds, chatsById }: StateProps) 
               {lang('CommandPaletteNoResults')}
             </div>
           ) : (
-            <ul className={styles.list} ref={listRef}>
-              {results.map((result, index) => (
-                <li
-                  key={result.id}
-                  ref={(el) => {
-                    if (el) {
-                      itemRefs.current[result.id] = el;
-                    }
-                  }}
-                  className={buildClassName(
-                    styles.item,
-                    index === selectedIndex && styles.selected,
-                  )}
-                  onClick={() => handleItemClick(result.id)}
-                >
-                  {result.chat && (
-                    <Avatar
-                      peer={result.chat}
-                      size="tiny"
-                    />
-                  )}
-                  <div className={styles.itemTitle}>{result.title}</div>
-                </li>
-              ))}
-            </ul>
+            <div className={styles.list} ref={listRef}>
+              {results.map((result, index) => {
+                const isSavedMessages = result.id === currentUserId;
+
+                return (
+                  <PickerItem
+                    key={result.id}
+                    className={buildClassName(
+                      styles.item,
+                      index === selectedIndex && styles.selected,
+                    )}
+                    title={(
+                      <div className="title-wrapper">
+                        <FullNameTitle
+                          className="item-title"
+                          peer={result.chat!}
+                          isSavedMessages={isSavedMessages}
+                        />
+                      </div>
+                    )}
+                    avatarElement={(
+                      result.chat && (
+                        <Avatar
+                          peer={result.chat}
+                          size="tiny"
+                          isSavedMessages={isSavedMessages}
+                        />
+                      )
+                    )}
+                    ripple
+                    onClick={() => handleItemClick(result.id)}
+                  />
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
@@ -185,6 +197,7 @@ export default memo(
       query: commandPalette?.query,
       chatIds,
       chatsById: global.chats.byId,
+      currentUserId: global.currentUserId,
     };
   })(CommandPalette),
 );
