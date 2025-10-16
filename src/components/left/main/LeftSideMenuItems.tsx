@@ -181,7 +181,7 @@ const LeftSideMenuItems = ({
         />
       </MenuItem>
       <MenuItem
-        icon="unmute"
+        icon="mute"
         onClick={handleFocusModeToggle}
       >
         <span className="menu-item-name">{lang('MenuFocusMode')}</span>
