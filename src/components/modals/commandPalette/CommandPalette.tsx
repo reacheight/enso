@@ -274,9 +274,11 @@ export default memo(
   withGlobal((global: GlobalState): StateProps => {
     const tabState = selectTabState(global);
     const { commandPalette } = tabState;
-    const chatIds = global.chats.listIds.active || [];
+    const activeChatIds = global.chats.listIds.active || [];
+    const archivedChatIds = global.chats.listIds.archived || [];
+    const chatIds = [...activeChatIds, ...archivedChatIds];
 
-    return {
+    return {  
       isOpen: commandPalette?.isOpen,
       query: commandPalette?.query,
       chatIds,
