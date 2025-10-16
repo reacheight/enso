@@ -529,12 +529,16 @@ const Main = ({
     isFocusListOpen && 'focus-list-open',
   );
 
-  const { openCommandPalette } = getActions();
+  const { openCommandPalette, toggleFocusList } = getActions();
 
   useHotkeys(useMemo(() => ({
     'Mod+K': (e: KeyboardEvent) => {
       e.preventDefault();
       openCommandPalette();
+    },
+    'Mod+P': (e: KeyboardEvent) => {
+      e.preventDefault();
+      toggleFocusList();
     },
   }), []));
 
