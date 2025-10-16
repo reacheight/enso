@@ -40,12 +40,41 @@
   margin: 0;
 }
 
+.sectionHeader {
+  padding: 0.5rem 1rem;
+  padding-top: 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+
+  &:first-child {
+    padding-top: 0.5rem;
+  }
+}
+
 .item {
   &.selected {
     background-color: var(--color-item-hover);
   }
 }
 
+
+.commandIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  color: var(--color-white);
+  
+  i {
+    font-size: 1rem;
+  }
+}
 
 .noResults {
   padding: 1.5rem;
