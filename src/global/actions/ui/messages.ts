@@ -779,6 +779,18 @@ addActionHandler('openTodoListModal', (global, actions, payload): ActionReturnTy
 
 addTabStateResetterAction('closeTodoListModal', 'todoListModal');
 
+addActionHandler('openQuickReminderModal', (global, actions, payload): ActionReturnType => {
+  const { tabId = getCurrentTabId() } = payload || {};
+
+  return updateTabState(global, {
+    quickReminderModal: {
+      isOpen: true,
+    },
+  }, tabId);
+});
+
+addTabStateResetterAction('closeQuickReminderModal', 'quickReminderModal');
+
 addActionHandler('checkVersionNotification', (global, actions): ActionReturnType => {
   if (CHANGELOG_DATETIME && Date.now() > CHANGELOG_DATETIME + VERSION_NOTIFICATION_DURATION) {
     return;

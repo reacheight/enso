@@ -562,6 +562,10 @@ export type TabState = {
     forNewTask?: boolean;
   };
 
+  quickReminderModal?: {
+    isOpen: boolean;
+  };
+
   preparedMessageModal?: {
     message: ApiPreparedInlineMessage;
     webAppKey: string;

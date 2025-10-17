@@ -1889,7 +1889,6 @@
 "ActionStarGiftDisplaying" = "You added this gift to your profile.";
 "ActionStarGiftChannelDisplaying" = "This gift is displayed to visitors of your channel.";
 "ActionStarGiftUpgradeText" = "{peer} can turn this gift into a unique collectible.";
-"ActionStarGiftUpgradeTextYou" = "Tap "Unpack" to turn this gift into a unique collectible.";
 "ActionStarGiftUpgraded" = "This gift was upgraded.";
 "ActionStarGiftUnpack" = "Unpack";
 "ActionStarGiftLimitedRibbon" = "1 of {total}";
@@ -2299,3 +2298,4 @@
 "QuickPreview" = "Quick Preview";
 "CommandPaletteSearchPlaceholder" = "Search chats or commands...";
 "CommandPaletteNoResults" = "No results found";
+"QuickReminderModalPlaceholder" = "Enter reminder text..."

@@ -1488,7 +1488,6 @@ export interface LangPair {
   'ActionStarGiftNoConvertTextYou': undefined;
   'ActionStarGiftDisplaying': undefined;
   'ActionStarGiftChannelDisplaying': undefined;
-  'ActionStarGiftUpgradeTextYou': undefined;
   'ActionStarGiftUpgraded': undefined;
   'ActionStarGiftUnpack': undefined;
   'ActionStarGiftUniqueRibbon': undefined;
@@ -1720,6 +1719,7 @@ export interface LangPair {
   'QuickPreview': undefined;
   'CommandPaletteSearchPlaceholder': undefined;
   'CommandPaletteNoResults': undefined;
+  'QuickReminderModalPlaceholder': undefined;
 }
 
 export interface LangPairWithVariables<V = LangVariable> {

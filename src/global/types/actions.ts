@@ -2307,6 +2307,8 @@ export interface ActionPayloads {
     forNewTask?: boolean;
   } & WithTabId;
   closeTodoListModal: WithTabId | undefined;
+  openQuickReminderModal: WithTabId | undefined;
+  closeQuickReminderModal: WithTabId | undefined;
   requestConfetti: (ConfettiParams & WithTabId) | WithTabId;
   requestWave: {
     startX: number;

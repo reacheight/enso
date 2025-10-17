@@ -7,7 +7,7 @@ import { createElement, TeactNode } from '../../../lib/teact/teact';
 import WorkspaceAvatar from '../../left/main/WorkspaceAvatar';
 
 export function getAvailableCommands(allWorkspaces: Workspace[], currentWorkspaceId: string, currentUser?: ApiUser, focusMode?: FocusMode): Command[] {
-  const { setFocusMode, setCurrentWorkspace } = getActions();
+  const { setFocusMode, setCurrentWorkspace, openQuickReminderModal } = getActions();
 
   const focusModeCommands: Command[] = [];
 
@@ -82,6 +82,17 @@ export function getAvailableCommands(allWorkspaces: Workspace[], currentWorkspac
       },
     })));
   }
+
+  commands.push({
+    id: 'quick-reminder',
+    title: 'Quick Reminder',
+    subtitle: 'Schedule a message for yourself',
+    icon: 'schedule',
+    keywords: ['schedule'],
+    action: () => {
+      openQuickReminderModal();
+    },
+  });
 
   return commands;
 }
