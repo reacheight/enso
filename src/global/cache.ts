@@ -368,6 +368,18 @@ function unsafeMigrateCache(cached: GlobalState, initialState: GlobalState) {
     cached.sharedState.settings.shouldWarnAboutFiles = true;
     untypedCached.sharedState.settings.shouldWarnAboutSvg = undefined;
   }
+
+  if (!cached.workspaces) {
+    cached.workspaces = initialState.workspaces;
+  } else {
+    // Ensure all workspace fields exist
+    cached.workspaces = {
+      ...initialState.workspaces,
+      ...cached.workspaces,
+      byId: cached.workspaces.byId || {},
+      orderedIds: cached.workspaces.orderedIds || [],
+    };
+  }
 }
 
 function updateCache(force?: boolean) {
