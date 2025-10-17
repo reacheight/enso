@@ -1,6 +1,7 @@
-import { ApiUser } from '../../../api/types';
+import type { ApiUser } from '../../../api/types';
+import type { Workspace } from '../../../types';
 import { FC, memo } from '../../../lib/teact/teact';
-import { Workspace } from '../../../types';
+import { EVERYTHING_WORKSPACE_ID } from '../../../global/selectors/workspaces';
 import Avatar, { AvatarSize } from '../../common/Avatar';
 
 type OwnProps = {
@@ -10,9 +11,7 @@ type OwnProps = {
 };
 
 const WorkspaceAvatar: FC<OwnProps> = ({ workspace, currentUser, size }) => {
-  const everythingWorkspaceId = '0';
-
-  return workspace.id === everythingWorkspaceId
+  return workspace.id === EVERYTHING_WORKSPACE_ID
     ? <Avatar isRectangular peer={currentUser} size={size} />
     : <Avatar isRectangular size={size} text={workspace.name} />
 };

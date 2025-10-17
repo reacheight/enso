@@ -2,8 +2,12 @@ import type { FC } from '../../../lib/teact/teact';
 import { useState, useCallback, useEffect } from '../../../lib/teact/teact';
 import { getGlobal, getActions } from '../../../global';
 
-import { useWorkspaceStorage } from '../../../hooks/useWorkspaceStorage';
-import { Workspace } from '../../../types';
+import type { Workspace } from '../../../types';
+import {
+  selectWorkspaceById,
+  EVERYTHING_WORKSPACE_ID,
+} from '../../../global/selectors/workspaces';
+import useSelector from '../../../hooks/data/useSelector';
 import Button from '../../ui/Button';
 import InputText from '../../ui/InputText';
 import Checkbox from '../../ui/Checkbox';
@@ -23,7 +27,14 @@ const WorkspaceModal: FC<OwnProps> = ({
   workspaceId,
 }) => {
   const global = getGlobal();
-  const { setActiveChatFolder, closeWorkspaceCreator } = getActions();
+  const {
+    setActiveChatFolder,
+    closeWorkspaceCreator,
+    createWorkspace,
+    updateWorkspace,
+    deleteWorkspace,
+    setCurrentWorkspace,
+  } = getActions();
 
   const chatFoldersById = global.chatFolders.byId;
   const orderedFolderIds = global.chatFolders.orderedIds;
@@ -31,23 +42,23 @@ const WorkspaceModal: FC<OwnProps> = ({
 
   const [workspaceName, setWorkspaceName] = useState('');
   const [selectedFolderIds, setSelectedFolderIds] = useState<number[]>([]);
-  const { savedWorkspaces, setSavedWorkspaces, setCurrentWorkspaceId } = useWorkspaceStorage();
+  
+  const editingWorkspace = useSelector((state) => 
+    workspaceId ? selectWorkspaceById(state, workspaceId) : undefined
+  );
 
   const lang = useLang();
   const currentWorkspaceId = workspaceId;
 
   useEffect(() => {
-    if (currentWorkspaceId) {
-      const workspace = savedWorkspaces.find(w => w.id === currentWorkspaceId);
-      if (workspace) {
-        setWorkspaceName(workspace.name);
-        setSelectedFolderIds(workspace.foldersIds || []);
-      }
+    if (editingWorkspace) {
+      setWorkspaceName(editingWorkspace.name);
+      setSelectedFolderIds(editingWorkspace.foldersIds || []);
     } else {
       setWorkspaceName('');
       setSelectedFolderIds([]);
     }
-  }, [currentWorkspaceId, savedWorkspaces]);
+  }, [editingWorkspace]);
 
   const isFormValid = selectedFolderIds.length > 0 && workspaceName.trim() !== '';
 
@@ -57,25 +68,37 @@ const WorkspaceModal: FC<OwnProps> = ({
 
     if (isFormValid) {
       if (currentWorkspaceId) {
-        setSavedWorkspaces(
-          savedWorkspaces.map(w =>
-            w.id === currentWorkspaceId ? { ...w, name: trimmedName, foldersIds: selectedFolderIds } : w
-          )
-        );
+        updateWorkspace({
+          workspace: {
+            id: currentWorkspaceId,
+            name: trimmedName,
+            foldersIds: selectedFolderIds,
+          },
+        });
       } else {
         const newWorkspace: Workspace = {
           id: Date.now().toString(),
           name: trimmedName,
           foldersIds: selectedFolderIds,
         };
-        setSavedWorkspaces([...savedWorkspaces, newWorkspace]);
-        setCurrentWorkspaceId(newWorkspace.id);
+        createWorkspace({ workspace: newWorkspace });
+        setCurrentWorkspace({ workspaceId: newWorkspace.id });
       }
 
       setActiveChatFolder({ activeChatFolder: 0 }, { forceOnHeavyAnimation: true });
       closeWorkspaceCreator();
     }
-  }, [workspaceName, selectedFolderIds, currentWorkspaceId, setSavedWorkspaces, savedWorkspaces, isFormValid, setActiveChatFolder, closeWorkspaceCreator]);
+  }, [
+    workspaceName,
+    selectedFolderIds,
+    currentWorkspaceId,
+    isFormValid,
+    createWorkspace,
+    updateWorkspace,
+    setCurrentWorkspace,
+    setActiveChatFolder,
+    closeWorkspaceCreator,
+  ]);
 
   const handleNameChange = useCallback(e => {
     setWorkspaceName(e.target.value);
@@ -91,11 +114,11 @@ const WorkspaceModal: FC<OwnProps> = ({
 
   const handleDeleteWorkspace = useCallback(() => {
     if (currentWorkspaceId) {
-      setSavedWorkspaces(savedWorkspaces.filter(w => w.id !== currentWorkspaceId));
-      setCurrentWorkspaceId('0');
+      deleteWorkspace({ workspaceId: currentWorkspaceId });
+      setCurrentWorkspace({ workspaceId: EVERYTHING_WORKSPACE_ID });
       closeWorkspaceCreator();
     }
-  }, [currentWorkspaceId, savedWorkspaces, setSavedWorkspaces, setCurrentWorkspaceId, closeWorkspaceCreator]);
+  }, [currentWorkspaceId, deleteWorkspace, setCurrentWorkspace, closeWorkspaceCreator]);
 
   const handleClose = useCallback(() => {
     closeWorkspaceCreator();

@@ -14,6 +14,13 @@ import { ALL_FOLDER_ID } from '../../../config';
 import { selectCanShareFolder, selectIsCurrentUserFrozen, selectTabState } from '../../../global/selectors';
 import { selectCurrentLimit } from '../../../global/selectors/limits';
 import { selectSharedSettings } from '../../../global/selectors/sharedState';
+import {
+  selectWorkspaces,
+  selectCurrentWorkspaceId,
+  selectCurrentWorkspace,
+  selectExcludeOtherWorkspaces,
+  EVERYTHING_WORKSPACE_ID,
+} from '../../../global/selectors/workspaces';
 import { IS_TOUCH_ENV } from '../../../util/browser/windowEnvironment';
 import buildClassName from '../../../util/buildClassName';
 import captureEscKeyListener from '../../../util/captureEscKeyListener';
@@ -32,7 +39,6 @@ import useHistoryBack from '../../../hooks/useHistoryBack';
 import useLang from '../../../hooks/useLang';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useShowTransition from '../../../hooks/useShowTransition';
-import { useWorkspaceStorage } from '../../../hooks/useWorkspaceStorage';
 
 import TabList from '../../ui/TabList';
 import Transition from '../../ui/Transition';
@@ -62,6 +68,10 @@ type StateProps = {
   sessions?: Record<string, ApiSession>;
   isAccountFrozen?: boolean;
   focusMode?: FocusMode;
+  currentWorkspace: Workspace;
+  currentWorkspaceId: string;
+  excludeOtherWorkspaces: boolean;
+  allWorkspaces: Workspace[];
 };
 
 const SAVED_MESSAGES_HOTKEY = '0';
@@ -88,6 +98,10 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
   sessions,
   isAccountFrozen,
   focusMode,
+  currentWorkspace,
+  currentWorkspaceId,
+  excludeOtherWorkspaces,
+  allWorkspaces,
 }) => {
   const {
     loadChatFolders,
@@ -137,32 +151,28 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
     } satisfies ApiChatFolder;
   }, [orderedFolderIds, lang]);
 
-  const { currentWorkspaceId, savedWorkspaces, excludeOtherWorkspaces } = useWorkspaceStorage();
-  const everythingWorkspace = { id: '0', name: 'Personal', foldersIds: [] } satisfies Workspace;
-  const currentWorkspace = savedWorkspaces.find((workspace) => workspace.id === currentWorkspaceId) || everythingWorkspace;
-
   const displayedFolders = useMemo(() => {
     if (!orderedFolderIds) return undefined;
 
     return orderedFolderIds
       .map((id) => {
-        if (id === ALL_FOLDER_ID && currentWorkspaceId === everythingWorkspace.id) {
+        if (id === ALL_FOLDER_ID && currentWorkspaceId === EVERYTHING_WORKSPACE_ID) {
           return allChatsFolder;
         }
         
-        if (currentWorkspaceId === everythingWorkspace.id && excludeOtherWorkspaces && savedWorkspaces.some(w => w.foldersIds.includes(id))) {
+        if (currentWorkspaceId === EVERYTHING_WORKSPACE_ID && excludeOtherWorkspaces && allWorkspaces.some(w => w.foldersIds.includes(id))) {
           return null;
         }
 
         const folder = chatFoldersById[id] || allChatsFolder;
-        if (folder && (currentWorkspaceId === everythingWorkspace.id || currentWorkspace.foldersIds.includes(id))) {
+        if (folder && (currentWorkspaceId === EVERYTHING_WORKSPACE_ID || currentWorkspace.foldersIds.includes(id))) {
           return folder;
         }
 
         return null;
       })
       .filter(Boolean);
-  }, [chatFoldersById, allChatsFolder, orderedFolderIds, currentWorkspaceId, currentWorkspace.foldersIds, excludeOtherWorkspaces]);
+  }, [chatFoldersById, allChatsFolder, orderedFolderIds, currentWorkspaceId, currentWorkspace.foldersIds, excludeOtherWorkspaces, allWorkspaces]);
 
   const allChatsFolderIndex = displayedFolders?.findIndex((folder) => folder.id === ALL_FOLDER_ID);
   const isInAllChatsFolder = allChatsFolderIndex === activeChatFolder;
@@ -181,12 +191,12 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
   const folderCountersById = useFolderManagerForUnreadCounters();
   
   const adjustedFolderCountersById = useMemo(() => {
-    const shouldFilterByWorkspace = currentWorkspaceId === everythingWorkspace.id && excludeOtherWorkspaces;
+    const shouldFilterByWorkspace = currentWorkspaceId === EVERYTHING_WORKSPACE_ID && excludeOtherWorkspaces;
     if (!shouldFilterByWorkspace) {
       return folderCountersById;
     }
 
-    const folderFromWorkspaces = savedWorkspaces.flatMap(w => w.foldersIds);
+    const folderFromWorkspaces = allWorkspaces.flatMap(w => w.foldersIds);
     const adjusted = { ...folderCountersById };
     
     const allFolderUnreadChats = folderUnreadChatsCountersById[ALL_FOLDER_ID];
@@ -208,9 +218,8 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
     folderCountersById, 
     currentWorkspaceId, 
     excludeOtherWorkspaces, 
-    savedWorkspaces, 
+    allWorkspaces, 
     folderUnreadChatsCountersById,
-    everythingWorkspace.id,
   ]);
 
   const folderTabs = useMemo(() => {
@@ -508,6 +517,10 @@ export default memo(withGlobal<OwnProps>(
       sessions,
       isAccountFrozen,
       focusMode,
+      currentWorkspace: selectCurrentWorkspace(global),
+      currentWorkspaceId: selectCurrentWorkspaceId(global),
+      excludeOtherWorkspaces: selectExcludeOtherWorkspaces(global),
+      allWorkspaces: selectWorkspaces(global),
     };
   },
 )(ChatFolders));

@@ -103,6 +103,7 @@ import type {
   ThemeKey,
   ThreadId,
   WebPageMediaSize,
+  Workspace,
 } from '../../types';
 import type { WebApp, WebAppModalStateType, WebAppOutboundEvent } from '../../types/webapp';
 import type { DownloadableMedia } from '../helpers';
@@ -1081,6 +1082,11 @@ export interface ActionPayloads {
   openWorkspaceCreator: undefined;
   openWorkspaceEditor: { workspaceId: string };
   closeWorkspaceCreator: undefined;
+  createWorkspace: { workspace: Workspace };
+  updateWorkspace: { workspace: Workspace };
+  deleteWorkspace: { workspaceId: string };
+  setCurrentWorkspace: { workspaceId: string };
+  setExcludeOtherWorkspaces: { excludeOtherWorkspaces: boolean };
   setIsElectronUpdateAvailable: boolean;
   setGlobalSearchClosing: ({
     isClosing?: boolean;

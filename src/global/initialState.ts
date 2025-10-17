@@ -345,6 +345,10 @@ export const INITIAL_GLOBAL_STATE: GlobalState = {
   workspaces: {
     isCreatorOpen: false,
     editingWorkspaceId: undefined,
+    byId: {},
+    orderedIds: [],
+    currentWorkspaceId: '0',
+    excludeOtherWorkspaces: false,
   },
 
   focusMode: undefined,

@@ -434,6 +434,7 @@ function reduceGlobal<T extends GlobalState>(global: T) {
       'availableEffectById',
       'focusList',
       'focusMode',
+      'workspaces',
     ]),
     lastIsChatInfoShown: !getIsMobile() ? global.lastIsChatInfoShown : undefined,
     lastIsFocusListShown: !getIsMobile() ? global.lastIsFocusListShown : undefined,

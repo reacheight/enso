@@ -7,6 +7,7 @@ import { getActions, withGlobal } from '../../../global';
 import type { ApiSession } from '../../../api/types';
 import type { GlobalState } from '../../../global/types';
 import type { FolderEditDispatch } from '../../../hooks/reducers/useFoldersReducer';
+import type { Workspace } from '../../../types';
 import { LeftColumnContent } from '../../../types';
 
 import {
@@ -30,6 +31,12 @@ import useInfiniteScroll from '../../../hooks/useInfiniteScroll';
 import { useIntersectionObserver } from '../../../hooks/useIntersectionObserver';
 import useLastCallback from '../../../hooks/useLastCallback';
 import useOrderDiff from './hooks/useOrderDiff';
+import {
+  selectWorkspaces,
+  selectCurrentWorkspaceId,
+  selectExcludeOtherWorkspaces,
+  EVERYTHING_WORKSPACE_ID,
+} from '../../../global/selectors/workspaces';
 
 import InfiniteScroll from '../../ui/InfiniteScroll';
 import Loading from '../../ui/Loading';
@@ -38,7 +45,6 @@ import Chat from './Chat';
 import EmptyFolder from './EmptyFolder';
 import FrozenAccountNotification from './FrozenAccountNotification';
 import UnconfirmedSession from './UnconfirmedSession';
-import { useWorkspaceStorage } from '../../../hooks/useWorkspaceStorage';
 
 type OwnProps = {
   className?: string;
@@ -57,6 +63,9 @@ type OwnProps = {
 
 type StateProps = {
   currentUserId?: string;
+  allWorkspaces: Workspace[];
+  currentWorkspaceId: string;
+  excludeOtherWorkspaces: boolean;
 };
 
 const INTERSECTION_THROTTLE = 200;
@@ -77,6 +86,9 @@ const ChatList: FC<OwnProps & StateProps> = ({
   foldersDispatch,
   withTags,
   currentUserId,
+  allWorkspaces,
+  currentWorkspaceId,
+  excludeOtherWorkspaces,
 }) => {
   const {
     openChat,
@@ -88,9 +100,6 @@ const ChatList: FC<OwnProps & StateProps> = ({
   const containerRef = useRef<HTMLDivElement>();
   const shouldIgnoreDragRef = useRef(false);
   const [unconfirmedSessionHeight, setUnconfirmedSessionHeight] = useState(0);
-  const { currentWorkspaceId, excludeOtherWorkspaces, savedWorkspaces } = useWorkspaceStorage();
-
-  const EVERYTHING_WORKSPACE_ID = '0';
   
   const isArchived = folderType === 'archived';
   const isAllFolder = folderType === 'all';
@@ -104,7 +113,7 @@ const ChatList: FC<OwnProps & StateProps> = ({
 
   const orderedIds = useFolderManagerForOrderedIds(resolvedFolderId);
   
-  const foldersFromWorkspaces = useMemo(() => savedWorkspaces.flatMap(w => w.foldersIds), [savedWorkspaces]);
+  const foldersFromWorkspaces = useMemo(() => allWorkspaces.flatMap(w => w.foldersIds), [allWorkspaces]);
   const shouldFilterByWorkspace = isAllFolder && currentWorkspaceId === EVERYTHING_WORKSPACE_ID && excludeOtherWorkspaces;
 
   const filteredOrderedIds = useMemo(() => {
@@ -315,6 +324,9 @@ export default memo(withGlobal<OwnProps>(
   (global): StateProps => {
     return {
       currentUserId: global.currentUserId!,
+      allWorkspaces: selectWorkspaces(global),
+      currentWorkspaceId: selectCurrentWorkspaceId(global),
+      excludeOtherWorkspaces: selectExcludeOtherWorkspaces(global),
     };
   },
 )(ChatList));

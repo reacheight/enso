@@ -72,6 +72,7 @@ import type {
   ThreadId,
   TopicsInfo,
   WebPageMediaSize,
+  Workspace,
 } from '../../types';
 import type { RegularLangFnParameters } from '../../util/localization';
 import type { SharedState } from './sharedState';
@@ -484,6 +485,10 @@ export type GlobalState = {
   workspaces: {
     isCreatorOpen: boolean;
     editingWorkspaceId?: string;
+    byId: Record<string, Workspace>;
+    orderedIds: string[];
+    currentWorkspaceId: string;
+    excludeOtherWorkspaces: boolean;
   };
 
   focusMode: FocusMode | undefined;

@@ -1,8 +1,7 @@
 import type { FC } from '../../../lib/teact/teact';
 import React, { memo, useCallback } from '../../../lib/teact/teact';
 import { getActions, withGlobal } from '../../../global';
-import { Workspace } from '../../../types';
-import { useWorkspaceStorage } from '../../../hooks/useWorkspaceStorage';
+import type { Workspace } from '../../../types';
 
 import DropdownMenu from '../../ui/DropdownMenu';
 import MenuItem from '../../ui/MenuItem';
@@ -12,31 +11,41 @@ import buildClassName from '../../../util/buildClassName';
 import Icon from '../../common/icons/Icon';
 import MenuSeparator from '../../ui/MenuSeparator';
 import Switcher from '../../ui/Switcher';
-import { ApiUser } from '../../../api/types';
+import type { ApiUser } from '../../../api/types';
 import { selectUser } from '../../../global/selectors/users';
+import {
+  selectWorkspaces,
+  selectCurrentWorkspace,
+  selectExcludeOtherWorkspaces,
+  EVERYTHING_WORKSPACE_ID,
+} from '../../../global/selectors/workspaces';
 import WorkspaceAvatar from './WorkspaceAvatar';
 
 type StateProps = {
   currentUser?: ApiUser;
+  allWorkspaces: Workspace[];
+  currentWorkspace: Workspace;
+  excludeOtherWorkspaces: boolean;
 };
 
-const WorkspaceManager: FC<StateProps> = ({ currentUser }) => {
-  const { openWorkspaceCreator, openWorkspaceEditor, setActiveChatFolder } = getActions();
+const WorkspaceManager: FC<StateProps> = ({
+  currentUser,
+  allWorkspaces,
+  currentWorkspace,
+  excludeOtherWorkspaces,
+}) => {
   const {
-    savedWorkspaces,
-    currentWorkspaceId,
-    setCurrentWorkspaceId,
-    excludeOtherWorkspaces,
-    setExcludeOtherWorkspaces,
-  } = useWorkspaceStorage();
-
-  const everythingWorkspace: Workspace = { id: '0', name: 'Personal', foldersIds: [] };
-  const selectedWorkspace = savedWorkspaces.find(workspace => workspace.id === currentWorkspaceId) || everythingWorkspace;
+    openWorkspaceCreator,
+    openWorkspaceEditor,
+    setActiveChatFolder,
+    setCurrentWorkspace,
+    setExcludeOtherWorkspaces: setExcludeOtherWorkspacesAction,
+  } = getActions();
 
   const handleWorkspaceSelect = useCallback((workspace: Workspace) => {
-    setCurrentWorkspaceId(workspace.id);
+    setCurrentWorkspace({ workspaceId: workspace.id });
     setActiveChatFolder({ activeChatFolder: 0 }, { forceOnHeavyAnimation: true });
-  }, [setCurrentWorkspaceId, setActiveChatFolder]);
+  }, [setCurrentWorkspace, setActiveChatFolder]);
 
   const handleCreateWorkspace = useCallback(() => {
     openWorkspaceCreator();
@@ -44,19 +53,19 @@ const WorkspaceManager: FC<StateProps> = ({ currentUser }) => {
 
   const handleSwitcherChange = useCallback((e) => {
     e.stopPropagation();
-    setExcludeOtherWorkspaces(!excludeOtherWorkspaces);
-  }, [excludeOtherWorkspaces, setExcludeOtherWorkspaces]);
+    setExcludeOtherWorkspacesAction({ excludeOtherWorkspaces: !excludeOtherWorkspaces });
+  }, [excludeOtherWorkspaces, setExcludeOtherWorkspacesAction]);
 
   const renderTrigger = useCallback(({ onTrigger, isOpen }: { onTrigger: () => void; isOpen?: boolean }) => (
     <div
-      key={selectedWorkspace?.id}
+      key={currentWorkspace.id}
       onClick={onTrigger}
       className={buildClassName('WorkspaceManager-trigger', isOpen && 'active')}
     >
-      <WorkspaceAvatar workspace={selectedWorkspace} currentUser={currentUser} size="tiny" />
-      {selectedWorkspace.name}
+      <WorkspaceAvatar workspace={currentWorkspace} currentUser={currentUser} size="tiny" />
+      {currentWorkspace.name}
     </div>
-  ), [selectedWorkspace]);
+  ), [currentWorkspace, currentUser]);
 
   return (
     <DropdownMenu
@@ -64,7 +73,7 @@ const WorkspaceManager: FC<StateProps> = ({ currentUser }) => {
       trigger={renderTrigger}
       positionX="left"
     >
-      {[everythingWorkspace, ...savedWorkspaces].map((workspace) => (
+      {allWorkspaces.map((workspace) => (
         <MenuItem
           key={workspace.id}
           onClick={() => handleWorkspaceSelect(workspace)}
@@ -72,7 +81,7 @@ const WorkspaceManager: FC<StateProps> = ({ currentUser }) => {
           customIcon={<WorkspaceAvatar workspace={workspace} currentUser={currentUser} size="mini" />}
         >
           {workspace.name}
-          {workspace.id === currentWorkspaceId && <Icon name="check" />}
+          {workspace.id === currentWorkspace.id && <Icon name="check" />}
         </MenuItem>
       ))}
       <MenuSeparator />
@@ -82,15 +91,15 @@ const WorkspaceManager: FC<StateProps> = ({ currentUser }) => {
       >
         New Workspace
       </MenuItem>
-      {selectedWorkspace.id !== everythingWorkspace.id && (
+      {currentWorkspace.id !== EVERYTHING_WORKSPACE_ID && (
         <MenuItem
           icon="settings"
-          onClick={() => openWorkspaceEditor({ workspaceId: selectedWorkspace.id })}
+          onClick={() => openWorkspaceEditor({ workspaceId: currentWorkspace.id })}
         >
           Workspace settings
         </MenuItem>
       )}
-      {selectedWorkspace.id === everythingWorkspace.id && savedWorkspaces.length > 0 && (
+      {currentWorkspace.id === EVERYTHING_WORKSPACE_ID && allWorkspaces.length > 1 && (
         <MenuItem
           className="WorkspaceManager-excludeOther"
           onClick={handleSwitcherChange}
@@ -110,6 +119,9 @@ export default memo(withGlobal<StateProps>(
   (global): StateProps => {
     return {
       currentUser: selectUser(global, global.currentUserId!),
+      allWorkspaces: selectWorkspaces(global),
+      currentWorkspace: selectCurrentWorkspace(global),
+      excludeOtherWorkspaces: selectExcludeOtherWorkspaces(global),
     };
   },
 )(WorkspaceManager));
