@@ -1,4 +1,5 @@
 import type { IconName } from '../../../types/icons';
+import type { TeactNode } from '../../../lib/teact/teact';
 
 export type CommandAction = () => void;
 
@@ -7,6 +8,7 @@ export interface Command {
   title: string;
   subtitle?: string;
   icon?: IconName;
+  avatar?: TeactNode;
   action: CommandAction;
   keywords?: string[];
 }

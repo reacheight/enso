@@ -8,12 +8,13 @@ type OwnProps = {
   workspace: Workspace;
   currentUser?: ApiUser;
   size?: AvatarSize;
+  isRectangular?: boolean;
 };
 
-const WorkspaceAvatar: FC<OwnProps> = ({ workspace, currentUser, size }) => {
+const WorkspaceAvatar: FC<OwnProps> = ({ workspace, currentUser, size, isRectangular = true }) => {
   return workspace.id === EVERYTHING_WORKSPACE_ID
-    ? <Avatar isRectangular peer={currentUser} size={size} />
-    : <Avatar isRectangular size={size} text={workspace.name} />
+    ? <Avatar isRectangular={isRectangular} peer={currentUser} size={size} />
+    : <Avatar isRectangular={isRectangular} size={size} text={workspace.name} />
 };
 
 export default memo(WorkspaceAvatar);

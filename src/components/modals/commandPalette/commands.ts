@@ -1,9 +1,13 @@
-import type { FocusMode } from '../../../types';
+import type { FocusMode, Workspace } from '../../../types';
 import type { Command } from './types';
+import type { ApiUser } from '../../../api/types';
 import { getActions } from '../../../global';
+import { EVERYTHING_WORKSPACE_ID } from '../../../global/selectors/workspaces';
+import { createElement, TeactNode } from '../../../lib/teact/teact';
+import WorkspaceAvatar from '../../left/main/WorkspaceAvatar';
 
-export function getAvailableCommands(focusMode?: FocusMode): Command[] {
-  const { setFocusMode } = getActions();
+export function getAvailableCommands(allWorkspaces: Workspace[], currentWorkspaceId: string, currentUser?: ApiUser, focusMode?: FocusMode): Command[] {
+  const { setFocusMode, setCurrentWorkspace } = getActions();
 
   const focusModeCommands: Command[] = [];
 
@@ -60,6 +64,23 @@ export function getAvailableCommands(focusMode?: FocusMode): Command[] {
 
   if (focusModeCommands.length > 0) {
     commands.push(...focusModeCommands);
+  }
+
+  if (allWorkspaces.length > 1) {
+    commands.push(...allWorkspaces.filter((workspace) => workspace.id !== currentWorkspaceId).map((workspace) => ({
+      id: `switch-workspace-${workspace.id}`,
+      title: `Switch to ${workspace.name}`,
+      avatar: createElement(WorkspaceAvatar, {
+        workspace,
+        currentUser,
+        size: 'tiny',
+        isRectangular: false,
+      }) as unknown as TeactNode,
+      keywords: ['workspace', workspace.name.toLowerCase(), ...(workspace.id === EVERYTHING_WORKSPACE_ID ? ['default'] : [])],
+      action: () => {
+        setCurrentWorkspace({ workspaceId: workspace.id });
+      },
+    })));
   }
 
   return commands;

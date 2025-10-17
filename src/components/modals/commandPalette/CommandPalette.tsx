@@ -1,8 +1,8 @@
 import { memo, useEffect, useRef, useState, useMemo } from '../../../lib/teact/teact';
 import { withGlobal, getActions } from '../../../global';
 
-import type { ApiChat } from '../../../api/types';
-import type { FocusMode } from '../../../types';
+import type { ApiChat, ApiUser } from '../../../api/types';
+import type { FocusMode, Workspace } from '../../../types';
 import type { GlobalState } from '../../../global/types';
 import type { Command } from './types';
 
@@ -20,6 +20,8 @@ import FullNameTitle from '../../common/FullNameTitle';
 import Icon from '../../common/icons/Icon';
 
 import styles from './CommandPalette.module.scss';
+import { selectWorkspaces } from '../../../global/selectors/workspaces';
+import { selectCurrentWorkspaceId } from '../../../global/selectors/workspaces';
 
 type SearchResult = {
   id: string;
@@ -33,10 +35,13 @@ type StateProps = {
   chatIds?: string[];
   chatsById?: Record<string, ApiChat>;
   currentUserId?: string;
+  currentUser?: ApiUser;
   focusMode?: FocusMode;
+  allWorkspaces: Workspace[];
+  currentWorkspaceId: string;
 };
 
-const CommandPalette = ({ isOpen, query = '', chatIds, chatsById, currentUserId, focusMode }: StateProps) => {
+const CommandPalette = ({ isOpen, query = '', chatIds, chatsById, currentUserId, currentUser, focusMode, allWorkspaces, currentWorkspaceId }: StateProps) => {
   const lang = useLang();
   const { closeCommandPalette, setCommandPaletteQuery, openChat } = getActions();
 
@@ -45,8 +50,8 @@ const CommandPalette = ({ isOpen, query = '', chatIds, chatsById, currentUserId,
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const commands = useMemo(() => {
-    return getAvailableCommands(focusMode);
-  }, [focusMode]);
+    return getAvailableCommands(allWorkspaces, currentWorkspaceId, currentUser, focusMode);
+  }, [focusMode, allWorkspaces, currentWorkspaceId, currentUser]);
 
   const commandResults = useMemo(() => {
     return searchCommands(commands, query);
@@ -165,11 +170,13 @@ const CommandPalette = ({ isOpen, query = '', chatIds, chatsById, currentUserId,
               title={command.title}
               subtitle={command.subtitle}
               avatarElement={(
-                command.icon ? (
-                  <div className={styles.commandIcon}>
-                    <Icon name={command.icon} />
-                  </div>
-                ) : undefined
+                command.avatar ? command.avatar : (
+                  command.icon ? (
+                    <div className={styles.commandIcon}>
+                      <Icon name={command.icon} />
+                    </div>
+                  ) : undefined
+                )
               )}
               ripple
               onClick={() => handleCommandClick(command)}
@@ -284,7 +291,10 @@ export default memo(
       chatIds,
       chatsById: global.chats.byId,
       currentUserId: global.currentUserId,
+      currentUser: global.currentUserId ? global.users.byId[global.currentUserId] : undefined,
       focusMode: global.focusMode,
+      allWorkspaces: selectWorkspaces(global),
+      currentWorkspaceId: selectCurrentWorkspaceId(global),
     };
   })(CommandPalette),
 );
