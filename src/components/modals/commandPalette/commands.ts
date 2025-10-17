@@ -47,12 +47,13 @@ export function getAvailableCommands(allWorkspaces: Workspace[], currentWorkspac
 
     const otherMode = focusMode === 'noDistraction' ? 'deepWork' : 'noDistraction';
     const otherModeTitle = otherMode === 'noDistraction' ? 'No Distraction' : 'Deep Work';
+    const otherModeIcon = otherMode === 'noDistraction' ? 'eye-crossed' : 'mute';
 
     focusModeCommands.push({
       id: `switch-focus-${otherMode}`,
       title: `Switch to ${otherModeTitle}`,
       subtitle: `Currently: ${focusMode === 'noDistraction' ? 'No Distraction' : 'Deep Work'}`,
-      icon: 'replace',
+      icon: otherModeIcon,
       keywords: ['focus', otherModeTitle.toLowerCase(), otherMode.toLowerCase()],
       action: () => {
         setFocusMode({ mode: otherMode });
