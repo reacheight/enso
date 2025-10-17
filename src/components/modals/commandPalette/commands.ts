@@ -1,8 +1,8 @@
 import type { FocusMode } from '../../../types';
-import type { Command, CommandCategory } from './types';
+import type { Command } from './types';
 import { getActions } from '../../../global';
 
-export function getAvailableCommands(focusMode?: FocusMode): CommandCategory[] {
+export function getAvailableCommands(focusMode?: FocusMode): Command[] {
   const { setFocusMode } = getActions();
 
   const focusModeCommands: Command[] = [];
@@ -56,41 +56,31 @@ export function getAvailableCommands(focusMode?: FocusMode): CommandCategory[] {
     });
   }
 
-  const categories: CommandCategory[] = [];
+  const commands: Command[] = [];
 
   if (focusModeCommands.length > 0) {
-    categories.push({
-      id: 'focus-mode',
-      title: 'Focus Mode',
-      commands: focusModeCommands,
-    });
+    commands.push(...focusModeCommands);
   }
 
-  return categories;
+  return commands;
 }
 
-export function searchCommands(
-  categories: CommandCategory[],
-  query: string,
-): Command[] {
+export function searchCommands(commands: Command[], query: string): Command[] {
   if (!query) {
-    return categories.flatMap((category) => category.commands);
+    return commands;
   }
 
   const lowerQuery = query.toLowerCase().trim();
   const results: Command[] = [];
 
-  categories.forEach((category) => {
-    category.commands.forEach((command) => {
-      const titleMatch = command.title.toLowerCase().includes(lowerQuery);
-      const keywordsMatch = command.keywords?.some((keyword) => keyword.toLowerCase().includes(lowerQuery));
+  commands.forEach((command) => {
+    const titleMatch = command.title.toLowerCase().includes(lowerQuery);
+    const keywordsMatch = command.keywords?.some((keyword) => keyword.toLowerCase().includes(lowerQuery));
 
-      if (titleMatch || keywordsMatch) {
-        results.push(command);
-      }
-    });
+    if (titleMatch || keywordsMatch) {
+      results.push(command);
+    }
   });
 
   return results;
 }
-

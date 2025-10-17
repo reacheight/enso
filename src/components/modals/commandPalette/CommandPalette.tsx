@@ -44,13 +44,13 @@ const CommandPalette = ({ isOpen, query = '', chatIds, chatsById, currentUserId,
   const listRef = useRef<HTMLDivElement>();
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const commandCategories = useMemo(() => {
+  const commands = useMemo(() => {
     return getAvailableCommands(focusMode);
   }, [focusMode]);
 
   const commandResults = useMemo(() => {
-    return searchCommands(commandCategories, query);
-  }, [commandCategories, query]);
+    return searchCommands(commands, query);
+  }, [commands, query]);
 
   const chatResults = useMemo(() => {
     if (!chatIds || !chatsById) {

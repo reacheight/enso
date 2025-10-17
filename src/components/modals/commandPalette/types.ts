@@ -10,10 +10,3 @@ export interface Command {
   action: CommandAction;
   keywords?: string[];
 }
-
-export interface CommandCategory {
-  id: string;
-  title: string;
-  commands: Command[];
-}
-
