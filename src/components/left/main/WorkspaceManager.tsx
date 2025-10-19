@@ -115,7 +115,7 @@ const WorkspaceManager: FC<StateProps> = ({
   );
 };
 
-export default memo(withGlobal<StateProps>(
+export default memo(withGlobal(
   (global): StateProps => {
     return {
       currentUser: selectUser(global, global.currentUserId!),

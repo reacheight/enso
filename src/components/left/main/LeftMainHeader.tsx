@@ -45,7 +45,7 @@ import SearchInput from '../../ui/SearchInput';
 import ShowTransition from '../../ui/ShowTransition';
 import ConnectionStatusOverlay from '../ConnectionStatusOverlay';
 import LeftSideMenuItems from './LeftSideMenuItems';
-import StatusButton from './StatusButton';
+import WorkspaceManager from './WorkspaceManager';
 
 import './LeftMainHeader.scss';
 
@@ -121,6 +121,7 @@ const LeftMainHeader: FC<OwnProps & StateProps> = ({
   const { isMobile } = useAppLayout();
 
   const [isBotMenuOpen, markBotMenuOpen, unmarkBotMenuOpen] = useFlag();
+  const [isSearchExpanded, expandSearch, collapseSearch] = useFlag();
 
   const areContactsVisible = content === LeftColumnContent.Contacts;
   const hasMenu = content === LeftColumnContent.ChatList;
@@ -166,7 +167,7 @@ const LeftMainHeader: FC<OwnProps & StateProps> = ({
         color="translucent"
         className={isOpen ? 'active' : ''}
 
-        onClick={hasMenu ? onTrigger : () => onReset()}
+        onClick={hasMenu ? onTrigger : () => handleSearchClose()}
         ariaLabel={hasMenu ? oldLang('AccDescrOpenMenu2') : 'Return to chat list'}
       >
         <div className={buildClassName(
@@ -183,6 +184,18 @@ const LeftMainHeader: FC<OwnProps & StateProps> = ({
     if (!searchQuery) {
       onSearchQuery('');
     }
+  });
+
+  const handleSearchIconClick = useLastCallback(() => {
+    expandSearch();
+    if (!searchQuery) {
+      onSearchQuery('');
+    }
+  });
+
+  const handleSearchClose = useLastCallback(() => {
+    collapseSearch();
+    onReset();
   });
 
   const toggleConnectionStatus = useLastCallback(() => {
@@ -208,7 +221,13 @@ const LeftMainHeader: FC<OwnProps & StateProps> = ({
 
   const isSearchFocused = isMobile ? !isMessageListOpen && isSearchRelevant : isSearchRelevant;
 
-  useEffect(() => (isSearchFocused ? captureEscKeyListener(() => onReset()) : undefined), [isSearchFocused, onReset]);
+  useEffect(() => (isSearchFocused ? captureEscKeyListener(() => handleSearchClose()) : undefined), [isSearchFocused, handleSearchClose]);
+
+  useEffect(() => {
+    if (isSearchRelevant) {
+      expandSearch();
+    }
+  }, [isSearchRelevant, expandSearch]);
 
   const searchInputPlaceholder = content === LeftColumnContent.Contacts
     ? lang('SearchFriends')
@@ -296,30 +315,46 @@ const LeftMainHeader: FC<OwnProps & StateProps> = ({
             onBotMenuClosed={unmarkBotMenuOpen}
           />
         </DropdownMenu>
-        <SearchInput
-          inputId="telegram-search-input"
-          resultsItemSelector=".LeftSearch .ListItem-button"
-          className={buildClassName(
-            (globalSearchChatId || searchDate) ? 'with-picker-item' : undefined,
-            shouldHideSearch && 'SearchInput--hidden',
-          )}
-          value={isClosingSearch ? undefined : (contactsFilter || searchQuery)}
-          focused={isSearchFocused}
-          isLoading={isLoading || connectionStatusPosition === 'minimized'}
-          spinnerColor={connectionStatusPosition === 'minimized' ? 'yellow' : undefined}
-          spinnerBackgroundColor={connectionStatusPosition === 'minimized' && theme === 'light' ? 'light' : undefined}
-          placeholder={searchInputPlaceholder}
-          autoComplete="off"
-          canClose={Boolean(globalSearchChatId || searchDate)}
-          onChange={onSearchQuery}
-          onReset={onReset}
-          onFocus={handleSearchFocus}
-          onSpinnerClick={connectionStatusPosition === 'minimized' ? toggleConnectionStatus : undefined}
-          onEnter={handleSearchEnter}
+        {isSearchExpanded ? (
+          <SearchInput
+            inputId="telegram-search-input"
+            resultsItemSelector=".LeftSearch .ListItem-button"
+            className={buildClassName(
+              'SearchInput--expanded',
+              (globalSearchChatId || searchDate) ? 'with-picker-item' : undefined,
+            )}
+            value={isClosingSearch ? undefined : (contactsFilter || searchQuery)}
+            focused={isSearchFocused}
+            isLoading={isLoading || connectionStatusPosition === 'minimized'}
+            spinnerColor={connectionStatusPosition === 'minimized' ? 'yellow' : undefined}
+            spinnerBackgroundColor={connectionStatusPosition === 'minimized' && theme === 'light' ? 'light' : undefined}
+            placeholder={searchInputPlaceholder}
+            autoComplete="off"
+            canClose
+            onChange={onSearchQuery}
+            onReset={handleSearchClose}
+            onFocus={handleSearchFocus}
+            onSpinnerClick={connectionStatusPosition === 'minimized' ? toggleConnectionStatus : undefined}
+            onEnter={handleSearchEnter}
+          >
+            {searchContent}
+          </SearchInput>
+        ) : (
+          <div className="workspace-manager-wrapper">
+            <WorkspaceManager />
+          </div>
+        )}
+        <Button
+          round
+          ripple={!isMobile}
+          size="smaller"
+          color="translucent"
+          ariaLabel={lang('Search')}
+          onClick={handleSearchIconClick}
+          className={buildClassName('search-icon-button', isSearchExpanded && 'hidden')}
         >
-          {searchContent}
-        </SearchInput>
-        {isCurrentUserPremium && <StatusButton />}
+          <Icon name="search" />
+        </Button>
         {hasPasscode && (
           <Button
             round
@@ -328,7 +363,6 @@ const LeftMainHeader: FC<OwnProps & StateProps> = ({
             color="translucent"
             ariaLabel={`${oldLang('ShortcutsController.Others.LockByPasscode')} (Ctrl+Shift+L)`}
             onClick={handleLockScreen}
-            className={buildClassName(!isCurrentUserPremium && 'extra-spacing')}
           >
             <Icon name="lock" />
           </Button>
