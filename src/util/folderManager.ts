@@ -173,6 +173,10 @@ export function getAllNotificationsCount() {
   return getUnreadCounters()[ALL_FOLDER_ID]?.notificationsCount || 0;
 }
 
+export function getAllUnmutedChatsCount() {
+  return getUnreadCounters()[ALL_FOLDER_ID]?.unmutedChatsCount || 0;
+}
+
 export function getAdjustedUnreadCounters(
   excludeOtherWorkspaces: boolean,
   allWorkspaces: Array<{ foldersIds: number[] }>,
