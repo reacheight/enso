@@ -33,7 +33,7 @@ import { renderTextWithEntities } from '../../common/helpers/renderTextWithEntit
 import useDerivedState from '../../../hooks/useDerivedState';
 import {
   useFolderManagerForUnreadChatsByFolder,
-  useFolderManagerForUnreadCounters,
+  useAdjustedUnreadCounters,
 } from '../../../hooks/useFolderManager';
 import useHistoryBack from '../../../hooks/useHistoryBack';
 import useLang from '../../../hooks/useLang';
@@ -188,39 +188,7 @@ const ChatFolders: FC<OwnProps & StateProps> = ({
     });
   });
 
-  const folderCountersById = useFolderManagerForUnreadCounters();
-  
-  const adjustedFolderCountersById = useMemo(() => {
-    const shouldFilterByWorkspace = currentWorkspaceId === EVERYTHING_WORKSPACE_ID && excludeOtherWorkspaces;
-    if (!shouldFilterByWorkspace) {
-      return folderCountersById;
-    }
-
-    const folderFromWorkspaces = allWorkspaces.flatMap(w => w.foldersIds);
-    const adjusted = { ...folderCountersById };
-    
-    const allFolderUnreadChats = folderUnreadChatsCountersById[ALL_FOLDER_ID];
-    if (allFolderUnreadChats) {
-      const filteredUnreadChats = allFolderUnreadChats.filter((chatId) => 
-        !folderFromWorkspaces.some(folderId => getOrderedIds(folderId)?.includes(chatId))
-      );
-      
-      if (adjusted[ALL_FOLDER_ID]) {
-        adjusted[ALL_FOLDER_ID] = {
-          ...adjusted[ALL_FOLDER_ID],
-          chatsCount: filteredUnreadChats.length,
-        };
-      }
-    }
-    
-    return adjusted;
-  }, [
-    folderCountersById, 
-    currentWorkspaceId, 
-    excludeOtherWorkspaces, 
-    allWorkspaces, 
-    folderUnreadChatsCountersById,
-  ]);
+  const adjustedFolderCountersById = useAdjustedUnreadCounters(excludeOtherWorkspaces, allWorkspaces);
 
   const folderTabs = useMemo(() => {
     if (!displayedFolders || !displayedFolders.length) {

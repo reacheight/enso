@@ -173,6 +173,69 @@ export function getAllNotificationsCount() {
   return getUnreadCounters()[ALL_FOLDER_ID]?.notificationsCount || 0;
 }
 
+export function getAdjustedUnreadCounters(
+  excludeOtherWorkspaces: boolean,
+  allWorkspaces: Array<{ foldersIds: number[] }>,
+): Record<string, {
+  chatsCount: number;
+  notificationsCount: number;
+  unmutedChatsCount: number;
+} | undefined> {
+  const unreadCounters = getUnreadCounters();
+  
+  if (!excludeOtherWorkspaces) {
+    return unreadCounters;
+  }
+
+  const folderFromWorkspaces = allWorkspaces.flatMap(w => w.foldersIds);
+  const adjusted = { ...unreadCounters };
+  
+  const folderUnreadChatsCountersById = getUnreadChatsByFolderId();
+  const allFolderUnreadChats = folderUnreadChatsCountersById[ALL_FOLDER_ID];
+  
+  if (allFolderUnreadChats) {
+    const filteredUnreadChats = allFolderUnreadChats.filter((chatId) => 
+      !folderFromWorkspaces.some(folderId => getOrderedIds(folderId)?.includes(chatId))
+    );
+    
+    if (adjusted[ALL_FOLDER_ID]) {
+      const { chatSummariesById } = prepared;
+      let unmutedChatsCount = 0;
+      let notificationsCount = 0;
+      
+      filteredUnreadChats.forEach((chatId) => {
+        const chatSummary = chatSummariesById.get(chatId);
+        if (!chatSummary) return;
+        
+        if (chatSummary.isUnread) {
+          if (chatSummary.unreadMentionsCount) {
+            notificationsCount += chatSummary.unreadMentionsCount;
+          }
+          
+          if (!chatSummary.isMuted) {
+            unmutedChatsCount++;
+            
+            if (chatSummary.unreadCount) {
+              notificationsCount += chatSummary.unreadCount;
+            } else if (!chatSummary.unreadMentionsCount) {
+              notificationsCount += 1;
+            }
+          }
+        }
+      });
+      
+      adjusted[ALL_FOLDER_ID] = {
+        ...adjusted[ALL_FOLDER_ID],
+        chatsCount: filteredUnreadChats.length,
+        notificationsCount,
+        unmutedChatsCount,
+      };
+    }
+  }
+  
+  return adjusted;
+}
+
 export function getOrderKey(chatId: string, isForSaved?: boolean) {
   const summary = prepared.chatSummariesById.get(chatId)!;
   return isForSaved ? summary.orderInSaved : summary.orderInAll;

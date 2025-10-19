@@ -1,10 +1,8 @@
 import type { GlobalState } from '../types';
 import type { Workspace } from '../../types';
 
-import { getOrderedIds, getUnreadCounters } from '../../util/folderManager';
-import { getIsChatMuted } from '../helpers/notifications';
-import { selectChat } from './chats';
-import { selectNotifyDefaults, selectNotifyException } from './settings';
+import { getAdjustedUnreadCounters } from '../../util/folderManager';
+import { SAVED_FOLDER_ID } from '../../config';
 
 export const EVERYTHING_WORKSPACE_ID = '0';
 
@@ -46,19 +44,26 @@ export function selectExcludeOtherWorkspaces<T extends GlobalState>(global: T) {
   return global.workspaces.excludeOtherWorkspaces;
 }
 
-export function selectWorkspaceUnreadUnmutedChatsCount<T extends GlobalState>(
-  global: T,
+export function selectWorkspaceUnreadUnmutedChatsCount(
   workspace: Workspace,
+  allWorkspaces: Workspace[],
+  excludeOtherWorkspaces: boolean,
 ): number {
+  const adjustedUnreadCounters = getAdjustedUnreadCounters(excludeOtherWorkspaces, allWorkspaces);
+
   if (workspace.id === EVERYTHING_WORKSPACE_ID) {
-    return 0;
+    const otherWorkspacesFoldersIds = allWorkspaces.flatMap(w => w.foldersIds);
+    otherWorkspacesFoldersIds.push(SAVED_FOLDER_ID);
+
+    return Object.entries(adjustedUnreadCounters)
+      .filter(([folderId]) => !otherWorkspacesFoldersIds.includes(Number(folderId)))
+      .reduce((acc, [, counters]) => acc + (counters?.unmutedChatsCount || 0), 0);
   }
 
-  const unreadCounters = getUnreadCounters();
   let count = 0;
 
   for (const folderId of workspace.foldersIds) {
-    const folderCounters = unreadCounters[folderId];
+    const folderCounters = adjustedUnreadCounters[folderId];
     if (folderCounters) {
       count += folderCounters.unmutedChatsCount;
     }

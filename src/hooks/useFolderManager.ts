@@ -7,6 +7,7 @@ import {
   getChatsCount,
   getOrderedIds, getUnreadChatsByFolderId,
   getUnreadCounters,
+  getAdjustedUnreadCounters,
 } from '../util/folderManager';
 import useForceUpdate from './useForceUpdate';
 
@@ -24,6 +25,17 @@ export function useFolderManagerForUnreadCounters() {
   useEffect(() => addUnreadCountersCallback(forceUpdate), [forceUpdate]);
 
   return getUnreadCounters();
+}
+
+export function useAdjustedUnreadCounters(
+  excludeOtherWorkspaces: boolean,
+  allWorkspaces: Array<{ foldersIds: number[] }>,
+) {
+  const forceUpdate = useForceUpdate();
+
+  useEffect(() => addUnreadCountersCallback(forceUpdate), [forceUpdate]);
+
+  return getAdjustedUnreadCounters(excludeOtherWorkspaces, allWorkspaces);
 }
 
 export function useFolderManagerForChatsCount() {

@@ -151,17 +151,22 @@ const WorkspaceManager: FC<StateProps> = ({
 export default memo(withGlobal(
   (global): StateProps => {
     const allWorkspaces = selectWorkspaces(global);
+    const excludeOtherWorkspaces = selectExcludeOtherWorkspaces(global);
     const workspacesUnreadCounts: Record<string, number> = {};
 
     allWorkspaces.forEach((workspace) => {
-      workspacesUnreadCounts[workspace.id] = selectWorkspaceUnreadUnmutedChatsCount(global, workspace);
+      workspacesUnreadCounts[workspace.id] = selectWorkspaceUnreadUnmutedChatsCount(
+        workspace, 
+        allWorkspaces, 
+        excludeOtherWorkspaces
+      );
     });
 
     return {
       currentUser: selectUser(global, global.currentUserId!),
       allWorkspaces,
       currentWorkspace: selectCurrentWorkspace(global),
-      excludeOtherWorkspaces: selectExcludeOtherWorkspaces(global),
+      excludeOtherWorkspaces,
       workspacesUnreadCounts,
       focusMode: global.focusMode,
     };
