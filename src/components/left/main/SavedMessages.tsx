@@ -4,6 +4,7 @@ import type { FC } from '../../../lib/teact/teact';
 import React, { memo } from '../../../lib/teact/teact';
 import buildClassName from '../../../util/buildClassName';
 import Icon from '../../common/icons/Icon';
+import UnreadBadge from '../../common/CustomUnreadBadge';
 
 import './SavedMessages.scss';
 
@@ -26,7 +27,9 @@ const SavedMessages: FC<StateProps> = ({ currentUserId, isActive, savedMesagesUn
     >
       <Icon name="saved-messages" />  
       Saved
-      {savedMesagesUnreadCount !== undefined && savedMesagesUnreadCount !== 0 && <span className="count">{savedMesagesUnreadCount}</span>}
+      {savedMesagesUnreadCount !== undefined && savedMesagesUnreadCount !== 0 && (
+        <UnreadBadge count={savedMesagesUnreadCount} className="SavedMessages-count" />
+      )}
     </div>
   );
 };

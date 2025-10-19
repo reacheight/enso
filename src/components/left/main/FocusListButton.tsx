@@ -3,6 +3,7 @@ import { selectFocusListCount, selectTabState } from '../../../global/selectors'
 import type { FC } from '../../../lib/teact/teact';
 import React, { memo } from '../../../lib/teact/teact';
 import buildClassName from '../../../util/buildClassName';
+import UnreadBadge from '../../common/CustomUnreadBadge';
 
 export const TargetIcon: FC = () => (
   <span className="icon">
@@ -37,7 +38,9 @@ const FocusListButton: FC<StateProps> = ({ isActive, count }) => {
     >
       <TargetIcon />  
       Priority
-      <span className="count">{count}</span>
+      {count !== undefined && count !== 0 && (
+        <UnreadBadge count={count} isInactive={true} className="FocusListButton-count" />
+      )}
     </div>
   );
 };

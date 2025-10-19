@@ -19,6 +19,24 @@
     &.active {
       background-color: var(--color-interactive-element-hover);
     }
+
+    &-avatar {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    &-badge {
+      position: absolute;
+      top: -1px;
+      right: -1px;
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      background-color: var(--color-primary);
+      z-index: 1;
+    }
   }
 
   &-workspace {
@@ -32,7 +50,23 @@
     .icon {
       color: var(--color-primary);
       margin: 0 !important;
-      margin-left: auto !important;
+    }
+
+    &-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+
+    &-name {
+      flex: 1;
+    }
+
+    &-right {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
   }
 

@@ -9,6 +9,7 @@ import MenuItem from '../../ui/MenuItem';
 import './WorkspaceManager.scss';
 import buildClassName from '../../../util/buildClassName';
 import Icon from '../../common/icons/Icon';
+import UnreadBadge from '../../common/CustomUnreadBadge';
 import MenuSeparator from '../../ui/MenuSeparator';
 import Switcher from '../../ui/Switcher';
 import type { ApiUser } from '../../../api/types';
@@ -17,6 +18,7 @@ import {
   selectWorkspaces,
   selectCurrentWorkspace,
   selectExcludeOtherWorkspaces,
+  selectWorkspaceUnreadUnmutedChatsCount,
   EVERYTHING_WORKSPACE_ID,
 } from '../../../global/selectors/workspaces';
 import WorkspaceAvatar from './WorkspaceAvatar';
@@ -26,6 +28,8 @@ type StateProps = {
   allWorkspaces: Workspace[];
   currentWorkspace: Workspace;
   excludeOtherWorkspaces: boolean;
+  workspacesUnreadCounts: Record<string, number>;
+  focusMode?: 'deepWork' | 'noDistraction';
 };
 
 const WorkspaceManager: FC<StateProps> = ({
@@ -33,6 +37,8 @@ const WorkspaceManager: FC<StateProps> = ({
   allWorkspaces,
   currentWorkspace,
   excludeOtherWorkspaces,
+  workspacesUnreadCounts,
+  focusMode,
 }) => {
   const {
     openWorkspaceCreator,
@@ -56,16 +62,53 @@ const WorkspaceManager: FC<StateProps> = ({
     setExcludeOtherWorkspacesAction({ excludeOtherWorkspaces: !excludeOtherWorkspaces });
   }, [excludeOtherWorkspaces, setExcludeOtherWorkspacesAction]);
 
-  const renderTrigger = useCallback(({ onTrigger, isOpen }: { onTrigger: () => void; isOpen?: boolean }) => (
-    <div
-      key={currentWorkspace.id}
-      onClick={onTrigger}
-      className={buildClassName('WorkspaceManager-trigger', isOpen && 'active')}
-    >
-      <WorkspaceAvatar workspace={currentWorkspace} currentUser={currentUser} size="tiny" />
-      {currentWorkspace.name}
-    </div>
-  ), [currentWorkspace, currentUser]);
+  const renderTrigger = useCallback(({ onTrigger, isOpen }: { onTrigger: () => void; isOpen?: boolean }) => {
+    const hasUnreadInOtherWorkspaces = Object.entries(workspacesUnreadCounts).some(
+      ([workspaceId, unreadCount]) => workspaceId !== currentWorkspace.id && unreadCount > 0
+    );
+    const shouldShowIndicator = hasUnreadInOtherWorkspaces && focusMode !== 'deepWork';
+
+    return (
+      <div
+        key={currentWorkspace.id}
+        onClick={onTrigger}
+        className={buildClassName('WorkspaceManager-trigger', isOpen && 'active')}
+      >
+        <div className="WorkspaceManager-trigger-avatar">
+          <WorkspaceAvatar workspace={currentWorkspace} currentUser={currentUser} size="tiny" />
+          {shouldShowIndicator && (
+            <div className="WorkspaceManager-trigger-badge" />
+          )}
+        </div>
+        {currentWorkspace.name}
+      </div>
+    );
+  }, [currentWorkspace, currentUser, workspacesUnreadCounts, focusMode]);
+
+  const renderWorkspaceItem = useCallback((workspace: Workspace) => {
+    const unreadCount = workspacesUnreadCounts[workspace.id];
+    const isOtherWorkspace = workspace.id !== currentWorkspace.id;
+    const shouldShowBadge = unreadCount > 0 && isOtherWorkspace && focusMode !== 'deepWork';
+
+    return (
+      <MenuItem
+        key={workspace.id}
+        onClick={() => handleWorkspaceSelect(workspace)}
+        className="WorkspaceManager-workspace"
+        customIcon={<WorkspaceAvatar workspace={workspace} currentUser={currentUser} size="mini" />}
+      >
+        <div className="WorkspaceManager-workspace-content">
+          <span className="WorkspaceManager-workspace-name">{workspace.name}</span>
+          <div className="WorkspaceManager-workspace-right">
+            {shouldShowBadge && (
+              <UnreadBadge count={unreadCount} />
+            )}
+            {workspace.id === currentWorkspace.id && <Icon name="check" />}
+          </div>
+        </div>
+      </MenuItem>
+    );
+  }, [currentWorkspace.id, currentUser, handleWorkspaceSelect, workspacesUnreadCounts, focusMode]);
 
   return (
     <DropdownMenu
@@ -73,17 +116,7 @@ const WorkspaceManager: FC<StateProps> = ({
       trigger={renderTrigger}
       positionX="left"
     >
-      {allWorkspaces.map((workspace) => (
-        <MenuItem
-          key={workspace.id}
-          onClick={() => handleWorkspaceSelect(workspace)}
-          className="WorkspaceManager-workspace"
-          customIcon={<WorkspaceAvatar workspace={workspace} currentUser={currentUser} size="mini" />}
-        >
-          {workspace.name}
-          {workspace.id === currentWorkspace.id && <Icon name="check" />}
-        </MenuItem>
-      ))}
+      {allWorkspaces.map(renderWorkspaceItem)}
       <MenuSeparator />
       <MenuItem
         icon="add"
@@ -117,11 +150,20 @@ const WorkspaceManager: FC<StateProps> = ({
 
 export default memo(withGlobal(
   (global): StateProps => {
+    const allWorkspaces = selectWorkspaces(global);
+    const workspacesUnreadCounts: Record<string, number> = {};
+
+    allWorkspaces.forEach((workspace) => {
+      workspacesUnreadCounts[workspace.id] = selectWorkspaceUnreadUnmutedChatsCount(global, workspace);
+    });
+
     return {
       currentUser: selectUser(global, global.currentUserId!),
-      allWorkspaces: selectWorkspaces(global),
+      allWorkspaces,
       currentWorkspace: selectCurrentWorkspace(global),
       excludeOtherWorkspaces: selectExcludeOtherWorkspaces(global),
+      workspacesUnreadCounts,
+      focusMode: global.focusMode,
     };
   },
 )(WorkspaceManager));
