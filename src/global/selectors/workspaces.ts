@@ -1,7 +1,7 @@
 import type { GlobalState } from '../types';
 import type { Workspace } from '../../types';
 
-import { getOrderedIds } from '../../util/folderManager';
+import { getOrderedIds, getUnreadCounters } from '../../util/folderManager';
 import { getIsChatMuted } from '../helpers/notifications';
 import { selectChat } from './chats';
 import { selectNotifyDefaults, selectNotifyException } from './settings';
@@ -54,29 +54,13 @@ export function selectWorkspaceUnreadUnmutedChatsCount<T extends GlobalState>(
     return 0;
   }
 
-  const notifyDefaults = selectNotifyDefaults(global);
+  const unreadCounters = getUnreadCounters();
   let count = 0;
 
   for (const folderId of workspace.foldersIds) {
-    const orderedIds = getOrderedIds(folderId);
-    if (!orderedIds) continue;
-
-    for (const chatId of orderedIds) {
-      const chat = selectChat(global, chatId);
-      if (!chat) continue;
-
-      const hasUnread = Boolean(
-        chat.unreadCount
-        || chat.unreadMentionsCount
-        || chat.hasUnreadMark,
-      );
-
-      if (!hasUnread) continue;
-
-      const isMuted = getIsChatMuted(chat, notifyDefaults, selectNotifyException(global, chatId));
-      if (!isMuted) {
-        count++;
-      }
+    const folderCounters = unreadCounters[folderId];
+    if (folderCounters) {
+      count += folderCounters.unmutedChatsCount;
     }
   }
 

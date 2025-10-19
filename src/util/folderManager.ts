@@ -97,6 +97,7 @@ let results: {
   unreadCountersByFolderId: Record<string, {
     chatsCount: number;
     notificationsCount: number;
+    unmutedChatsCount: number;
   } | undefined>;
   unreadChatIdsByFolderId: Record<string, string[] | undefined>;
 } = initials.results;
@@ -819,6 +820,8 @@ function buildFolderUnreadCounters(folderId: number) {
       }
 
       if (!chatSummary.isMuted) {
+        newUnreadCounters.unmutedChatsCount++;
+        
         if (chatSummary.unreadCount) {
           newUnreadCounters.notificationsCount += chatSummary.unreadCount;
         } else if (!chatSummary.unreadMentionsCount) {
@@ -831,6 +834,7 @@ function buildFolderUnreadCounters(folderId: number) {
   }, {
     chatsCount: 0,
     notificationsCount: 0,
+    unmutedChatsCount: 0,
   });
 }
 
